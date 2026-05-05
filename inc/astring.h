@@ -1,0 +1,100 @@
+/*
+ * Copyright (c) 2026 Atlan
+ * GPLv3
+ */
+
+#ifndef __astring_h__
+#define __astring_h__
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+#include "alib.h"
+
+typedef struct AString AString;
+typedef struct A_FUNC(AString) A_FUNC(AString);
+
+struct AString{
+    const A_FUNC(AString)* f;
+    bool noLiteral;     //是否为字面量, false指向字面量
+    uint32_t number;    //字符数量，不包括\0
+    uint32_t capacity;
+    char* s;
+};
+
+struct A_FUNC(AString){
+    bool    flag;
+    void (*const rm)(AString* self, uint32_t index);
+    void (*const ins)(AString* self, uint32_t index, char c);
+    void (*const pushBack)(AString* self, char c);
+    void (*const pushFront)(AString* self, char c);
+    char (*const popBack)(AString* self);
+    char (*const popFront)(AString* self);
+    /* 拼接字符串*/
+    void (*const addBack)(AString* self, AString that);
+    void (*const addFront)(AString* self, AString that);
+    /* 截断字符串，仅保留前index个字符*/
+    void  (*const truncate)(AString* self, uint32_t index);
+
+    uint32_t (*const getNumber)(const AString* self);
+    uint32_t (*const getCapacity)(const AString* self);
+    bool (*const empty)(const AString* self);
+};
+
+void AString_rm(AString* self, uint32_t index);
+void AString_ins(AString* self, uint32_t index, char c);
+void AString_pushBack(AString* self, char c);
+void AString_pushFront(AString* self, char c);
+char AString_popBack(AString* self);
+char AString_popFront(AString* self);
+void AString_addBack(AString* self, AString that);
+void AString_addFront(AString* self, AString that);
+void  AString_truncate(AString* self, uint32_t index);
+
+__unused static uint32_t AString_getNumber(const AString* self){
+    return self->number;
+}
+__unused static uint32_t AString_getCapacity(const AString* self){
+    return self->capacity;
+}
+__unused static bool AString_empty(const AString* self){
+    return self->number == 0;
+}
+
+static const A_FUNC(AString) A_FUNC_TAB(AString) = {
+    true,
+    AString_rm,
+    AString_ins,
+    AString_pushBack,
+    AString_pushFront,
+    AString_popBack,
+    AString_popFront,
+    AString_addBack,
+    AString_addFront,
+    AString_truncate,
+    AString_getNumber,
+    AString_getCapacity,
+    AString_empty,
+};
+
+A_TYPE_REGISTER(AString);
+
+/* 将字面量转换为AString */
+static inline AString AString_new(char* s){
+    return  (AString){
+        .f = &A_FUNC_TAB(AString),
+        .number = s ? strlen(s) : 0,
+        .noLiteral = false,
+        .capacity = 0,
+        .s = s,
+    };
+}
+
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
+#endif
+
