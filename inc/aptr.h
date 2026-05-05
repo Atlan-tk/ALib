@@ -69,5 +69,5 @@ extern "C" {
 }
 #endif /* __cplusplus */
 
-#endif /*__aline_h__*/
+#endif /*__aptr_h__*/
 
