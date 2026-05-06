@@ -44,7 +44,7 @@ extern "C" {
     };                                                                                                      \
 
 #define AClass_Generate(T, ...)                                                                             \
-    __weak A_FUNC(T) A_FUNC_TAB(T) = { false, __VA_ARGS__ };                                                \
+    __weak A_FUNC(T) A_FUNC_TAB(T) = { { false }, __VA_ARGS__ };                                            \
 
 #define A_CLASS_REGISTER(T)                                                                                 \
     void A_SET_VTAB(T)(T* self);                                                                            \
@@ -103,7 +103,7 @@ extern "C" {
         __A_OBJ_COPY_FUNC_BASE(T)((void*)self, (const void*)that); self->f = f;                             \
                                                                                                             \
         if(__a_unlikely(!flag)){                                                                            \
-            memcpy((void*)f, bf, sizeof(__A_FUNC_TAB_BASE(T)));                                             \
+            memcpy((void*)f, bf, sizeof(__A_FUNC_BASE(T)));                                                 \
             if(__A_SET_VTAB(T) != nullptr) __A_SET_VTAB(T)(self);                                           \
         }                                                                                                   \
                                                                                                             \

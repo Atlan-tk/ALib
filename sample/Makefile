@@ -1,9 +1,14 @@
 
-CC := gcc
+CC ?= gcc
 
-WORK := ..
+WORK ?= ..
+ROOT_DIR := $(abspath $(WORK))
+LOCAL_INCLUDE_DIR := $(ROOT_DIR)/.local/include
+LOCAL_INCLUDE_LINK := $(LOCAL_INCLUDE_DIR)/alib
+LIB_TARGET := $(ROOT_DIR)/libatlan.a
 
-CFLAGS := -std=c11 -Wall -Wextra -Werror -g -O0 -I.
+CPPFLAGS += -I$(LOCAL_INCLUDE_DIR)
+CFLAGS ?= -std=c11 -Wall -Wextra -Werror -g -O0
 
 SRC :=             	\
     sample_type.c   \
@@ -14,18 +19,24 @@ HEAD :=				\
 
 OUT := $(SRC:.c=.out)
 
-LIB := atlan
-
 all: $(OUT)
 
-%.out: %.c $(HEAD)
-	$(CC) $(CFLAGS) $< -l$(LIB) -o $@
+$(LIB_TARGET): FORCE
+	$(MAKE) -C $(ROOT_DIR) $(notdir $@)
+
+$(LOCAL_INCLUDE_LINK): FORCE
+	mkdir -p $(LOCAL_INCLUDE_DIR)
+	ln -snf $(ROOT_DIR)/inc $@
+
+%.out: %.c $(HEAD) $(LIB_TARGET) | $(LOCAL_INCLUDE_LINK)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $< $(LIB_TARGET)
 
 # Clean target
 clean:
 	rm -rf $(OUT)
 
 # Phony targets
-.PHONY: all clean
+.PHONY: all clean FORCE
 
+FORCE:
 
