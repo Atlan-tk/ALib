@@ -4,28 +4,35 @@
  */
 
 #include <alib.h>
+#include <stddef.h>
 #include <stdlib.h>
 
 /* __a_ref_count */
+/* Keep the payload naturally aligned even after the ref-count header. */
+typedef union {
+    atomic_size_t ref_count;
+    max_align_t payload_align;
+} __a_ref_count_head;
+
 /* 初始化计数为1 */
-static inline void __a_ref_count_set(atomic_size_t* ref_count){
-    atomic_store_explicit(ref_count, 1, memory_order_relaxed);
+static inline void __a_ref_count_set(__a_ref_count_head* ref_head){
+    atomic_store_explicit(&ref_head->ref_count, 1, memory_order_relaxed);
 }
-__unused static inline bool __a_ref_count_valid(atomic_size_t* ref_count){
-    return atomic_load_explicit(ref_count, memory_order_relaxed) >= 1;
+__unused static inline bool __a_ref_count_valid(__a_ref_count_head* ref_head){
+    return atomic_load_explicit(&ref_head->ref_count, memory_order_relaxed) >= 1;
 }
 /* 返回为真则自增成功 */
-static inline bool __a_ref_count_add(atomic_size_t* ref_count){
-    if(__a_unlikely(atomic_fetch_add(ref_count, 1) > 0)){
+static inline bool __a_ref_count_add(__a_ref_count_head* ref_head){
+    if(__a_unlikely(atomic_fetch_add(&ref_head->ref_count, 1) > 0)){
         return true;
     }else{
-        atomic_store(ref_count, 0);
+        atomic_store(&ref_head->ref_count, 0);
     }
     return false;
 }
 /* 返回为真则可释放 */
-static inline bool __a_ref_count_sub(atomic_size_t* ref_count){
-    if(__a_unlikely(atomic_fetch_sub(ref_count, 1) == 1)){
+static inline bool __a_ref_count_sub(__a_ref_count_head* ref_head){
+    if(__a_unlikely(atomic_fetch_sub(&ref_head->ref_count, 1) == 1)){
         return true;
     }
     return false;
@@ -70,13 +77,13 @@ __unused __weak void  alib_delete(void* p, void(*dest_func)(void*)){
 
 __unused __weak void* alib_ref_new(uint32_t size, void(*init_func)(void*)){
     aExcClean();
-    atomic_size_t* ref_count = alib_alloc(size + sizeof(atomic_size_t));
-    if(__a_likely(ref_count != nullptr)){
-        void* p = ref_count + 1;
-        __a_ref_count_set(ref_count);
+    __a_ref_count_head* ref_head = alib_alloc(size + sizeof(__a_ref_count_head));
+    if(__a_likely(ref_head != nullptr)){
+        void* p = ref_head + 1;
+        __a_ref_count_set(ref_head);
         if(__a_likely(init_func != nullptr)) init_func(p);
         if(aExcOccur()){
-            alib_free(ref_count); p = nullptr;
+            alib_free(ref_head); p = nullptr;
         }
         return p;
     }
@@ -85,13 +92,13 @@ __unused __weak void* alib_ref_new(uint32_t size, void(*init_func)(void*)){
 }
 __unused void* alib_ref_new_for_copy(uint32_t size, const void* that, void(*copy_func)(void*, const void*)){
     aExcClean();
-    atomic_size_t* ref_count = alib_alloc(size + sizeof(atomic_size_t));
-    if(__a_likely(ref_count != nullptr)){
-        void* p = ref_count + 1;
-        __a_ref_count_set(ref_count);
+    __a_ref_count_head* ref_head = alib_alloc(size + sizeof(__a_ref_count_head));
+    if(__a_likely(ref_head != nullptr)){
+        void* p = ref_head + 1;
+        __a_ref_count_set(ref_head);
         if(__a_likely(copy_func != nullptr)) copy_func(p, that);
         if(aExcOccur()){
-            alib_free(ref_count); p = nullptr;
+            alib_free(ref_head); p = nullptr;
         }
         return p;
     }
@@ -100,17 +107,17 @@ __unused void* alib_ref_new_for_copy(uint32_t size, const void* that, void(*copy
 }
 __unused __weak void  alib_ref_delete(void* p, void(*dest_func)(void*)){
     if(__a_likely(p != nullptr)){
-        atomic_size_t* ref_count = p; ref_count--;
-        if(__a_ref_count_sub(ref_count)){
+        __a_ref_count_head* ref_head = p; ref_head--;
+        if(__a_ref_count_sub(ref_head)){
             if(__a_likely(dest_func != nullptr)) dest_func(p);
-            alib_free(ref_count);
+            alib_free(ref_head);
         }
     }
 };
 __unused __weak void* alib_ref_copy(void* p){
     if(__a_likely(p != nullptr)){
-        atomic_size_t* ref_count = p; ref_count--;
-        if(__a_ref_count_add(ref_count)){
+        __a_ref_count_head* ref_head = p; ref_head--;
+        if(__a_ref_count_add(ref_head)){
             return p;
         }
     }
@@ -169,4 +176,3 @@ uint32_t A_OBJ_HASH(astr_t)(const astr_t* self){
 
 /* exception handling */
 thread_local int __A_EXC_VALUE__ = 0;
-

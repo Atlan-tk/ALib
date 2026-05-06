@@ -1012,7 +1012,7 @@ own.f->addBack(&own, &lit);
 
 `AShPtr(T)` 基于引用计数内存块：
 
-- 初始化时分配 `[ref_count][payload]`
+- 初始化时分配一个按 `max_align_t` 对齐的引用计数头，再跟随 payload
 - 拷贝时增加引用计数
 - 析构时减少计数，归零后释放
 
