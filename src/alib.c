@@ -8,14 +8,14 @@
 
 /* __a_ref_count */
 /* 初始化计数为1 */
-static inline void __a_ref_count_set(atomic_int* ref_count){
+static inline void __a_ref_count_set(atomic_size_t* ref_count){
     atomic_store_explicit(ref_count, 1, memory_order_relaxed);
 }
-__unused static inline bool __a_ref_count_valid(atomic_int* ref_count){
+__unused static inline bool __a_ref_count_valid(atomic_size_t* ref_count){
     return atomic_load_explicit(ref_count, memory_order_relaxed) >= 1;
 }
 /* 返回为真则自增成功 */
-static inline bool __a_ref_count_add(atomic_int* ref_count){
+static inline bool __a_ref_count_add(atomic_size_t* ref_count){
     if(__a_unlikely(atomic_fetch_add(ref_count, 1) > 0)){
         return true;
     }else{
@@ -24,7 +24,7 @@ static inline bool __a_ref_count_add(atomic_int* ref_count){
     return false;
 }
 /* 返回为真则可释放 */
-static inline bool __a_ref_count_sub(atomic_int* ref_count){
+static inline bool __a_ref_count_sub(atomic_size_t* ref_count){
     if(__a_unlikely(atomic_fetch_sub(ref_count, 1) == 1)){
         return true;
     }
@@ -40,16 +40,24 @@ __unused __weak void* alib_realloc(void* p, uint32_t size){
     return realloc(p, size);
 }
 __unused __weak void* alib_new(uint32_t size, void(*init_func)(void*)){
+    aExcClean();
     void* p = alib_alloc(size);
     if(__a_likely(p != nullptr && init_func != nullptr)){
         init_func(p);
+        if(aExcOccur()){
+            alib_free(p); p = nullptr;
+        }
     }
     return p;
 }
 __unused void* alib_new_for_copy(uint32_t size, const void* that, void(*copy_func)(void*, const void*)){
+    aExcClean();
     void* p = alib_alloc(size);
     if(__a_likely(p != nullptr && copy_func != nullptr)){
         copy_func(p, that);
+        if(aExcOccur()){
+            alib_free(p); p = nullptr;
+        }
     }
     return p;
 }
@@ -61,22 +69,30 @@ __unused __weak void  alib_delete(void* p, void(*dest_func)(void*)){
 }
 
 __unused __weak void* alib_ref_new(uint32_t size, void(*init_func)(void*)){
-    atomic_int* ref_count = alib_alloc(size + sizeof(atomic_int));
+    aExcClean();
+    atomic_size_t* ref_count = alib_alloc(size + sizeof(atomic_size_t));
     if(__a_likely(ref_count != nullptr)){
         void* p = ref_count + 1;
         __a_ref_count_set(ref_count);
         if(__a_likely(init_func != nullptr)) init_func(p);
+        if(aExcOccur()){
+            alib_free(ref_count); p = nullptr;
+        }
         return p;
     }
 
     return nullptr;
 }
 __unused void* alib_ref_new_for_copy(uint32_t size, const void* that, void(*copy_func)(void*, const void*)){
-    atomic_int* ref_count = alib_alloc(size + sizeof(atomic_int));
+    aExcClean();
+    atomic_size_t* ref_count = alib_alloc(size + sizeof(atomic_size_t));
     if(__a_likely(ref_count != nullptr)){
         void* p = ref_count + 1;
         __a_ref_count_set(ref_count);
         if(__a_likely(copy_func != nullptr)) copy_func(p, that);
+        if(aExcOccur()){
+            alib_free(ref_count); p = nullptr;
+        }
         return p;
     }
 
@@ -84,7 +100,7 @@ __unused void* alib_ref_new_for_copy(uint32_t size, const void* that, void(*copy
 }
 __unused __weak void  alib_ref_delete(void* p, void(*dest_func)(void*)){
     if(__a_likely(p != nullptr)){
-        atomic_int* ref_count = p; ref_count--;
+        atomic_size_t* ref_count = p; ref_count--;
         if(__a_ref_count_sub(ref_count)){
             if(__a_likely(dest_func != nullptr)) dest_func(p);
             alib_free(ref_count);
@@ -93,7 +109,7 @@ __unused __weak void  alib_ref_delete(void* p, void(*dest_func)(void*)){
 };
 __unused __weak void* alib_ref_copy(void* p){
     if(__a_likely(p != nullptr)){
-        atomic_int* ref_count = p; ref_count--;
+        atomic_size_t* ref_count = p; ref_count--;
         if(__a_ref_count_add(ref_count)){
             return p;
         }

@@ -31,7 +31,7 @@ typedef struct{
     uint32_t num;
     uint32_t size;
     void(*dest)(void*);
-    int (*copy)(void*,const void*);
+    void(*copy)(void*,const void*);
     int (*cmpd)(const void*,const void*);
     int (*cmpd_k)(const void*,const void*);
 }__Atree;
@@ -110,11 +110,11 @@ void      __Atree_take(__Atree* tree, void* data);
     static inline void __Atrf(TK,TV,data_dest)(__Atr_data(TK,TV)* data){                        \
         A_DEST(TK, data->k); A_DEST(TV, data->v);                                               \
     }                                                                                           \
-    static inline int  __Atrf(TK,TV,data_copy)(__Atr_data(TK,TV)* data,                         \
+    static inline void __Atrf(TK,TV,data_copy)(__Atr_data(TK,TV)* data,                         \
             const __Atr_data(TK,TV)* that_data){                                                \
-        aExcClean();                                                                            \
-        data->k = A_COPY(TK, that_data->k); if(!aExcOccur()){ data->v=A_COPY(TV,that_data->v); }\
-        return aExcGet();                                                                       \
+        data->k = A_COPY(TK, that_data->k);                                                     \
+        if(!aExcOccur()){ data->v=A_COPY(TV,that_data->v); }                                    \
+        if(aExcOccur()){ A_DEST(TK, data->k); }                                                 \
     }                                                                                           \
     static inline int  __Atrf(TK,TV,data_cmpd)(const __Atr_data(TK,TV)* data,                   \
             const __Atr_data(TK,TV)* that_data){                                                \
@@ -133,6 +133,7 @@ void      __Atree_take(__Atree* tree, void* data);
         __Atree_rm(&self->tree, node);                                                          \
     }                                                                                           \
     static inline void __Atrf(TK,TV,ins)(ATree(TK,TV)* self, const TK k, const TV v){           \
+        aExcClean();                                                                            \
         __AtrNode* node = __Atree_new_node(&self->tree, &(__Atr_data(TK,TV)){.k = k,.v = v});   \
         if(__a_unlikely(node == nullptr)){ aExcSet(AEXC_alloc_failed); return; };               \
         int ret = __Atree_ins(&self->tree, node); if(__a_unlikely(ret != 0)) aExcSet(ret);      \

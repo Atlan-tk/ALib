@@ -28,7 +28,7 @@ typedef struct{
     uint32_t size_k;
 
     void(*dest)(void*);
-    int (*copy)(void*,const void*);
+    void(*copy)(void*,const void*);
     int (*cmpd)(const void*,const void*);
     int (*cmpd_k)(const void*,const void*);
     uint32_t (*hash_func)(const void*);
@@ -41,7 +41,7 @@ int  __Ahash_cmpd(const __Ahash* self, const __Ahash* that);
 
 void*__Ahash_at(const __Ahash* self, const void* k);
 void __Ahash_rm(__Ahash* self, const void* k);
-void __Ahash_ins(__Ahash* self, const void* data);
+void __Ahash_ins(__Ahash* self, void* data);
 void __Ahash_take(__Ahash* self, void* data);
 
 void __Ahash_get_head(const __Ahash* self, __Aiter* it);
@@ -112,11 +112,11 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
     static inline void __Ahsf(TK,TV,data_dest)(__Ahs_data(TK,TV)* data){                        \
         A_DEST(TK, data->k); A_DEST(TV, data->v);                                               \
     }                                                                                           \
-    static inline int  __Ahsf(TK,TV,data_copy)(__Ahs_data(TK,TV)* data,                         \
+    static inline void __Ahsf(TK,TV,data_copy)(__Ahs_data(TK,TV)* data,                         \
             const __Ahs_data(TK,TV)* that_data){                                                \
-        aExcClean();                                                                            \
-        data->k = A_COPY(TK, that_data->k); if(!aExcOccur()){ data->v=A_COPY(TV,that_data->v); }\
-        return aExcGet();                                                                       \
+        data->k = A_COPY(TK, that_data->k);                                                     \
+        if(!aExcOccur()){ data->v=A_COPY(TV,that_data->v); }                                    \
+        if(aExcOccur()){ A_DEST(TK, data->k); }                                                 \
     }                                                                                           \
     static inline int  __Ahsf(TK,TV,data_cmpd)(const __Ahs_data(TK,TV)* data,                   \
             const __Ahs_data(TK,TV)* that_data){                                                \
@@ -134,9 +134,8 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
         __Ahash_rm(&self->hash, (const void*)&k);                                               \
     }                                                                                           \
     static inline void __Ahsf(TK,TV,ins)(AHash(TK,TV)* self, const TK k, const TV v){           \
-        __Ahs_data(TK,TV) data;                                                                 \
-        int ret = __Ahsf(TK,TV,data_copy)(&data, &(__Ahs_data(TK,TV)){ .k = k,.v = v });        \
-        if(__a_unlikely(ret != 0)){ return; }; __Ahash_ins(&self->hash, &data);                 \
+        aExcClean();                                                                            \
+        __Ahs_data(TK,TV) data = {.k = k, .v = v }; __Ahash_ins(&self->hash, &data);            \
     }                                                                                           \
     static inline void __Ahsf(TK,TV,take)(AHash(TK,TV)* self, const TK k, TV* tar){             \
         if(tar != nullptr) memset(tar, 0, sizeof(TV));                                          \

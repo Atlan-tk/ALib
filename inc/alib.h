@@ -224,11 +224,13 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
         if(__A_OBJ_DEST(T) != nullptr) __A_OBJ_DEST(T)(self);                                               \
     }                                                                                                       \
     __unused static inline void __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                         \
+        aExcClean();                                                                                        \
         if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
         memset(self, 0, sizeof(T)); if(__A_OBJ_INIT(T) != nullptr) __A_OBJ_INIT(T)(self);                   \
         if(aExcOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
     }                                                                                                       \
     __unused static inline void __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){                          \
+        aExcClean();                                                                                        \
         if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
         if(__a_unlikely(that == nullptr)) { __A_OBJ_INIT_FUNC_SELF(T)(self); return; }                      \
         memset(self, 0, sizeof(T)); if(__A_OBJ_COPY(T) != nullptr) __A_OBJ_COPY(T)(self, that);             \
@@ -279,7 +281,7 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
         bool:    __A_OBJ_CMPD_X(bool,     (self), (that)),                  \
         float:   __A_OBJ_CMPD_X(float,    (self), (that)),                  \
         double:  __A_OBJ_CMPD_X(double,   (self), (that)),                  \
-        cptr_t:  __A_OBJ_CMPD_X(size_t,   &(self), &(that)),                \
+        cptr_t:  __A_OBJ_CMPD_X(size_t,   (self), (that)),                  \
         cstr_t:  strcmp(*(cstr_t*)(self), *(cstr_t*)(that)),                \
         astr_t:  strcmp(*(cstr_t*)(self), *(cstr_t*)(that)),                \
         default: memcmp((self), (that), sizeof(T))                          \

@@ -45,7 +45,7 @@ extern "C" {
 
 #define AClass_Generate(T, ...)                                                                             \
     __weak A_FUNC(T) A_FUNC_TAB(T) = { false, __VA_ARGS__ };                                                \
-    
+
 #define A_CLASS_REGISTER(T)                                                                                 \
     void A_SET_VTAB(T)(T* self);                                                                            \
     void A_OBJ_DEST(T)(T* self);                                                                            \
@@ -77,6 +77,7 @@ extern "C" {
         __A_OBJ_DEST_FUNC_BASE(T)((__A_CLASS_BASE(T)*)self);                                                \
     }                                                                                                       \
     __unused static inline void __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                         \
+        aExcClean();                                                                                        \
         if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
                                                                                                             \
         A_FUNC(T)* f = (void*)&A_FUNC_TAB(T); __A_FUNC_BASE(T)* bf = (void*)__A_FUNC_TAB_BASE(T);           \
@@ -84,7 +85,7 @@ extern "C" {
         __A_OBJ_INIT_FUNC_BASE(T)((void*)self); self->f = f;                                                \
                                                                                                             \
         if(__a_unlikely(!flag)){                                                                            \
-            memcpy((void*)f, bf, sizeof(__A_FUNC_TAB_BASE(T)));                                             \
+            memcpy((void*)f, bf, sizeof(__A_FUNC_BASE(T)));                                                 \
             if(__A_SET_VTAB(T) != nullptr) __A_SET_VTAB(T)(self);                                           \
         }                                                                                                   \
                                                                                                             \
@@ -92,6 +93,7 @@ extern "C" {
         if(aExcOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
     }                                                                                                       \
     __unused static inline void __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){                          \
+        aExcClean();                                                                                        \
         if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
                                                                                                             \
         if(that == nullptr){ __A_OBJ_INIT_FUNC_SELF(T)(self); return; }                                     \
@@ -111,7 +113,7 @@ extern "C" {
             __A_OBJ_COPY(T)(self, that);                                                                    \
         }else{                                                                                              \
             uint32_t size_self = sizeof(T); uint32_t size_base = sizeof(__A_CLASS_BASE(T));                 \
-            memcpy(((char*)self) + size_base, ((const char*)that) + size_base, size_self);                  \
+            memcpy(((char*)self) + size_base, ((const char*)that) + size_base, size_self - size_base);      \
         }                                                                                                   \
                                                                                                             \
         if(aExcOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
@@ -186,7 +188,7 @@ __unused static inline void A_SET_VTAB(Atlan)(__unused Atlan* self){}
 __unused static inline void __A_OBJ_DEST_FUNC_SELF(Atlan)(__unused Atlan* self){}
 __unused static inline void __A_OBJ_INIT_FUNC_SELF(Atlan)(Atlan* self){
     if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }
-    self->f = &A_FUNC_TAB(Atlan); 
+    self->f = &A_FUNC_TAB(Atlan);
 }
 __unused static inline void __A_OBJ_COPY_FUNC_SELF(Atlan)(Atlan* self, const Atlan* that){
     if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }

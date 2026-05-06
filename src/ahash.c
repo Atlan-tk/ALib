@@ -151,7 +151,7 @@ static inline int __Ahash_reHash(__Ahash* hash){
     hash->bucket_num = cap;
     return 0;
 }
-static inline int __Ahash_add(__Ahash* hash, const void* obj){
+static inline int __Ahash_add(__Ahash* hash, void* obj){
     uint32_t obj_size = hash->size;
     uint32_t hv = hash_func(hash, obj, hash->bucket_num);
     __AhsBucket* bt = __Ahash_at_bt(hash, hv);
@@ -162,8 +162,16 @@ static inline int __Ahash_add(__Ahash* hash, const void* obj){
         //已存在
         char* element = __AhsBucket_at(bt, obj_size, y);
         if(__a_likely(element != nullptr)){
-            hash->dest(element); memcpy(element, obj, obj_size);
-            return 0;
+            char buf[obj_size]; memset(buf, 0, obj_size);
+            memcpy(buf, element, obj_size);
+            hash->copy(element, obj);
+            if(aExcOccur()){
+                memcpy(element, buf, obj_size);
+                return aExcGet();
+            }else{
+                hash->dest(buf);
+                return 0;
+            }
         }
     }
 
@@ -172,10 +180,14 @@ static inline int __Ahash_add(__Ahash* hash, const void* obj){
     if(__a_unlikely(element == nullptr)){
         return AEXC_alloc_failed;
     }
-    memcpy(element, obj, obj_size);
-    hash->num++;
-
-    return 0;
+    hash->copy(element, obj);
+    if(aExcOccur()){
+        __AhsBucket_rm(bt, obj_size, bt->num - 1);
+        return aExcGet();
+    }else{
+        hash->num++;
+        return 0;
+    }
 }
 static inline int __Ahash_del(__Ahash* hash, const void* k){
     uint32_t obj_size = hash->size;
@@ -235,10 +247,18 @@ void __Ahash_rm(__Ahash* hash, const void* k){
         aExcSet(AEXC_overstep);
     }
 }
-void __Ahash_ins(__Ahash* hash, const void* data){
+void __Ahash_ins(__Ahash* hash, void* data){
     int ret = __Ahash_reCap(hash);
-    if(__a_likely(ret == 0)) ret = __Ahash_add(hash, data);
-    if(__a_unlikely(ret != 0)) aExcSet(ret);
+    if(__a_unlikely(ret != 0)){
+        aExcSet(ret);
+        return;
+    }
+
+    ret = __Ahash_add(hash, data);
+
+    if(__a_unlikely(ret != 0)){
+        aExcSet(ret);
+    }
 }
 
 void __Ahash_take(__Ahash* hash, void* data){
@@ -451,8 +471,11 @@ int __Ahash_copy(__Ahash* self, const __Ahash* that){
                 return AEXC_alloc_failed;
             }
 
-            int ret = self->copy(element_self, element_that);
-            if(ret != 0) return ret;
+            self->copy(element_self, element_that);
+            if(aExcOccur()){
+                __AhsBucket_rm(bt_self, self->size, bt_self->num - 1);
+                return aExcGet();
+            }
             self->num++;
         }
     }

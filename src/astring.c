@@ -151,46 +151,68 @@ char AString_popFront(AString* self) {
 }
 
 void AString_addBack(AString* self, AString that) {
+    bool flag = false;
+    if(self->s == that.s){
+        that = A_COPY(AString, that);
+        flag = true;
+    }
+
     if(__a_unlikely(that.number == 0)){
+        if(flag) A_DEST(AString, that);
         return;
     }
 
     int ret = AString_ensure_writable(self);
     if(ret != 0){
         aExcSet(AEXC_alloc_failed);
+        if(flag) A_DEST(AString, that);
         return;
     }
 
     ret = AString_grow(self, self->number + that.number + 1);
     if(ret != 0){
         aExcSet(AEXC_alloc_failed);
+        if(flag) A_DEST(AString, that);
         return;
     }
 
     memcpy(self->s + self->number, that.s, that.number + 1);
     self->number += that.number;
+
+    if(flag) A_DEST(AString, that);
 }
 
 void AString_addFront(AString* self, AString that) {
+    bool flag = false;
+    if(self->s == that.s){
+        that = A_COPY(AString, that);
+        flag = true;
+    }
+
     if(__a_unlikely(that.number == 0)){
+        if(flag) A_DEST(AString, that);
         return;
     }
 
     int ret = AString_ensure_writable(self);
     if(ret != 0){
         aExcSet(AEXC_alloc_failed);
+        if(flag) A_DEST(AString, that);
         return;
     }
 
     ret = AString_grow(self, self->number + that.number + 1);
     if(ret != 0){
         aExcSet(AEXC_alloc_failed);
+        if(flag) A_DEST(AString, that);
         return;
     }
 
     memmove(self->s + that.number, self->s, self->number + 1);
     memcpy(self->s, that.s, that.number);
     self->number += that.number;
+
+    if(flag) A_DEST(AString, that);
 }
 
 void AString_truncate(AString* self, uint32_t index) {

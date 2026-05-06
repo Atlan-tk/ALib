@@ -130,7 +130,8 @@ __AtrNode* __Atree_new_node(__Atree* tree, const void* data){
     memset(node, 0, sizeof(__AtrNode));
 
     __AtrNode_set_red(node);
-    if(tree->copy(__AtrNode_get_data(node), data) != 0){
+    tree->copy(__AtrNode_get_data(node), data);
+    if(aExcOccur()){
         alib_free(node); node = nullptr;
     }
     return node;

@@ -62,9 +62,9 @@ int __A2arr_add_cap_front(__A2arr* arr){
         return AEXC_alloc_failed;
     }
 
-    char** src = arr->data + arr->offset;
+    char** src = arr->data != nullptr ? (arr->data + arr->offset) : nullptr;
     char** tar = p + new_offset;
-    memcpy(tar, src, arr->num * obj_size);
+    if(src != nullptr) memcpy(tar, src, arr->num * obj_size);
 
     alib_free(arr->data);
     arr->data = p, arr->cap = cap, arr->offset = new_offset;
