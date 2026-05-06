@@ -49,23 +49,45 @@ __unused __weak void* alib_realloc(void* p, uint32_t size){
 __unused __weak void* alib_new(uint32_t size, void(*init_func)(void*)){
     aExcClean();
     void* p = alib_alloc(size);
-    if(__a_likely(p != nullptr && init_func != nullptr)){
-        init_func(p);
-        if(aExcOccur()){
-            alib_free(p); p = nullptr;
-        }
+
+    if(__a_unlikely(p == nullptr)){
+        if(__a_likely(size != 0))
+            aExcSet(AEXC_alloc_failed);
+        return nullptr;
     }
+
+    if(init_func != nullptr){
+        init_func(p);
+    }else{
+        memset(p, 0, size);
+    }
+
+    if(aExcOccur()){
+        alib_free(p); p = nullptr;
+    }
+
     return p;
 }
 __unused void* alib_new_for_copy(uint32_t size, const void* that, void(*copy_func)(void*, const void*)){
     aExcClean();
     void* p = alib_alloc(size);
-    if(__a_likely(p != nullptr && copy_func != nullptr)){
-        copy_func(p, that);
-        if(aExcOccur()){
-            alib_free(p); p = nullptr;
-        }
+
+    if(__a_unlikely(p == nullptr)){
+        if(__a_likely(size != 0))
+            aExcSet(AEXC_alloc_failed);
+        return nullptr;
     }
+
+    if(copy_func != nullptr){
+        copy_func(p, that);
+    }else{
+        memset(p, 0, size);
+    }
+
+    if(aExcOccur()){
+        alib_free(p); p = nullptr;
+    }
+
     return p;
 }
 __unused __weak void  alib_delete(void* p, void(*dest_func)(void*)){
@@ -78,32 +100,48 @@ __unused __weak void  alib_delete(void* p, void(*dest_func)(void*)){
 __unused __weak void* alib_ref_new(uint32_t size, void(*init_func)(void*)){
     aExcClean();
     __a_ref_count_head* ref_head = alib_alloc(size + sizeof(__a_ref_count_head));
-    if(__a_likely(ref_head != nullptr)){
-        void* p = ref_head + 1;
-        __a_ref_count_set(ref_head);
-        if(__a_likely(init_func != nullptr)) init_func(p);
-        if(aExcOccur()){
-            alib_free(ref_head); p = nullptr;
-        }
-        return p;
+
+    if(__a_unlikely(ref_head == nullptr)){
+        aExcSet(AEXC_alloc_failed);
+        return nullptr;
     }
 
-    return nullptr;
+    void* p = ref_head + 1;
+    __a_ref_count_set(ref_head);
+    if(__a_likely(init_func != nullptr)){
+        init_func(p);
+    }else{
+        memset(p, 0, size);
+    }
+
+    if(aExcOccur()){
+        alib_free(ref_head); p = nullptr;
+    }
+
+    return p;
 }
 __unused void* alib_ref_new_for_copy(uint32_t size, const void* that, void(*copy_func)(void*, const void*)){
     aExcClean();
     __a_ref_count_head* ref_head = alib_alloc(size + sizeof(__a_ref_count_head));
-    if(__a_likely(ref_head != nullptr)){
-        void* p = ref_head + 1;
-        __a_ref_count_set(ref_head);
-        if(__a_likely(copy_func != nullptr)) copy_func(p, that);
-        if(aExcOccur()){
-            alib_free(ref_head); p = nullptr;
-        }
-        return p;
+
+    if(__a_unlikely(ref_head == nullptr)){
+        aExcSet(AEXC_alloc_failed);
+        return nullptr;
     }
 
-    return nullptr;
+    void* p = ref_head + 1;
+    __a_ref_count_set(ref_head);
+    if(__a_likely(copy_func != nullptr)){
+        copy_func(p, that);
+    }else{
+        memset(p, 0, size);
+    }
+
+    if(aExcOccur()){
+        alib_free(ref_head); p = nullptr;
+    }
+
+    return p;
 }
 __unused __weak void  alib_ref_delete(void* p, void(*dest_func)(void*)){
     if(__a_likely(p != nullptr)){

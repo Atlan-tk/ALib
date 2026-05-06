@@ -34,6 +34,9 @@ extern "C" {
         self->p = that->p, self->strong_flag = false;                                   \
     }                                                                                   \
     __unused static int  A_OBJ_CMPD(APtr(T))(const APtr(T)* self,const APtr(T)*that){   \
+        if(self->p == that->p) return 0;                                                \
+        if(self->p == nullptr) return -1;                                               \
+        if(that->p == nullptr) return 1;                                                \
         return A_CMPD(T, *self->p, *that->p);                                           \
     }                                                                                   \
 
@@ -61,6 +64,9 @@ extern "C" {
         self->p = alib_ref_copy(that->p);                                               \
     }                                                                                   \
     __unused static int  A_OBJ_CMPD(AShPtr(T))(const AShPtr(T)* self,const AShPtr(T)*that){   \
+        if(self->p == that->p) return 0;                                                \
+        if(self->p == nullptr) return -1;                                               \
+        if(that->p == nullptr) return 1;                                                \
         return A_CMPD(T, *self->p, *that->p);                                           \
     }                                                                                   \
 

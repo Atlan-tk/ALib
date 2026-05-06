@@ -22,15 +22,15 @@ static inline int AString_ensure_writable(AString* self) {
     uint32_t new_cap = self->number + 1;  /* 至少容纳字符和'\0' */
     new_cap = AString_calCap(new_cap);
 
-
     char* new_s = alib_alloc(new_cap);
     if (__a_unlikely(new_s == nullptr)) {
         return AEXC_alloc_failed;
     }
 
     if(__a_likely(self->s != nullptr)){
-        memcpy(new_s, self->s, self->number + 1);
+        memcpy(new_s, self->s, self->number);
     }
+    new_s[self->number] = '\0';
 
     self->s = new_s;
     self->noLiteral = true;
@@ -125,7 +125,10 @@ char AString_popBack(AString* self) {
         return '\0';
     }
 
-    if(0 != AString_ensure_writable(self)) return '\0';
+    if(0 != AString_ensure_writable(self)){
+        aExcSet(AEXC_alloc_failed);
+        return '\0';
+    }
 
     char c = self->s[self->number - 1];
     self->s[self->number - 1] = '\0';
@@ -140,7 +143,10 @@ char AString_popFront(AString* self) {
         return '\0';
     }
 
-    if(0 != AString_ensure_writable(self)) return '\0';
+    if(0 != AString_ensure_writable(self)){
+        aExcSet(AEXC_alloc_failed);
+        return '\0';
+    }
 
     char c = self->s[0];
     memmove(self->s, self->s + 1, self->number);

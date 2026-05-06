@@ -141,6 +141,20 @@ static inline astr_t astr_new(const char* s){
     return (astr_t){ .s = s, .len = strlen(s) };
 }
 
+static inline int __a_strcmp(const char* s0, const char* s1){
+    if(s0 == s1) return 0;
+    if(s0 == nullptr) return -1;
+    if(s1 == nullptr) return 1;
+    return strcmp(s0, s1);
+}
+
+static inline int __a_memcmp(const void* s0, const void* s1, uint32_t size){
+    if(s0 == s1) return 0;
+    if(s0 == nullptr) return -1;
+    if(s1 == nullptr) return 1;
+    return memcmp(s0, s1, size);
+}
+
 
 
 /* exception handling */
@@ -282,9 +296,9 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
         float:   __A_OBJ_CMPD_X(float,    (self), (that)),                  \
         double:  __A_OBJ_CMPD_X(double,   (self), (that)),                  \
         cptr_t:  __A_OBJ_CMPD_X(size_t,   (self), (that)),                  \
-        cstr_t:  strcmp(*(cstr_t*)(self), *(cstr_t*)(that)),                \
-        astr_t:  strcmp(*(cstr_t*)(self), *(cstr_t*)(that)),                \
-        default: memcmp((self), (that), sizeof(T))                          \
+        cstr_t:  __a_strcmp(*(cstr_t*)(self), *(cstr_t*)(that)),            \
+        astr_t:  __a_strcmp(((astr_t*)(self))->s, ((astr_t*)(that))->s),    \
+        default: __a_memcmp((self), (that), sizeof(T))                      \
 )                                                                           \
 
 #define A_INIT(T)({                                                         \

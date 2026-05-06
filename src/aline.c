@@ -109,6 +109,7 @@ int __Aarr_copy(__Aarr* arr, const __Aarr* that_arr){
 
     uint32_t obj_size = that_arr->size;
     uint32_t num = that_arr->num;
+    if(num == 0) return 0;
 
     char* p = alib_alloc(obj_size * num);
     if(__a_unlikely(p == nullptr)){
