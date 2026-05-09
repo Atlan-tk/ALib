@@ -14,9 +14,6 @@ extern "C" {
 
 /* class system */
 /********************************************************************/
-#define A_SET_VTAB(T)   __A_Splice(T, _vftab)
-#define __A_SET_VTAB(T) __A_Splice(____A_SET_VTAB_$__, T)
-
 #define AClass_Inherit(T, ...)                                                                              \
     static_assert(__aNarg_n(0, ##__VA_ARGS__) <= 1, "Error: Only single inheritance is allowed");           \
     typedef struct T T;                                                                                     \
@@ -47,6 +44,8 @@ extern "C" {
     __weak A_FUNC(T) A_FUNC_TAB(T) = { { false }, __VA_ARGS__ };                                            \
 
 #define A_CLASS_REGISTER(T)                                                                                 \
+    enum{ __A_IS_CLASS(T) = 1 };                                                                            \
+                                                                                                            \
     void A_SET_VTAB(T)(T* self);                                                                            \
     void A_OBJ_DEST(T)(T* self);                                                                            \
     void A_OBJ_INIT(T)(T* self);                                                                            \
@@ -87,6 +86,7 @@ extern "C" {
         if(__a_unlikely(!flag)){                                                                            \
             memcpy((void*)f, bf, sizeof(__A_FUNC_BASE(T)));                                                 \
             if(__A_SET_VTAB(T) != nullptr) __A_SET_VTAB(T)(self);                                           \
+            ((A_FUNC(Atlan)*)f)->dest = (void*)__A_OBJ_DEST_FUNC_SELF(T);                                   \
         }                                                                                                   \
                                                                                                             \
         if(!aExcOccur() && __A_OBJ_INIT(T) != nullptr) __A_OBJ_INIT(T)(self);                               \
@@ -105,6 +105,7 @@ extern "C" {
         if(__a_unlikely(!flag)){                                                                            \
             memcpy((void*)f, bf, sizeof(__A_FUNC_BASE(T)));                                                 \
             if(__A_SET_VTAB(T) != nullptr) __A_SET_VTAB(T)(self);                                           \
+            ((A_FUNC(Atlan)*)f)->dest = (void*)__A_OBJ_DEST_FUNC_SELF(T);                                   \
         }                                                                                                   \
                                                                                                             \
         if(aExcOccur()){ __A_OBJ_DEST_FUNC_SELF(T)(self); return; }                                         \
@@ -128,6 +129,7 @@ extern "C" {
 
 
 #define __AClass_Inherit(T, B, ...)                                                                         \
+    static_assert(__A_IS_CLASS(B) != 0, "Error: The inherited type is not a class");                        \
     typedef B __A_CLASS_BASE(T);                                                                            \
     typedef A_FUNC(B) __A_FUNC_BASE(T);                                                                     \
     static auto __A_FUNC_TAB_BASE(T) = &A_FUNC_TAB(B);                                                      \
@@ -165,37 +167,6 @@ extern "C" {
  *      A_COVER_FUNC(self, B, name, func);
  * }
  */
-
-
-
-/* PRIMITIVE TYPE REGISTER */
-/********************************************************************/
-//Atlan
-typedef struct Atlan Atlan;
-typedef struct A_FUNC(Atlan) A_FUNC(Atlan);
-
-struct Atlan{
-    const A_FUNC(Atlan)* f;
-};
-
-struct A_FUNC(Atlan){
-    bool flag;
-};
-
-static const A_FUNC(Atlan) A_FUNC_TAB(Atlan) = { .flag = true };
-
-__unused static inline void A_SET_VTAB(Atlan)(__unused Atlan* self){}
-__unused static inline void __A_OBJ_DEST_FUNC_SELF(Atlan)(__unused Atlan* self){}
-__unused static inline void __A_OBJ_INIT_FUNC_SELF(Atlan)(Atlan* self){
-    if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }
-    self->f = &A_FUNC_TAB(Atlan);
-}
-__unused static inline void __A_OBJ_COPY_FUNC_SELF(Atlan)(Atlan* self, const Atlan* that){
-    if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }
-    memset(self, 0, sizeof(Atlan)); if(that != nullptr) *self = *that;
-}
-__unused static inline int  __A_OBJ_CMPD_FUNC_SELF(Atlan)(__unused const Atlan* self, __unused const Atlan* that){ return 0; }
-__unused static uint32_t (*const __A_OBJ_HASH(Atlan))(const Atlan* self) = nullptr;
 
 
 

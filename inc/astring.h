@@ -24,7 +24,8 @@ struct AString{
 };
 
 struct A_FUNC(AString){
-    bool    flag;
+    bool flag;
+    void (*dest)(void*);
     void (*const rm)(AString* self, uint32_t index);
     void (*const ins)(AString* self, uint32_t index, char c);
     void (*const pushBack)(AString* self, char c);
@@ -62,8 +63,11 @@ __unused static bool AString_empty(const AString* self){
     return self->number == 0;
 }
 
+A_TYPE_REGISTER(AString);
+
 static const A_FUNC(AString) A_FUNC_TAB(AString) = {
     true,
+    (void*)__A_OBJ_DEST_FUNC_SELF(AString),
     AString_rm,
     AString_ins,
     AString_pushBack,
@@ -77,8 +81,6 @@ static const A_FUNC(AString) A_FUNC_TAB(AString) = {
     AString_getCapacity,
     AString_empty,
 };
-
-A_TYPE_REGISTER(AString);
 
 /* 将字面量转换为AString */
 static inline AString AString_new(char* s){

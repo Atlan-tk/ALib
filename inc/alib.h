@@ -155,7 +155,7 @@ static inline int __a_memcmp(const void* s0, const void* s1, uint32_t size){
     return memcmp(s0, s1, size);
 }
 
-
+__unused static inline void a_class_dest(void* _self);
 
 /* exception handling */
 /********************************************************************/
@@ -216,6 +216,8 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
 /* type system */
 /********************************************************************/
 #define A_TYPE_REGISTER(T)                                                                                  \
+    enum{ __A_IS_CLASS(T) = 0 };                                                                            \
+                                                                                                            \
     void A_OBJ_DEST(T)(T* self);                                                                            \
     void A_OBJ_INIT(T)(T* self);                                                                            \
     void A_OBJ_COPY(T)(T* self, const T* that);                                                             \
@@ -262,93 +264,100 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
 #define __A_OBJ_COPY_FUNC_SELF(T) __A_Splice(__A_OBJ_COPY_FUNC_SELF_$__, T)
 #define __A_OBJ_DEST_FUNC_SELF(T) __A_Splice(__A_OBJ_DEST_FUNC_SELF_$__, T)
 #define __A_OBJ_CMPD_FUNC_SELF(T) __A_Splice(__A_OBJ_CMPD_FUNC_SELF_$__, T)
+#define __A_IS_CLASS(T)           __A_Splice(__A_IS_CLASS_$__, T)
 
 #define A_OBJ_INIT(T) __A_Splice(T, _init)
 #define A_OBJ_DEST(T) __A_Splice(T, _dest)
 #define A_OBJ_COPY(T) __A_Splice(T, _copy)
 #define A_OBJ_CMPD(T) __A_Splice(T, _cmpd)
 #define A_OBJ_HASH(T) __A_Splice(T, _hash)
+#define A_SET_VTAB(T) __A_Splice(T, _vftab)
 
 #define __A_OBJ_INIT(T) __A_Splice(____A_OBJ_INIT_$__, T)
 #define __A_OBJ_DEST(T) __A_Splice(____A_OBJ_DEST_$__, T)
 #define __A_OBJ_COPY(T) __A_Splice(____A_OBJ_COPY_$__, T)
 #define __A_OBJ_CMPD(T) __A_Splice(____A_OBJ_CMPD_$__, T)
 #define __A_OBJ_HASH(T) __A_Splice(____A_OBJ_HASH_$__, T)
+#define __A_SET_VTAB(T) __A_Splice(____A_SET_VTAB_$__, T)
 
-#define __A_OBJ_CMPD_X(T, self, that) ({                                    \
-    const T* __a_p0 = (const void*)self;                                    \
-    const T* __a_p1 = (const void*)that;                                    \
-    int __a_ret = *__a_p0 == *__a_p1 ? 0 : (*__a_p0 > *__a_p1 ? 1 : -1);    \
-    __a_ret;                                                                \
-})                                                                          \
+#define __A_OBJ_CMPD_X(T, self, that) ({                                            \
+    const T* __a_p0 = (const void*)self;                                            \
+    const T* __a_p1 = (const void*)that;                                            \
+    int __a_ret = *__a_p0 == *__a_p1 ? 0 : (*__a_p0 > *__a_p1 ? 1 : -1);            \
+    __a_ret;                                                                        \
+})                                                                                  \
 
-#define __A_OBJ_CMPD_AUTO(T, self, that)                                    \
-    _Generic(*(typeof(T*))0,                                                \
-        int8_t:  __A_OBJ_CMPD_X(int8_t,   (self), (that)),                  \
-        int16_t: __A_OBJ_CMPD_X(int16_t,  (self), (that)),                  \
-        int32_t: __A_OBJ_CMPD_X(int32_t,  (self), (that)),                  \
-        int64_t: __A_OBJ_CMPD_X(int64_t,  (self), (that)),                  \
-        uint8_t: __A_OBJ_CMPD_X(uint8_t,  (self), (that)),                  \
-        uint16_t:__A_OBJ_CMPD_X(uint16_t, (self), (that)),                  \
-        uint32_t:__A_OBJ_CMPD_X(uint32_t, (self), (that)),                  \
-        uint64_t:__A_OBJ_CMPD_X(uint64_t, (self), (that)),                  \
-        bool:    __A_OBJ_CMPD_X(bool,     (self), (that)),                  \
-        float:   __A_OBJ_CMPD_X(float,    (self), (that)),                  \
-        double:  __A_OBJ_CMPD_X(double,   (self), (that)),                  \
-        cptr_t:  __A_OBJ_CMPD_X(size_t,   (self), (that)),                  \
-        cstr_t:  __a_strcmp(*(cstr_t*)(self), *(cstr_t*)(that)),            \
-        astr_t:  __a_strcmp(((astr_t*)(self))->s, ((astr_t*)(that))->s),    \
-        default: __a_memcmp((self), (that), sizeof(T))                      \
-)                                                                           \
+#define __A_OBJ_CMPD_AUTO(T, self, that)                                            \
+    _Generic(*(typeof(T*))0,                                                        \
+        int8_t:  __A_OBJ_CMPD_X(int8_t,   (self), (that)),                          \
+        int16_t: __A_OBJ_CMPD_X(int16_t,  (self), (that)),                          \
+        int32_t: __A_OBJ_CMPD_X(int32_t,  (self), (that)),                          \
+        int64_t: __A_OBJ_CMPD_X(int64_t,  (self), (that)),                          \
+        uint8_t: __A_OBJ_CMPD_X(uint8_t,  (self), (that)),                          \
+        uint16_t:__A_OBJ_CMPD_X(uint16_t, (self), (that)),                          \
+        uint32_t:__A_OBJ_CMPD_X(uint32_t, (self), (that)),                          \
+        uint64_t:__A_OBJ_CMPD_X(uint64_t, (self), (that)),                          \
+        bool:    __A_OBJ_CMPD_X(bool,     (self), (that)),                          \
+        float:   __A_OBJ_CMPD_X(float,    (self), (that)),                          \
+        double:  __A_OBJ_CMPD_X(double,   (self), (that)),                          \
+        cptr_t:  __A_OBJ_CMPD_X(size_t,   (self), (that)),                          \
+        cstr_t:  __a_strcmp(*(cstr_t*)(self), *(cstr_t*)(that)),                    \
+        astr_t:  __a_strcmp(((astr_t*)(self))->s, ((astr_t*)(that))->s),            \
+        default: __a_memcmp((self), (that), sizeof(T))                              \
+)                                                                                   \
 
-#define A_INIT(T)({                                                         \
-    T __a_obj; __A_OBJ_INIT_FUNC_SELF(T)(&__a_obj); __a_obj;                \
-})                                                                          \
+#define A_INIT(T)({                                                                 \
+    T __a_obj; __A_OBJ_INIT_FUNC_SELF(T)(&__a_obj); __a_obj;                        \
+})                                                                                  \
 
-#define A_DEST(T, obj)({                                                    \
-    auto __a_obj = (obj);                                                   \
-    __a_type_assert(T, __a_obj);                                            \
-    T __a_objx = __a_obj; __A_OBJ_DEST_FUNC_SELF(T)(&__a_objx);             \
-})                                                                          \
+#define A_DEST(T, obj)({                                                            \
+    /* 参数 obj 只能为非const的左值 */                                              \
+    auto __a_p = &(obj); __a_type_assert(T, *__a_p);                                \
+    (__A_IS_CLASS(T) != 0) ? a_class_dest(__a_p) : __A_OBJ_DEST_FUNC_SELF(T)(__a_p);\
+})                                                                                  \
 
-#define A_CMPD(T, obj0, obj1)({                                             \
-    auto __a_obj0 = (obj0); auto __a_obj1 = (obj1);                         \
-    __a_type_assert(T, __a_obj0); __a_type_assert(T, __a_obj1);             \
-    __A_OBJ_CMPD_FUNC_SELF(T)(&__a_obj0, &__a_obj1);                        \
-})                                                                          \
+#define A_CMPD(T, obj0, obj1)({                                                     \
+    auto __a_obj0 = (obj0); __a_type_assert(T, __a_obj0);                           \
+    auto __a_obj1 = (obj1); __a_type_assert(T, __a_obj1);                           \
+    __A_OBJ_CMPD_FUNC_SELF(T)(&__a_obj0, &__a_obj1);                                \
+})                                                                                  \
 
-#define A_COPY(T, obj)({                                                    \
-    auto __a_obj = (obj);                                                   \
-    __a_type_assert(T, __a_obj);                                            \
-    T __a_objx; __A_OBJ_COPY_FUNC_SELF(T)(&__a_objx, &__a_obj); __a_objx;   \
-})                                                                          \
+#define A_COPY(T, obj)({                                                            \
+    auto __a_obj = (obj); __a_type_assert(T, __a_obj);                              \
+    T __a_objx; __A_OBJ_COPY_FUNC_SELF(T)(&__a_objx, &__a_obj); __a_objx;           \
+})                                                                                  \
 
-#define A_MOVE(obj)({                                                       \
-    /* 参数 obj 只能为非const的右值 */                                      \
-    auto __a_p = &(obj);                                                    \
-    typeof(*__a_p)__a_obj = *__a_p; memset(__a_p,0,sizeof(*__a_p));__a_obj; \
-})                                                                          \
+#define A_MOVE(obj)({                                                               \
+    /* 参数 obj 只能为非const的左值 */                                              \
+    auto __a_p = &(obj);                                                            \
+    typeof(*__a_p)__a_obj = *__a_p; memset(__a_p,0,sizeof(*__a_p));__a_obj;         \
+})                                                                                  \
+
+/* 右值转为左值 */
+#define A_LEFT(obj) ((typeof(obj)[1]){ (obj) }[1])
 
 
 
 /* raii */
 #define RAII(T) __cleanup(__A_OBJ_DEST_FUNC_SELF(T)) T
 
-#define A_NEW(T) ({                                                         \
-    (T*)alib_new(sizeof(T), (void*)__A_OBJ_INIT_FUNC_SELF(T));              \
-})                                                                          \
+#define A_NEW(T) ({                                                                 \
+    (T*)alib_new(sizeof(T), (void*)__A_OBJ_INIT_FUNC_SELF(T));                      \
+})                                                                                  \
 
-#define A_NEW_COPY(T, obj) ({                                               \
-    auto __a_objx = (obj);                                                  \
-    __a_type_assert(T, __a_objx);                                           \
-    (T*)alib_new_for_copy(sizeof(T),  &__a_objx,                            \
-            (void*)__A_OBJ_COPY_FUNC_SELF(T));                              \
-})                                                                          \
+#define A_NEW_COPY(T, obj) ({                                                       \
+    auto __a_objx = (obj); __a_type_assert(T, __a_objx);                            \
+    (T*)alib_new_for_copy(sizeof(T),  &__a_objx, (void*)__A_OBJ_COPY_FUNC_SELF(T)); \
+})                                                                                  \
 
-#define A_DELETE(T, _p) ({                                                  \
-    auto __a_p = (_p); __a_type_assert(T, *__a_p);                          \
-    alib_delete((_p), (void*)__A_OBJ_DEST_FUNC_SELF(T));                    \
-})                                                                          \
+#define A_DELETE(T, _p) ({                                                          \
+    auto __a_p = (_p); __a_type_assert(T, *__a_p);                                  \
+    if(__A_IS_CLASS(T) != 0){                                                       \
+        alib_delete((_p), (void*)a_class_dest);                                     \
+    }else{                                                                          \
+        alib_delete((_p), (void*)__A_OBJ_DEST_FUNC_SELF(T));                        \
+    }                                                                               \
+})                                                                                  \
 
 //RAII(int) obj = A_INIT(int);
 //return;//自动释放
@@ -356,6 +365,13 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
 //int* obj = A_NEW(int);
 //A_DELETE(int, obj);//堆上对象手动释放
 //return;
+
+
+
+/* function table */
+/********************************************************************/
+#define A_FUNC(T)       __A_Splice(__A_FUNCTION_$__, T)
+#define A_FUNC_TAB(T)   __A_Splice(__A_FUNCTION_$_TAB__, T)
 
 
 
@@ -370,6 +386,7 @@ __unused static inline uint32_t __A_OBJ_HASH(void)(__unused const void* self){ r
 
 //int
 #define __A_PRIMITIVE_TYPE_REGISTER(T)                                                  \
+    enum{ __A_IS_CLASS(T) = 0 };                                                        \
     __unused static void __A_OBJ_DEST_FUNC_SELF(T)(__unused T* self){                   \
     }                                                                                   \
     __unused static void  __A_OBJ_INIT_FUNC_SELF(T)(T* self){                           \
@@ -412,12 +429,53 @@ __A_PRIMITIVE_TYPE_REGISTER(astr_t);
 uint32_t alib_hash(const void* k, uint32_t size_k);
 uint32_t alib_hash_str(const char* k);
 
+//Atlan
+typedef struct Atlan Atlan;
+typedef struct A_FUNC(Atlan) A_FUNC(Atlan);
 
+struct Atlan{
+    const A_FUNC(Atlan)* f;
+};
 
-/* function table */
-/********************************************************************/
-#define A_FUNC(T)       __A_Splice(__A_FUNCTION_$__, T)
-#define A_FUNC_TAB(T)   __A_Splice(__A_FUNCTION_$_TAB__, T)
+struct A_FUNC(Atlan){
+    bool flag;
+    void (*dest)(void*);
+};
+
+static const A_FUNC(Atlan) A_FUNC_TAB(Atlan);
+
+enum{ __A_IS_CLASS(Atlan) = 1 };
+
+__unused static inline void A_SET_VTAB(Atlan)(__unused Atlan* self){}
+
+__unused static inline void __A_OBJ_DEST_FUNC_SELF(Atlan)(__unused Atlan* self){}
+
+__unused static inline void __A_OBJ_INIT_FUNC_SELF(Atlan)(Atlan* self){
+    if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }
+    self->f = &A_FUNC_TAB(Atlan);
+}
+
+__unused static inline void __A_OBJ_COPY_FUNC_SELF(Atlan)(Atlan* self, const Atlan* that){
+    if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }
+    memset(self, 0, sizeof(Atlan)); if(that != nullptr) *self = *that;
+}
+
+__unused static inline int  __A_OBJ_CMPD_FUNC_SELF(Atlan)(const Atlan* self, const Atlan* that){
+    if(self == that || (self == nullptr && that == nullptr)) return 0;
+    if(self == nullptr){ return 1; } if(that == nullptr){ return -1; }
+    return 0;
+}
+
+__unused static uint32_t (*const __A_OBJ_HASH(Atlan))(const Atlan* self) = nullptr;
+
+static const A_FUNC(Atlan) A_FUNC_TAB(Atlan) = { .flag = true, (void*)__A_OBJ_DEST_FUNC_SELF(Atlan) };
+
+__unused static inline void a_class_dest(void* _self){
+    Atlan* self = _self;
+
+    if(self->f != nullptr && self->f->dest != nullptr)
+        self->f->dest(self);
+}
 
 
 

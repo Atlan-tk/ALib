@@ -673,25 +673,11 @@ A_COPY(T, obj)
 A_DEST(T, obj)
 RAII(T)
 A_MOVE(obj)
+A_LEFT(obj)
 ```
 
-其中 `A_DEST(T, obj)` 需要特别注意：
-
-- 它接收的是**对象值**，不是对象指针
-- 它会对 `obj` 的一个临时副本执行析构逻辑，不会自动修改原变量
-- 因此它**不能替代** `A_DELETE(T, p)`；堆对象仍应使用 `A_DELETE`
-- 如果 `obj` 本身还是一个 `RAII(T)` 栈变量，直接写 `A_DEST(T, obj)` 可能导致作用域结束时再次析构同一份资源
-
-更安全的提前释放写法是：
-
-```c
-RAII(AString) s = A_INIT(AString);
-
-/* ... 需要提前释放时 ... */
-A_DEST(AString, A_MOVE(s));
-```
-
-这里 `A_MOVE(s)` 会把当前值移出并将 `s` 置零，从而避免后续 `RAII` 再次析构同一对象。
+其中 `A_DEST(T, obj)` 的参数仅为非const的左值
+其中 `A_MOVE(obj)` 的参数仅为非const的左值
 
 ### 8.2 堆上对象
 

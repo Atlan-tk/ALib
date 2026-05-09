@@ -30,6 +30,7 @@ extern "C" {
                                                                                     \
     struct A_FUNC(AStack(T)){                                                       \
         bool    flag;                                                               \
+        void    (*dest)(void*);                                                     \
         T*      (*const at)       (const AStack(T)* self, uint32_t index);          \
         void    (*const push) (AStack(T)* self, const T obj);                       \
         void    (*const pop)  (AStack(T)* self, T* tar);                            \
@@ -50,9 +51,14 @@ extern "C" {
     static inline AIter(AStack(T)) __Ascf(T, iter_tail)(const AStack(T)* self);     \
     static inline void __Ascf(T, iter_next)(AIter(AStack(T))* it);                  \
     static inline void __Ascf(T, iter_prev)(AIter(AStack(T))* it);                  \
+    static inline void __A_OBJ_DEST_FUNC_SELF(AStack(T))(AStack(T)*);               \
+    static inline void __A_OBJ_INIT_FUNC_SELF(AStack(T))(AStack(T)*);               \
+    static inline void __A_OBJ_COPY_FUNC_SELF(AStack(T))(AStack(T)*, const AStack(T)*);     \
+    static inline int __A_OBJ_CMPD_FUNC_SELF(AStack(T))(const AStack(T)*,const AStack(T)*); \
                                                                                     \
     static const A_FUNC(AStack(T)) A_FUNC_TAB(AStack(T)) = {                        \
         true,                                                                       \
+        (void*)__A_OBJ_DEST_FUNC_SELF(AStack(T)),                                   \
         __Ascf(T,at),                                                               \
         __Ascf(T,pushBack),                                                         \
         __Ascf(T,popBack),                                                          \
@@ -71,7 +77,7 @@ extern "C" {
                                                                                     \
     static inline void __Ascf(T,pushBack)(AStack(T)* self, const T obj){            \
         aExcClean();                                                                \
-        const T objx = A_COPY(T, obj); if(__a_unlikely(aExcOccur())){ return; }     \
+        T objx = A_COPY(T, obj); if(__a_unlikely(aExcOccur())){ return; }           \
         int ret = __Adeq_push_back(&self->deq); uint32_t i = self->deq.num - 1;     \
         if(__a_unlikely(ret != 0)){ aExcSet(ret); A_DEST(T,objx); return; }         \
         *__Ascf(T,at)(self, i) = objx;                                              \

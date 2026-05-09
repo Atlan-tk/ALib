@@ -30,6 +30,7 @@ extern "C" {
                                                                                     \
     struct A_FUNC(AQueue(T)){                                                       \
         bool    flag;                                                               \
+        void    (*dest)(void*);                                                     \
         T*      (*const at)       (const AQueue(T)* self, uint32_t index);          \
         void    (*const push) (AQueue(T)* self, const T obj);                       \
         void    (*const pop) (AQueue(T)* self, T* tar);                             \
@@ -50,9 +51,14 @@ extern "C" {
     static inline AIter(AQueue(T)) __Aquf(T, iter_tail)(const AQueue(T)* self);     \
     static inline void __Aquf(T, iter_next)(AIter(AQueue(T))* it);                  \
     static inline void __Aquf(T, iter_prev)(AIter(AQueue(T))* it);                  \
+    static inline void __A_OBJ_DEST_FUNC_SELF(AQueue(T))(AQueue(T)*);               \
+    static inline void __A_OBJ_INIT_FUNC_SELF(AQueue(T))(AQueue(T)*);               \
+    static inline void __A_OBJ_COPY_FUNC_SELF(AQueue(T))(AQueue(T)*, const AQueue(T)*);     \
+    static inline int __A_OBJ_CMPD_FUNC_SELF(AQueue(T))(const AQueue(T)*,const AQueue(T)*); \
                                                                                     \
     static const A_FUNC(AQueue(T)) A_FUNC_TAB(AQueue(T)) = {                        \
         true,                                                                       \
+        (void*)__A_OBJ_DEST_FUNC_SELF(AQueue(T)),                                   \
         __Aquf(T,at),                                                               \
         __Aquf(T,pushBack),                                                         \
         __Aquf(T,popFront),                                                         \
@@ -71,7 +77,7 @@ extern "C" {
                                                                                     \
     static inline void __Aquf(T,pushBack)(AQueue(T)* self, const T obj){            \
         aExcClean();                                                                \
-        const T objx = A_COPY(T, obj); if(__a_unlikely(aExcOccur())){ return; }     \
+        T objx = A_COPY(T, obj); if(__a_unlikely(aExcOccur())){ return; }           \
         int ret = __Adeq_push_back(&self->deq); uint32_t i = self->deq.num - 1;     \
         if(__a_unlikely(ret != 0)){ aExcSet(ret); A_DEST(T,objx); return; }         \
         *__Aquf(T,at)(self, i) = objx;                                              \

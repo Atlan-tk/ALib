@@ -87,6 +87,7 @@ static inline void __Aarr_pop_back(__Aarr* arr){
                                                                                         \
     struct A_FUNC(ALine(T)){                                                            \
         bool    flag;                                                                   \
+        void    (*dest)(void*);                                                         \
         T*      (*const at)       (const ALine(T)* self, uint32_t index);               \
         void    (*const rm)       (ALine(T)* self, uint32_t index);                     \
         void    (*const ins)      (ALine(T)* self, uint32_t index, const T obj);        \
@@ -117,9 +118,14 @@ static inline void __Aarr_pop_back(__Aarr* arr){
     static inline AIter(ALine(T)) __Alnf(T, iter_tail)(const ALine(T)* self);           \
     static inline void __Alnf(T, iter_next)(AIter(ALine(T))* it);                       \
     static inline void __Alnf(T, iter_prev)(AIter(ALine(T))* it);                       \
+    static inline void __A_OBJ_DEST_FUNC_SELF(ALine(T))(ALine(T)*);                     \
+    static inline void __A_OBJ_INIT_FUNC_SELF(ALine(T))(ALine(T)*);                     \
+    static inline void __A_OBJ_COPY_FUNC_SELF(ALine(T))(ALine(T)*, const ALine(T)*);    \
+    static inline int __A_OBJ_CMPD_FUNC_SELF(ALine(T))(const ALine(T)*,const ALine(T)*);\
                                                                                         \
     static const A_FUNC(ALine(T)) A_FUNC_TAB(ALine(T)) = {                              \
         true,                                                                           \
+        (void*)__A_OBJ_DEST_FUNC_SELF(ALine(T)),                                        \
         __Alnf(T,at),                                                                   \
         __Alnf(T,rm),                                                                   \
         __Alnf(T,ins),                                                                  \
@@ -151,7 +157,7 @@ static inline void __Aarr_pop_back(__Aarr* arr){
                                                                                         \
     static inline void __Alnf(T,ins)(ALine(T)*self, uint32_t i, const T obj){           \
         if(i > self->arr.num) i = self->arr.num ;                                       \
-        aExcClean(); const T objx = A_COPY(T, obj); if(aExcOccur()){ return; }          \
+        aExcClean(); T objx = A_COPY(T, obj); if(aExcOccur()){ return; }                \
         int ret = __Aarr_ins(&self->arr, i); self->p = __Aarr_get_strat(&self->arr);    \
         if(__a_unlikely(ret != 0)){ aExcSet(ret); A_DEST(T, objx); return; }            \
         self->p[i] = objx;                                                              \
@@ -167,7 +173,7 @@ static inline void __Aarr_pop_back(__Aarr* arr){
                                                                                         \
     static inline void __Alnf(T,pushBack)(ALine(T)* self, const T obj){                 \
         aExcClean();                                                                    \
-        uint32_t i = self->arr.num; const T objx = A_COPY(T,obj);if(aExcOccur())return; \
+        uint32_t i = self->arr.num; T objx = A_COPY(T,obj);if(aExcOccur())return;       \
         int ret = __Aarr_push_back(&self->arr); self->p = __Aarr_get_strat(&self->arr); \
         if(__a_unlikely(ret != 0)){ aExcSet(ret); A_DEST(T, objx); return; }            \
         self->p[i] = objx;                                                              \
@@ -175,7 +181,7 @@ static inline void __Aarr_pop_back(__Aarr* arr){
                                                                                         \
     static inline void __Alnf(T,pushFront)(ALine(T)* self, const T obj){                \
         aExcClean();                                                                    \
-        uint32_t i = 0; const T objx = A_COPY(T, obj); if(aExcOccur()) return;          \
+        uint32_t i = 0; T objx = A_COPY(T, obj); if(aExcOccur()) return;                \
         int ret = __Aarr_push_front(&self->arr); self->p = __Aarr_get_strat(&self->arr);\
         if(__a_unlikely(ret != 0)){ aExcSet(ret); A_DEST(T, objx); return; }            \
         self->p[i] = objx;                                                              \

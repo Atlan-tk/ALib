@@ -67,6 +67,7 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
                                                                                                 \
     struct A_FUNC(AHash(TK,TV)){                                                                \
         bool    flag;                                                                           \
+        void    (*dest)(void*);                                                                 \
         TV*     (*const at)       (const AHash(TK,TV)* self, const TK k);                       \
         void    (*const rm)       (AHash(TK,TV)* self, const TK k);                             \
         void    (*const ins)      (AHash(TK,TV)* self, const TK k, const TV s);                 \
@@ -91,9 +92,14 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
     static inline void     __Ahsf(TK,TV,iter_next)(AIter(AHash(TK,TV))* it);                    \
     static inline void     __Ahsf(TK,TV,iter_prev)(AIter(AHash(TK,TV))* it);                    \
     static inline TK       __Ahsf(TK,TV,iter_getk)(AIter(AHash(TK,TV)) it);                     \
+    static inline void __A_OBJ_DEST_FUNC_SELF(AHash(TK,TV))(AHash(TK,TV)*);                     \
+    static inline void __A_OBJ_INIT_FUNC_SELF(AHash(TK,TV))(AHash(TK,TV)*);                     \
+    static inline void __A_OBJ_COPY_FUNC_SELF(AHash(TK,TV))(AHash(TK,TV)*, const AHash(TK,TV)*);     \
+    static inline int __A_OBJ_CMPD_FUNC_SELF(AHash(TK,TV))(const AHash(TK,TV)*,const AHash(TK,TV)*); \
                                                                                                 \
     static const A_FUNC(AHash(TK,TV)) A_FUNC_TAB(AHash(TK,TV)) = {                              \
         true,                                                                                   \
+        (void*)__A_OBJ_DEST_FUNC_SELF(AHash(TK,TV)),                                            \
         __Ahsf(TK,TV,at),                                                                       \
         __Ahsf(TK,TV,rm),                                                                       \
         __Ahsf(TK,TV,ins),                                                                      \

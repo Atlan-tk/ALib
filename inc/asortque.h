@@ -31,6 +31,7 @@ extern "C" {
                                                                                         \
     struct A_FUNC(ASortque(T)){                                                         \
         bool    flag;                                                                   \
+        void    (*dest)(void*);                                                         \
         T*      (*const at)       (const ASortque(T)* self, uint32_t index);            \
         void    (*const rm)       (ASortque(T)* self, uint32_t index);                  \
         void    (*const ins)      (ASortque(T)* self, const T s);                       \
@@ -57,9 +58,14 @@ extern "C" {
     static inline AIter(ASortque(T)) __Asqf(T, iter_tail)(const ASortque(T)* self);     \
     static inline void __Asqf(T, iter_next)(AIter(ASortque(T))* it);                    \
     static inline void __Asqf(T, iter_prev)(AIter(ASortque(T))* it);                    \
+    static inline void __A_OBJ_DEST_FUNC_SELF(ASortque(T))(ASortque(T)*);               \
+    static inline void __A_OBJ_INIT_FUNC_SELF(ASortque(T))(ASortque(T)*);               \
+    static inline void __A_OBJ_COPY_FUNC_SELF(ASortque(T))(ASortque(T)*, const ASortque(T)*);    \
+    static inline int __A_OBJ_CMPD_FUNC_SELF(ASortque(T))(const ASortque(T)*,const ASortque(T)*);\
                                                                                         \
     static const A_FUNC(ASortque(T)) A_FUNC_TAB(ASortque(T)) = {                        \
         true,                                                                           \
+        (void*)__A_OBJ_DEST_FUNC_SELF(ASortque(T)),                                     \
         __Asqf(T,at),                                                                   \
         __Asqf(T,rm),                                                                   \
         __Asqf(T,ins),                                                                  \
@@ -117,7 +123,7 @@ extern "C" {
                                                                                         \
     static inline void __Asqf(T,ins_i)(ASortque(T)*self, uint32_t i, const T obj){      \
         if(i > self->arr.num) i = self->arr.num ;                                       \
-        aExcClean(); const T objx = A_COPY(T, obj); if(aExcOccur()){ return; }          \
+        aExcClean(); T objx = A_COPY(T, obj); if(aExcOccur()){ return; }                \
         int ret = __Aarr_ins(&self->arr, i); self->p = __Aarr_get_strat(&self->arr);    \
         if(__a_unlikely(ret != 0)){ aExcSet(ret); A_DEST(T, objx); return; }            \
         self->p[i] = objx;                                                              \

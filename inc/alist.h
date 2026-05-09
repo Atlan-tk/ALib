@@ -68,6 +68,7 @@ static inline void* __Alist_getObj(__AlsNode* node){
                                                                                             \
     struct A_FUNC(AList(T)){                                                                \
         bool    flag;                                                                       \
+        void    (*dest)(void*);                                                             \
         T*      (*const at)       (const AList(T)* self, uint32_t index);                   \
         void    (*const rm)       (AList(T)* self, uint32_t index);                         \
         void    (*const ins)      (AList(T)* self, uint32_t index, const T obj);            \
@@ -98,9 +99,14 @@ static inline void* __Alist_getObj(__AlsNode* node){
     static inline AIter(AList(T)) __Alsf(T, iter_tail)(const AList(T)* self);               \
     static inline void __Alsf(T, iter_next)(AIter(AList(T))* it);                           \
     static inline void __Alsf(T, iter_prev)(AIter(AList(T))* it);                           \
+    static inline void __A_OBJ_DEST_FUNC_SELF(AList(T))(AList(T)*);                         \
+    static inline void __A_OBJ_INIT_FUNC_SELF(AList(T))(AList(T)*);                         \
+    static inline void __A_OBJ_COPY_FUNC_SELF(AList(T))(AList(T)*, const AList(T)*);        \
+    static inline int __A_OBJ_CMPD_FUNC_SELF(AList(T))(const AList(T)*,const AList(T)*);    \
                                                                                             \
     static const A_FUNC(AList(T)) A_FUNC_TAB(AList(T)) = {                                  \
         true,                                                                               \
+        (void*)__A_OBJ_DEST_FUNC_SELF(AList(T)),                                            \
         __Alsf(T,at),                                                                       \
         __Alsf(T,rm),                                                                       \
         __Alsf(T,ins),                                                                      \
