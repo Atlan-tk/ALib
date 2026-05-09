@@ -238,6 +238,7 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
         if(memcmp(self, &null_obj, sizeof(T)) == 0){ return; }                                              \
                                                                                                             \
         if(__A_OBJ_DEST(T) != nullptr) __A_OBJ_DEST(T)(self);                                               \
+        memset(self, 0, sizeof(T));                                                                         \
     }                                                                                                       \
     __unused static inline void __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                         \
         aExcClean();                                                                                        \
@@ -334,7 +335,7 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
 })                                                                                  \
 
 /* 右值转为左值 */
-#define A_LEFT(obj) ((typeof(obj)[1]){ (obj) }[1])
+#define A_LEFT(obj) ((typeof(obj)[1]){ (obj) }[0])
 
 
 
@@ -388,6 +389,7 @@ __unused static inline uint32_t __A_OBJ_HASH(void)(__unused const void* self){ r
 #define __A_PRIMITIVE_TYPE_REGISTER(T)                                                  \
     enum{ __A_IS_CLASS(T) = 0 };                                                        \
     __unused static void __A_OBJ_DEST_FUNC_SELF(T)(__unused T* self){                   \
+        memset(self, 0, sizeof(T));                                                     \
     }                                                                                   \
     __unused static void  __A_OBJ_INIT_FUNC_SELF(T)(T* self){                           \
         if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }             \

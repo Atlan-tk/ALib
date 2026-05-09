@@ -74,6 +74,7 @@ extern "C" {
                                                                                                             \
         if(__A_OBJ_DEST(T) != nullptr) __A_OBJ_DEST(T)(self);                                               \
         __A_OBJ_DEST_FUNC_BASE(T)((__A_CLASS_BASE(T)*)self);                                                \
+        memset(self, 0, sizeof(T));                                                                         \
     }                                                                                                       \
     __unused static inline void __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                         \
         aExcClean();                                                                                        \
