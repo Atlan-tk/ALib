@@ -45,6 +45,33 @@ ALib 试图解决这样一个问题：在纯 C 里，如何让容器像 C++ STL 
 - 零宏心智负担
 - 与 C++ STL 完全一致的边界语义
 
+### 1.1 和 GLib、STL 的关系
+
+如果把它和更常见的两套生态放在一起看，大致可以这样理解：
+
+| 维度 | ALib | GLib | STL |
+|---|---|---|---|
+| 语言基础 | C11 + GNU 扩展 | C | C++ |
+| 泛型策略 | 宏实例化容器，配合 `A_TYPE_REGISTER` | 多数通用容器更偏 `void*` / `gpointer` 风格 | 模板 + 标准类型系统 |
+| 生命周期模型 | 统一的 init/copy/dest/cmpd/hash 包装入口 | API 各自管理，常见模式是手动释放 | 语言原生 RAII |
+| 默认心智模型 | “值语义对象 + 容器副本 + 可选 RAII” | “指针/句柄 + 显式资源管理” | “值语义对象 + 模板容器 + 算法” |
+| 多态能力 | 轻量单继承类系统 | 往往结合 `GObject` 获得完整对象系统 | 语言原生对象模型 |
+| 主要代价 | 宏较重，依赖 GNU 扩展 | 类型信息弱一些，很多约束靠约定 | 需要完整接受 C++ 语言生态 |
+
+从设计取向上说：
+
+- **相对 GLib**：ALib 更强调“编译期生成具体容器类型”和“统一对象生命周期”，因此更像把一部分 STL 风格搬进 C
+- **相对 STL**：ALib 仍然没有模板、异常、标准算法体系和语言原生对象模型，所以它只是“接近 STL 的使用体验”，不是 STL 的 C 版等价替身
+- **相对两者共同的独特点**：ALib 把容器、值语义、`cleanup` 风格 RAII 和轻量类系统揉进了一套统一接口，这也是它最实验性、最有个性的地方
+
+### 1.2 什么时候更适合选 ALib
+
+- 你明确在写 C，而不是 C++
+- 你希望比传统 `void*` 容器更强的类型约束和更统一的资源管理
+- 你愿意接受宏实例化、GNU 扩展和一套自定义对象语义
+
+反过来说，如果你已经在 C++ 里工作，优先直接使用 STL 往往更自然；如果你更需要成熟广泛的 C 工具生态、主循环、字符串/编码/对象系统等长期积累，GLib 往往更合适。
+
 ---
 
 ## 2. 构建与安装
@@ -370,7 +397,7 @@ ALib 的类系统基于虚函数表（vtable）实现，在编译期通过宏生
 - 虚函数表，支持运行时多态
 - 延迟初始化（首次实例化时填充虚表）
 - 子类可覆盖父类虚函数
-- 通过 `A_CALL` 在基类视角调用子类方法
+- 通过 `A_CALL` 在子类视角调用基类方法
 
 ### 7.2 根基类 Atlan
 
@@ -385,8 +412,8 @@ struct Atlan {
 };
 
 struct A_FUNC(Atlan) {
-    bool flag;          // 延迟初始化标记，true 表示虚表已初始化
-    void (*dest)(void*); // 当前动态类型的析构入口
+    bool flag;              // 延迟初始化标记，true 表示虚表已初始化
+    void (*dest)(void*);    // 当前动态类型的析构入口
 };
 ```
 
@@ -635,11 +662,11 @@ A_CLASS_REGISTER(Dog);
 /* ========== 使用 ========== */
 int main() {
     RAII(Dog) dog = A_INIT(Dog);
-    A_CALL(dog)->speak((void*)&dog);       // 输出: dog barks!
-    A_CALL(dog)->wag(&dog);                // 输出: dog wags its tail
+    A_CALL(dog,Animal)->speak((void*)&dog); // 输出: dog barks!
+    A_CALL(dog)->wag(&dog);                 // 输出: dog wags its tail
 
     RAII(Animal) animal = A_INIT(Animal);
-    A_CALL(animal)->speak(&animal);        // 输出: unknown makes a sound
+    A_CALL(animal)->speak(&animal);         // 输出: unknown makes a sound
 
     return 0;
 }
@@ -801,7 +828,7 @@ AString dst = A_MOVE(tmp);
 /* 这里 tmp 已经被清零，不再保留原字符串内容 */
 ```
 
-`A_MOVE(obj)` 的语义不是深拷贝，而是“搬走旧值 + 源对象清零”。  
+`A_MOVE(obj)` 的语义不是深拷贝，而是“搬走旧值 + 源对象清零”。
 因此 `A_MOVE` 之后，源对象只能当作空对象继续使用，或者重新初始化/重新赋值。
 
 #### 误用 5：把 `A_LEFT(...)` 当成长生命周期对象
@@ -812,7 +839,7 @@ AString dst = A_MOVE(tmp);
 A_DEST(AString, A_LEFT(A_MOVE(tmp)));
 ```
 
-不推荐把它的地址保存到长期变量里，或者跨多步逻辑反复使用。  
+不推荐把它的地址保存到长期变量里，或者跨多步逻辑反复使用。
 `A_LEFT(...)` 的定位只是“把一个右值临时包装成左值”，最安全的使用方式是在当前表达式里立即消费它。
 
 ---
