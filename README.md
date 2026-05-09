@@ -225,7 +225,7 @@ A_CALL(sub, MyClass)->print((void*)&sub);  // 输出: sub: hello
 
 - 只支持单继承，编译期 `static_assert` 强制约束
 - 虚函数表中不打算被子类覆盖的函数应使用 `const` 函数指针
-- 根基类 `Atlan` 仅有一个 `bool flag` 字段
+- 根基类 `Atlan` 自身只保存虚表指针；其根虚表至少包含 `flag` 和内部析构入口 `dest`
 - 子类覆盖函数时，`A_SET_VTAB(T)` 在对象首次实例化时调用
 
 ## 对象语义
@@ -241,10 +241,38 @@ A_CALL(sub, MyClass)->print((void*)&sub);  // 输出: sub: hello
 
 - `A_INIT(T)`：构造一个栈上对象
 - `A_COPY(T, obj)`：深拷贝一个对象
-- `A_DEST(T, obj)`：手动析构一个对象
-- `A_NEW(T)` / `A_DELETE(T, p)`：堆上对象创建与销毁
+- `A_DEST(T, obj)`：手动析构一个非 `const` 左值，并把该对象清零为空状态
+- `A_NEW(T)` / `A_DELETE(T, p)`：堆上对象创建与销毁；`A_DELETE` 不会自动把指针变量置空
 - `RAII(T)`：自动析构
-- `A_MOVE(obj)`：按"搬移后清零"语义转移临时对象
+- `A_MOVE(obj)`：按"搬移后清零"语义转移一个非 `const` 左值
+- `A_LEFT(obj)`：把右值包装成临时左值，便于传给要求左值的宏
+
+常见组合：
+
+```c
+RAII(AString) s = A_INIT(AString);
+/* ... */
+A_DEST(AString, s);   // 提前释放，并把 s 置为空对象
+
+AString *p = A_NEW(AString);
+/* ... */
+A_DELETE(AString, p);
+p = nullptr;          // 若后续仍会访问变量，建议手动置空
+```
+
+### 对象生命周期速览
+
+| 路径 | 常见创建方式 | 谁拥有对象 | 常见释放方式 | 备注 |
+|---|---|---|---|---|
+| 栈对象 | `T obj = A_INIT(T);` / `RAII(T) obj = A_INIT(T);` | 当前作用域 | `RAII` 自动析构，或 `A_DEST(T, obj)` 提前释放 | `A_DEST` 后对象会被清零，适合提前释放资源 |
+| 堆对象 | `T *p = A_NEW(T);` | 调用方 | `A_DELETE(T, p);` | `A_DELETE` 只释放 `p` 指向的对象，不会自动把指针变量置空 |
+| 容器元素 | `pushBack` / `pushFront` / `ins` / `set` | 容器内部副本 | 容器删除元素、整体析构，或 `take` / `pop` 取出 | 插入时会拷贝元素，不会直接偷走传入实参 |
+
+把它理解成三句话会更直观：
+
+- 栈对象：默认跟随作用域，必要时可用 `A_DEST` 提前结束生命周期
+- 堆对象：由你显式创建和释放，释放后若变量还要继续使用，记得手动 `p = nullptr`
+- 容器元素：所有权一旦进入容器，就由容器负责析构；若想把旧值搬出来再处理，可配合 `A_MOVE` / `take`
 
 ## 异常模型
 
@@ -268,6 +296,7 @@ if (aExcOccur()) {
 ## 重要使用约定
 
 - 库依赖 GNU 扩展，不是纯 ISO C 头文件库
+- `A_DEST(T, obj)` 与 `A_MOVE(obj)` 只接受非 `const` 左值；需要把右值交给这类宏时可用 `A_LEFT(...)`
 - `AString_new("...")` 创建的是非拥有字符串包装；发生写操作或显式深拷贝后才会转成堆内存
 - 若把外部缓冲区包装成 `AString` 并长期存入容器，请先转成拥有型字符串
 - 顺序容器的 `at(index)` 在非空时通常会把越界索引截断到最后一个元素，而不是统一报错

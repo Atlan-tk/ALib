@@ -327,6 +327,7 @@ list.f->popFront(&list, NULL);
    - 空指针检查（设置 `AEXC_nullptr`）
    - 空对象保护（memset 为零的对象不析构，防止重复释放）
    - 调用用户的强符号实现（如果存在）
+   - 析构完成后自动将对象清零，便于和 `RAII` / 手动提前释放组合使用
    - 异常发生时回滚（init/copy 中途失败会自动调用 dest）
 
 ### 6.2 基础类型注册
@@ -384,11 +385,13 @@ struct Atlan {
 };
 
 struct A_FUNC(Atlan) {
-    bool flag;  // 延迟初始化标记，true 表示虚表已初始化
+    bool flag;          // 延迟初始化标记，true 表示虚表已初始化
+    void (*dest)(void*); // 当前动态类型的析构入口
 };
 ```
 
-`Atlan` 的虚表在编译期就已填充完毕（`flag = true`），是唯一不需要延迟初始化的类。
+`Atlan` 的虚表在编译期就已填充完毕（`flag = true`），因此根类不需要延迟初始化。
+其中 `dest` 用于保存当前动态类型的析构入口，供 `A_DEST` / `A_DELETE` 在只知道基类布局时继续按真实类型完成析构。
 
 ### 7.3 定义类的四步流程
 
@@ -483,7 +486,8 @@ A_CLASS_REGISTER(T);
 
 - **`A_SET_VTAB(T)`**：虚表初始化函数（子类在此覆盖父类虚函数）
 - **构造链**：`INIT` 时先清零内存，然后复制基类虚表，再调用 `A_SET_VTAB`（如果首次初始化），最后调用用户的 `A_OBJ_INIT`
-- **析构链**：`DEST` 时先调用用户 `A_OBJ_DEST`，再调用基类的 `DEST`，确保逐层析构
+- **动态析构入口**：首次准备好类虚表时，会把当前类的析构包装函数写入根虚表 `dest`
+- **析构链**：`DEST` 时先调用用户 `A_OBJ_DEST`，再调用基类的 `DEST`，最后把对象清零，确保逐层析构且可安全提前释放
 - **拷贝链**：`COPY` 时先复制基类虚表，然后 `A_SET_VTAB`，再调用用户 `A_OBJ_COPY`
 
 ### 7.5 子类与函数覆盖
@@ -676,17 +680,22 @@ A_MOVE(obj)
 A_LEFT(obj)
 ```
 
-其中 `A_DEST(T, obj)` 的参数仅为非const的左值
-其中 `A_MOVE(obj)` 的参数仅为非const的左值
+补充约定：
+
+- `A_DEST(T, obj)` 的参数必须是非 `const` 左值；析构完成后该对象会被清零，因此可安全用于提前释放 `RAII(T)` 栈对象或成员对象
+- `A_MOVE(obj)` 的参数必须是非 `const` 左值；它返回搬移前的旧值，并把源对象清零
+- `A_LEFT(obj)` 可把右值包装成一个临时左值，主要用于需要左值参数的宏
 
 ### 8.2 堆上对象
 
 ```c
 AString *p = A_NEW(AString);
 A_DELETE(AString, p);
+p = nullptr;
 ```
 
 适合需要显式控制堆生命周期的场景。
+需要注意：`A_DELETE` 释放的是 `p` 指向的对象本体，不会修改指针变量 `p` 自身；若后续还会访问该变量，建议手动置空。
 
 ### 8.3 容器的所有权语义
 
@@ -711,9 +720,100 @@ line.f->popBack(&line, &obj);   // 删除并把元素拷贝/转移到 obj
 
 ```c
 some_obj = A_MOVE(tmp);
+A_DEST(AString, A_LEFT(A_MOVE(tmp)));
 ```
 
-它不会做深拷贝，而是把源对象按字节搬走后清零。
+第一种写法适合把值搬移给另一个左值；
+第二种写法适合先搬移出旧值，再用对象语义立即析构这个临时值。
+无论哪种形式，它都不会做深拷贝，而是把源对象按字节搬走后清零。
+
+### 8.5 常见误用
+
+下面这些写法在语义上容易踩坑，建议在文档和业务代码里统一避开。
+
+#### 误用 1：把右值或 `const` 对象直接传给 `A_DEST`
+
+错误示例：
+
+```c
+A_DEST(AString, A_INIT(AString));   // 右值，不是左值
+
+const AString s = A_INIT(AString);
+A_DEST(AString, s);                 // const 对象，不能析构后清零
+```
+
+正确写法：
+
+```c
+RAII(AString) s = A_INIT(AString);
+A_DEST(AString, s);
+```
+
+`A_DEST(T, obj)` 的核心语义是“析构这个左值对象，然后把它清零为空对象”，因此参数必须是可修改的左值。
+
+#### 误用 2：以为 `A_DELETE` 会自动把指针变量置空
+
+错误理解：
+
+```c
+AString *p = A_NEW(AString);
+A_DELETE(AString, p);
+/* 此处 p 仍然是原地址，只是已经悬空 */
+```
+
+推荐写法：
+
+```c
+AString *p = A_NEW(AString);
+A_DELETE(AString, p);
+p = nullptr;
+```
+
+`A_DELETE` 只负责析构并释放 `p` 指向的对象，不会修改指针变量 `p` 本身。
+
+#### 误用 3：把带副作用的表达式传给 `A_DELETE`
+
+不推荐：
+
+```c
+A_DELETE(AString, arr[i++]);
+A_DELETE(AString, get_ptr());
+```
+
+更稳妥的写法是先绑定到局部变量：
+
+```c
+AString *p = get_ptr();
+A_DELETE(AString, p);
+p = nullptr;
+```
+
+原因是 `A_DELETE` 更适合接收简单的指针变量；把带副作用的表达式直接传进去会让代码可读性变差，也更容易埋下重复求值类问题。
+
+#### 误用 4：`A_MOVE` 后继续把源对象当作旧值使用
+
+容易误解的写法：
+
+```c
+AString tmp = A_INIT(AString);
+AString dst = A_MOVE(tmp);
+
+/* 这里 tmp 已经被清零，不再保留原字符串内容 */
+```
+
+`A_MOVE(obj)` 的语义不是深拷贝，而是“搬走旧值 + 源对象清零”。  
+因此 `A_MOVE` 之后，源对象只能当作空对象继续使用，或者重新初始化/重新赋值。
+
+#### 误用 5：把 `A_LEFT(...)` 当成长生命周期对象
+
+推荐用法：
+
+```c
+A_DEST(AString, A_LEFT(A_MOVE(tmp)));
+```
+
+不推荐把它的地址保存到长期变量里，或者跨多步逻辑反复使用。  
+`A_LEFT(...)` 的定位只是“把一个右值临时包装成左值”，最安全的使用方式是在当前表达式里立即消费它。
 
 ---
 
