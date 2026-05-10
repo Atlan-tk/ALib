@@ -150,10 +150,11 @@ extern "C" {
 #define __A_OBJ_COPY_FUNC_BASE(T)   __A_Splice(__A_OBJ_COPY_FUNC_BASE_$__, T)
 #define __A_OBJ_CMPD_FUNC_BASE(T)   __A_Splice(__A_OBJ_CMPD_FUNC_BASE_$__, T)
 
-#define __A_CALL(self, T, ...) (((const typeof(T)*)(self))->f)
+#define __A_CALL(obj, T, ...) (*(typeof(((typeof(T)*)0)->f))((obj).f))
+
 #define A_CALL(obj, ...) ({                                                                                 \
     static_assert(__aNarg_n(0, ##__VA_ARGS__) <= 1,"Too many parameters");                                  \
-    auto __a_obj = (obj); __A_CALL(&__a_obj, ##__VA_ARGS__, __a_obj);                                       \
+    auto __a_obj = (obj); __A_CALL(__a_obj, ##__VA_ARGS__, __a_obj);                                        \
 })                                                                                                          \
 
 #define A_COVER_FUNC(self, T, name, func) ({                                                                \

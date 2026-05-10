@@ -197,7 +197,7 @@ A_CLASS_REGISTER(MyClass);
 
 // 使用
 RAII(MyClass) obj = A_INIT(MyClass);
-A_CALL(obj)->print(&obj);
+A_CALL(obj).print(&obj);
 ```
 
 ### 子类与函数覆盖
@@ -224,7 +224,7 @@ A_CLASS_REGISTER(MyClassSub);
 
 // 调用覆盖后的函数
 RAII(MyClassSub) sub = A_INIT(MyClassSub);
-A_CALL(sub, MyClass)->print((void*)&sub);  // 输出: sub: hello
+A_CALL(sub, MyClass).print((void*)&sub);  // 输出: sub: hello
 ```
 
 ### 关键宏
@@ -236,7 +236,7 @@ A_CALL(sub, MyClass)->print((void*)&sub);  // 输出: sub: hello
 | `AClass_Function(T, ...)` | 定义虚函数表扩展 |
 | `AClass_Generate(T, ...)` | 生成虚函数表实例并绑定函数 |
 | `A_CLASS_REGISTER(T)` | 注册类的生命周期函数 |
-| `A_CALL(obj)` | 获取对象的虚函数表指针 |
+| `A_CALL(obj)` | 获取对象的虚函数表 |
 | `A_CALL(obj, Base)` | 将对象视为基类并获取虚函数表 |
 | `A_COVER_FUNC(self, Base, name, func)` | 在 VTAB 初始化时覆盖基类函数 |
 | `A_SET_VTAB(T)` | 虚表初始化函数，用于覆盖父类虚函数 |
@@ -321,6 +321,7 @@ if (aExcOccur()) {
 - 若把外部缓冲区包装成 `AString` 并长期存入容器，请先转成拥有型字符串
 - 顺序容器的 `at(index)` 在非空时通常会把越界索引截断到最后一个元素，而不是统一报错
 - `AHash` 的比较语义依赖迭代顺序，而不是数学意义上的"无序集合相等"
+- 尽可能避免使用goto
 
 ## 测试与示例
 

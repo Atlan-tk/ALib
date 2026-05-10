@@ -114,7 +114,7 @@ int main(){
     if(aExcOccur()){
     }
 
-    A_CALL(my_class)->print(&my_class);
+    A_CALL(my_class).print(&my_class);
 
     RAII(My_class) my_class_1 = A_COPY(My_class, my_class);
     if(aExcOccur()){
@@ -126,7 +126,7 @@ int main(){
 
     //调用父类函数
     //此函数已被重写
-    A_CALL(sub_class, My_class)->print((void*)&sub_class);
+    A_CALL(sub_class, My_class).print((void*)&sub_class);
 }
 
 

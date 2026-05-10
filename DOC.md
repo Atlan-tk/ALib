@@ -261,7 +261,7 @@ A_CLASS_REGISTER(Animal);
 
 int main(void) {
     RAII(Animal) a = A_INIT(Animal);
-    A_CALL(a)->speak(&a);
+    A_CALL(a).speak(&a);
     return 0;
 }
 ```
@@ -558,13 +558,15 @@ tab->name = (void*)func;
 
 ```c
 // 直接调用
-A_CALL(obj)->print(&obj);
+A_CALL(obj).print(&obj);
 
 // 以基类视角调用（触发子类覆盖的方法）
-A_CALL(sub_obj, MyClass)->print((void*)&sub_obj);
+A_CALL(sub_obj, MyClass).print((void*)&sub_obj);
 ```
 
-`A_CALL(obj, Base)` 将对象的虚表转为基类类型指针，调用子类覆盖的实现。
+`A_CALL(obj, Base)` 将对象的虚表转为基类类型，调用子类覆盖的实现。
+
+需要注意`A_CALL(obj)`和`A_CALL(obj, T)`中，参数obj仅为对象值，为不能是对象指针。
 
 ### 7.7 类系统关键宏一览
 
@@ -662,11 +664,11 @@ A_CLASS_REGISTER(Dog);
 /* ========== 使用 ========== */
 int main() {
     RAII(Dog) dog = A_INIT(Dog);
-    A_CALL(dog,Animal)->speak((void*)&dog); // 输出: dog barks!
-    A_CALL(dog)->wag(&dog);                 // 输出: dog wags its tail
+    A_CALL(dog,Animal).speak((void*)&dog); // 输出: dog barks!
+    A_CALL(dog).wag(&dog);                 // 输出: dog wags its tail
 
     RAII(Animal) animal = A_INIT(Animal);
-    A_CALL(animal)->speak(&animal);         // 输出: unknown makes a sound
+    A_CALL(animal).speak(&animal);         // 输出: unknown makes a sound
 
     return 0;
 }
@@ -1337,6 +1339,9 @@ ALib 依赖：
 - 子类调用基类虚函数时需要向上转型 `(void*)`
 - 构造函数中不检查 `self == nullptr`，由包装函数统一处理
 - 析构函数内部不允许设置新的异常状态
+
+### 16.6 尽可能避免使用goto
+- goto可能会破坏对象生命周期控制
 
 ---
 

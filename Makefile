@@ -40,13 +40,13 @@ clean:
 	$(RM) $(OBJS) $(DEPS) $(LIB_NAME)
 
 install: $(LIB_NAME)
-	mkdir -p $(DESTDIR)$(INCLUDEDIR) $(DESTDIR)$(LIBDIR)
-	cp $(HEADERS) $(DESTDIR)$(INCLUDEDIR)/
-	cp $(LIB_NAME) $(DESTDIR)$(LIBDIR)/
+	mkdir -p $(DESTDIR)/$(INCLUDEDIR) $(DESTDIR)/$(LIBDIR)
+	cp $(HEADERS) $(DESTDIR)/$(INCLUDEDIR)/
+	cp $(LIB_NAME) $(DESTDIR)/$(LIBDIR)/
 
 uninstall:
-	rm -rf $(DESTDIR)$(INCLUDEDIR)
-	rm -rf $(DESTDIR)$(LIBDIR)/$(LIB_NAME)
+	rm -rf $(DESTDIR)/$(INCLUDEDIR)
+	rm -rf $(DESTDIR)/$(LIBDIR)/$(LIB_NAME)
 
 .PHONY: all clean install uninstall
 
