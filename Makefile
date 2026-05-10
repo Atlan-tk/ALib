@@ -5,6 +5,9 @@ PREFIX ?= /usr/local
 DESTDIR ?=
 INCLUDEDIR ?= $(PREFIX)/include/alib
 LIBDIR ?= $(PREFIX)/lib
+DESTROOT := $(patsubst %/,%,$(DESTDIR))
+INSTALL_INCLUDEDIR := $(if $(DESTROOT),$(DESTROOT),)$(INCLUDEDIR)
+INSTALL_LIBDIR := $(if $(DESTROOT),$(DESTROOT),)$(LIBDIR)
 
 SRC_DIR := src
 INC_DIR := inc
@@ -40,13 +43,13 @@ clean:
 	$(RM) $(OBJS) $(DEPS) $(LIB_NAME)
 
 install: $(LIB_NAME)
-	mkdir -p $(DESTDIR)/$(INCLUDEDIR) $(DESTDIR)/$(LIBDIR)
-	cp $(HEADERS) $(DESTDIR)/$(INCLUDEDIR)/
-	cp $(LIB_NAME) $(DESTDIR)/$(LIBDIR)/
+	mkdir -p $(INSTALL_INCLUDEDIR) $(INSTALL_LIBDIR)
+	cp $(HEADERS) $(INSTALL_INCLUDEDIR)/
+	cp $(LIB_NAME) $(INSTALL_LIBDIR)/
 
 uninstall:
-	rm -rf $(DESTDIR)/$(INCLUDEDIR)
-	rm -rf $(DESTDIR)/$(LIBDIR)/$(LIB_NAME)
+	rm -rf $(INSTALL_INCLUDEDIR)
+	rm -rf $(INSTALL_LIBDIR)/$(LIB_NAME)
 
 .PHONY: all clean install uninstall
 
