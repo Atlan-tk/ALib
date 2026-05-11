@@ -25,7 +25,6 @@ extern "C" {
 
 #include <string.h>
 #include <stdint.h>
-#include <stdatomic.h>
 
 /* utils */
 /********************************************************************/
@@ -120,13 +119,8 @@ __unused void* alib_alloc(uint32_t size);
 __unused void* alib_realloc(void* p, uint32_t size);
 
 __unused void* alib_new(uint32_t size, void(*init_func)(void*));
-__unused void* alib_new_for_copy(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
+__unused void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
 __unused void  alib_delete(void* p, void(*dest_func)(void*));
-
-__unused void* alib_ref_new(uint32_t size, void(*init_func)(void*));
-__unused void* alib_ref_new_for_copy(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
-__unused void  alib_ref_delete(void* p, void(*dest_func)(void*));
-__unused void* alib_ref_copy(void* p);
 
 typedef void*               cptr_t;
 typedef char*               cstr_t;
@@ -346,25 +340,22 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
     (T*)alib_new(sizeof(T), (void*)__A_OBJ_INIT_FUNC_SELF(T));                      \
 })                                                                                  \
 
-#define A_NEW_COPY(T, obj) ({                                                       \
-    auto __a_objx = (obj); __a_type_assert(T, __a_objx);                            \
-    (T*)alib_new_for_copy(sizeof(T),  &__a_objx, (void*)__A_OBJ_COPY_FUNC_SELF(T)); \
+#define A_CPNEW(T, obj) ({                                                          \
+    auto __a_obj = (obj); __a_type_assert(T, __a_obj);                              \
+    (T*)alib_cpnew(sizeof(T),  &__a_obj, (void*)__A_OBJ_COPY_FUNC_SELF(T));         \
 })                                                                                  \
 
 #define A_DELETE(T, _p) ({                                                          \
     auto __a_p = (_p); __a_type_assert(T, *__a_p);                                  \
-    if(__A_IS_CLASS(T) != 0){                                                       \
-        alib_delete((_p), (void*)a_class_dest);                                     \
-    }else{                                                                          \
-        alib_delete((_p), (void*)__A_OBJ_DEST_FUNC_SELF(T));                        \
-    }                                                                               \
+    alib_delete((_p), (__A_IS_CLASS(T) != 0) ?                                      \
+            (void*)a_class_dest : (void*)__A_OBJ_DEST_FUNC_SELF(T));                \
 })                                                                                  \
 
 //RAII(int) obj = A_INIT(int);
 //return;//自动释放
 
-//int* obj = A_NEW(int);
-//A_DELETE(int, obj);//堆上对象手动释放
+//int* p = A_NEW(int);
+//A_DELETE(int, p);//堆上对象手动释放
 //return;
 
 

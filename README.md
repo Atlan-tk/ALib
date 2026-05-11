@@ -323,6 +323,55 @@ if (aExcOccur()) {
 - `AHash` 的比较语义依赖迭代顺序，而不是数学意义上的"无序集合相等"
 - 尽可能避免使用goto
 
+## 指针句柄
+
+`inc/aptr.h` 目前提供两种轻量句柄：`APtr(T)` 和 `AShPtr(T)`。
+
+### APtr：独占句柄
+
+`APtr(T)` 适合“堆上只有一个拥有者，必要时可派生出观察者”的场景：
+
+- `APtrNew(T)` 等价于 `A_INIT(APtr(T))`，默认会分配一个新的 `T`
+- `APtrCPNew(T, obj)` 会堆分配一个新的 `T`，再用 `A_COPY(T, obj)` 初始化
+- `A_COPY(APtr(T), x)` 只复制裸指针，新句柄会变成 `strong_flag == false` 的观察者
+- 只有 strong 句柄析构时才会真正释放底层对象
+
+```c
+APtr_Define(int);
+APtr_Generate(int);
+A_TYPE_REGISTER(APtr(int));
+
+RAII(APtr(int)) p = APtrCPNew(int, 42);
+RAII(APtr(int)) alias = A_COPY(APtr(int), p);
+
+*alias.p = 99;
+assert(*p.p == 99);
+assert(!alias.strong_flag);
+```
+
+### AShPtr：共享句柄
+
+`AShPtr(T)` 适合多个对象需要共享同一份大对象数据的场景：
+
+- `AShPtrNew(T)` 会分配一个内部包装块，布局等价于 `{ atomic_int ref_count; T data; }`
+- `AShPtrCPNew(T, obj)` 会把 `obj` 深拷贝进新的共享块
+- `A_COPY(AShPtr(T), x)` 会增加引用计数，多个句柄共享同一份 `T`
+- 最后一个句柄析构时，才会真正销毁 `T` 并释放整块内存
+
+```c
+AShPtr_Define(AString);
+AShPtr_Generate(AString);
+A_TYPE_REGISTER(AShPtr(AString));
+
+RAII(AString) src = AString_new("hello");
+RAII(AShPtr(AString)) sp = AShPtrCPNew(AString, src);
+RAII(AShPtr(AString)) alias = A_COPY(AShPtr(AString), sp);
+
+alias.p->f->pushBack(alias.p, '!');
+assert(strcmp(sp.p->s, "hello!") == 0);
+assert(strcmp(src.s, "hello") == 0);
+```
+
 ## 测试与示例
 
 仓库自带测试和示例源码，但它们默认面向"已安装头文件和库"的布局。

@@ -1134,22 +1134,56 @@ own.f->addBack(&own, lit);
 `APtr(T)` 提供简单的独占所有权语义：
 
 - 默认构造时分配一个 `T`
-- 拷贝时只复制裸指针，并把新对象标记成非 strong
+- `APtrNew(T)` 等价于 `A_INIT(APtr(T))`
+- `APtrCPNew(T, obj)` 会堆分配一个新的 `T`，并用 `A_COPY(T, obj)` 完成深拷贝
+- 拷贝 `APtr(T)` 时只复制裸指针，并把新对象标记成非 strong
 - 析构时只有 strong 对象会真正释放底层资源
 
 它更像一个轻量资源句柄，而不是完整的智能指针框架。
+
+示例：
+
+```c
+APtr_Define(int);
+APtr_Generate(int);
+A_TYPE_REGISTER(APtr(int));
+
+RAII(APtr(int)) p = APtrCPNew(int, 42);
+RAII(APtr(int)) alias = A_COPY(APtr(int), p);
+
+*alias.p = 99;
+assert(*p.p == 99);      // alias 只是观察者，不拥有对象
+assert(!alias.strong_flag);
+```
 
 ### 12.3 AShPtr：共享指针
 
 头文件：`inc/aptr.h`
 
-`AShPtr(T)` 基于引用计数内存块：
+`AShPtr(T)` 基于单块分配的引用计数包装对象：
 
-- 初始化时分配一个按 `max_align_t` 对齐的引用计数头，再跟随 payload
-- 拷贝时增加引用计数
-- 析构时减少计数，归零后释放
+- `AShPtrNew(T)` 会分配 `{ atomic_int ref_count; T data; }` 形式的内部包装块
+- `AShPtrCPNew(T, obj)` 会把 `obj` 深拷贝到新的共享块中
+- `A_COPY(AShPtr(T), x)` 只增加引用计数，多个句柄共享同一份 `T`
+- 析构时减少引用计数，归零后再销毁 `T` 并释放整块内存
 
 适合多个对象共享同一份大对象数据。
+
+示例：
+
+```c
+AShPtr_Define(AString);
+AShPtr_Generate(AString);
+A_TYPE_REGISTER(AShPtr(AString));
+
+RAII(AString) src = AString_new("hello");
+RAII(AShPtr(AString)) sp = AShPtrCPNew(AString, src);
+RAII(AShPtr(AString)) alias = A_COPY(AShPtr(AString), sp);
+
+alias.p->f->pushBack(alias.p, '!');
+assert(strcmp(sp.p->s, "hello!") == 0);    // 两个句柄共享同一个 AString
+assert(strcmp(src.s, "hello") == 0);       // 源对象与共享块彼此独立
+```
 
 ---
 
