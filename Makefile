@@ -40,8 +40,8 @@ $(LIB_NAME): $(OBJS)
 
 clean:
 	$(RM) $(OBJS) $(DEPS) $(LIB_NAME)
-	make clean -C sample
-	make clean -C test
+	$(MAKE) clean -C sample
+	$(MAKE) clean -C test
 
 install: $(LIB_NAME)
 	mkdir -p $(INSTALL_INCLUDEDIR) $(INSTALL_LIBDIR)
