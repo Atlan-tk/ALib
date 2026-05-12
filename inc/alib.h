@@ -108,11 +108,11 @@ typedef char*               cstr_t;
 typedef long long           longlong;
 
 typedef struct{
-    char* s;        //以0结尾
+    const char* s;  //以0结尾
     uint32_t len;   //不包含0的长度
 }astr_t;
 
-static inline astr_t astr_new(char* s){
+static inline astr_t astr_new(const char* s){
     return (astr_t){ .s = s, .len = (uint32_t)strlen(s) };
 }
 
