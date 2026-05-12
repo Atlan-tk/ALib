@@ -11,85 +11,72 @@ extern "C" {
 #endif /* __cplusplus */
 
 #ifndef __cplusplus
+    #if !(defined(__STDC_VERSION__)) || (__STDC_VERSION__ < 201112L)
+        #error "The minimum supported C standard is C11"
+    #endif /* __STDC_VERSION__ > c11 */
 
-#if !(defined(__STDC_VERSION__)) || (__STDC_VERSION__ < 201112L)
-    #error "The minimum supported C standard is C11"
-#endif /* __STDC_VERSION__ > c11 */
+    #if !defined(__GNUC__)
+        #error "Please use a compiler that supports GNU extensions: gcc, clang, icc, armcc"
+    #endif /* gcc or clang */
 
-#if !defined(__GNUC__)
-    #error "Please use a compiler that supports GNU extensions: gcc, clang, icc, armcc"
-#endif /* gcc or clang */
+    #if defined(__STDC_VERSION__) && (__STDC_VERSION__ < 202311L)
+        #include <stddef.h>
+        #include <stdbool.h>
 
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ < 202311L)
+        #ifndef auto
+            #define auto __auto_type
+        #endif /* auto */
 
-#include <stddef.h>
-#include <stdbool.h>
+        #ifndef nullptr
+            #define nullptr NULL
+        #endif /* nullptr */
 
-#ifndef auto
-#define auto __auto_type
-#endif /* auto */
+        #ifndef thread_local
+            #define thread_local _Thread_local
+        #endif /* thread_local */
 
-#ifndef nullptr
-#define nullptr NULL
-#endif /* nullptr */
-
-#ifndef thread_local
-#define thread_local _Thread_local
-#endif /* thread_local */
-
-#endif /* __STDC_VERSION__ < c23 */
-
+        #ifndef typeof
+            #define typeof __typeof__
+        #endif /* typeof */
+    #endif /* __STDC_VERSION__ < c23 */
 #endif /* no __cplusplus */
 
+#ifndef __weak
+    #define __weak __attribute__((weak))
+#endif /* __weak */
 
+#ifndef __weakref
+    #define __weakref(symbol) __attribute__((weakref(__A_Str(symbol))))
+#endif /* __weakref */
+
+#ifndef __unused
+    #define __unused __attribute__((unused))
+#endif /* __unused */
+
+#ifndef __cleanup
+    #define __cleanup(func) __attribute__((cleanup(func)))
+#endif /* __cleanup */
 
 #include <string.h>
 #include <stdint.h>
 #include <assert.h>
 
+
+
 /* utils */
 /********************************************************************/
 #define __aPagSize ((uint32_t)512)
-#define __aCahSize ((uint32_t)64)
-
-
-#ifndef __weak
-#define __weak __attribute__((weak))
-#endif /* __weak */
-
-#ifndef __weakref
-#define __weakref(symbol) __attribute__((weakref(__A_Str(symbol))))
-#endif /* __weakref */
-
-#ifndef __alias
-#define __alias(symbol) __attribute__((alias(__A_Str(symbol))))
-#endif /* __alias */
-
-#ifndef __unused
-#define __unused __attribute__((unused))
-#endif /* __unused */
-
-#ifndef __cleanup
-#define __cleanup(func) __attribute__((cleanup(func)))
-#endif /* __cleanup */
-
-#ifndef __aligned
-#define __aligned(n) __attribute__((aligned(n)))
-#endif /* __aligned */
-
-#ifndef typeof
-#define typeof __typeof__
-#endif /* typeof */
+#define __aCahSize ((uint32_t)64 )
 
 #ifndef container_of
-#define container_of(ptr, type, member) ({                          \
-    const typeof(((type *)0)->member) *__mptr = (ptr);              \
-    (type *)((char *)__mptr - offsetof(type, member));              \
-})
+    #define container_of(ptr, type, member) ({                      \
+        const typeof(((type *)0)->member) *__mptr = (ptr);          \
+        (type *)((char *)__mptr - offsetof(type, member));          \
+    })
 #endif /* container_of */
 
 #ifndef offsetof
-#define offsetof(type, member) __builtin_offsetof(type, member)
+    #define offsetof(type, member) __builtin_offsetof(type, member)
 #endif /* offsetof */
 
 #define __a_type_check(T, obj)                                      \
@@ -105,6 +92,9 @@ extern "C" {
 #define __a_likely(x)   __builtin_expect(!!(x), true)
 #define __a_unlikely(x) __builtin_expect(!!(x), false)
 
+
+
+/* alloc and free */
 __unused void  alib_free(void* p);
 __unused void* alib_alloc(uint32_t size);
 __unused void* alib_realloc(void* p, uint32_t size);
@@ -118,11 +108,11 @@ typedef char*               cstr_t;
 typedef long long           longlong;
 
 typedef struct{
-    const char* s;  //以0结尾
+    char* s;        //以0结尾
     uint32_t len;   //不包含0的长度
 }astr_t;
 
-static inline astr_t astr_new(const char* s){
+static inline astr_t astr_new(char* s){
     return (astr_t){ .s = s, .len = (uint32_t)strlen(s) };
 }
 
@@ -142,9 +132,10 @@ static inline int __a_memcmp(const void* s0, const void* s1, uint32_t size){
 
 __unused static inline void a_class_dest(void* _self);
 
+
+
 /* exception handling */
 /********************************************************************/
-
 enum AEXC_t{
     AEXC_NORMAL = 0,
 
@@ -322,8 +313,6 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
 
 /* 右值转为左值 */
 #define A_LEFT(obj) ((typeof(obj)[1]){ (obj) }[0])
-
-
 
 /* raii */
 #define RAII(T) __cleanup(__A_OBJ_DEST_FUNC_SELF(T)) T
