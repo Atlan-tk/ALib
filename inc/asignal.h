@@ -30,7 +30,7 @@ AClass_Generate(ASignal);
 A_CLASS_REGISTER(ASignal);
 
 /* 信号的靶函数 */
-typedef void (*ASignalTarget)(ASignal* signal, void* addressee);
+typedef void (*ASignalTarget)(const ASignal* signal, void* addressee);
 A_TYPE_REGISTER(ASignalTarget);
 
 
@@ -81,7 +81,7 @@ A_TYPE_REGISTER(ASignalSystem)
 int64_t a_signal_system_alloc();
 /* 发送信号 */
 /* 信号发出后后调用对应的靶函数 */
-void a_signal_system_transmit(ASignal* signal);
+void a_signal_system_transmit(const ASignal* signal);
 /* 注册信号靶 */
 void a_signal_system_register(int64_t id, void* addressee, ASignalTarget target);
 /* 注销信号靶 */

@@ -67,17 +67,17 @@ int64_t a_signal_system_alloc(){
 
 
 
-static inline void a_signal_call(ASignal* signal, ASignalEnd* end){
+static inline void a_signal_call(const ASignal* signal, ASignalEnd* end){
     end->call(signal, end->addressee);
 }
 
-static inline void a_signal_group_call(ASignal* signal, ALine(ASignalEnd)* group){
+static inline void a_signal_group_call(const ASignal* signal, ALine(ASignalEnd)* group){
     forEach(it, *group){
         a_signal_call(signal, it.p);
     }
 }
 
-void a_signal_system_transmit(ASignal* signal){
+void a_signal_system_transmit(const ASignal* signal){
     if(!a_ss_flag){
         aExcSet(AEXC_system_error);
         return;

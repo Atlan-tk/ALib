@@ -1200,7 +1200,7 @@ assert(strcmp(src.s, "hello") == 0);       // 源对象与共享块彼此独立
 目标函数签名：
 
 ```c
-typedef void (*ASignalTarget)(ASignal* signal, void* addressee);
+typedef void (*ASignalTarget)(const ASignal* signal, void* addressee);
 ```
 
 核心接口：
@@ -1215,6 +1215,7 @@ typedef void (*ASignalTarget)(ASignal* signal, void* addressee);
 - 同一个 `id` 下，同一个 `addressee` 只允许绑定一个 `target`
 - 重复注册会设置 `AEXC_repeat_write`
 - 负 `id` 或越界 `id` 会设置 `AEXC_overstep`
+- 回调接收到的是只读 `const ASignal*`，不应在监听者中修改信号内容
 - 发送前会复制当前接收者列表，因此回调里可以继续执行注册、分配新 `id`、再次发送等操作
 
 典型用法：
@@ -1233,8 +1234,8 @@ AClass_Function(PingSignal);
 AClass_Generate(PingSignal);
 A_CLASS_REGISTER(PingSignal);
 
-static void on_ping(ASignal* base, void* addressee) {
-    PingSignal* sig = (void*)base;
+static void on_ping(const ASignal* base, void* addressee) {
+    const PingSignal* sig = (const PingSignal*)base;
     int* counter = addressee;
     *counter += sig->payload;
 }
@@ -1249,7 +1250,7 @@ int main(void) {
     ((ASignal*)&sig)->id = ping_id;
     sig.payload = 3;
 
-    a_signal_system_transmit((ASignal*)&sig);
+    a_signal_system_transmit((const ASignal*)&sig);
     a_signal_system_unregister(ping_id, &counter);
     return 0;
 }

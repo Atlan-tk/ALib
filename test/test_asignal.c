@@ -13,7 +13,7 @@ AClass_Function(TestSignal);
 AClass_Generate(TestSignal);
 A_CLASS_REGISTER(TestSignal);
 
-static void noop_target(ASignal *signal, void *addressee) {
+static void noop_target(const ASignal *signal, void *addressee) {
     (void)signal;
     (void)addressee;
 }
@@ -55,7 +55,7 @@ static void test_signal_type_helpers(void) {
     A_DEST(ASignalSystem, sys1);
 }
 
-static void count_target(ASignal *signal, void *addressee) {
+static void count_target(const ASignal *signal, void *addressee) {
     int *counter = addressee;
     assert(signal != NULL);
     assert(counter != NULL);
@@ -64,7 +64,7 @@ static void count_target(ASignal *signal, void *addressee) {
 
 static int g_duplicate_target_hits = 0;
 
-static void duplicate_target(ASignal *signal, void *addressee) {
+static void duplicate_target(const ASignal *signal, void *addressee) {
     (void)signal;
     (void)addressee;
     g_duplicate_target_hits++;
@@ -132,13 +132,13 @@ static void test_signal_reject_duplicate_addressee(void) {
 static int g_nested_hits = 0;
 static int64_t g_inner_id = -1;
 
-static void nested_target(ASignal *signal, void *addressee) {
+static void nested_target(const ASignal *signal, void *addressee) {
     (void)signal;
     (void)addressee;
     g_nested_hits++;
 }
 
-static void outer_target(ASignal *signal, void *addressee) {
+static void outer_target(const ASignal *signal, void *addressee) {
     (void)signal;
     (void)addressee;
 
@@ -173,13 +173,13 @@ static void test_signal_transmit_reentrant(void) {
 static int g_registered_hits = 0;
 static int64_t g_register_target_id = -1;
 
-static void registered_target(ASignal *signal, void *addressee) {
+static void registered_target(const ASignal *signal, void *addressee) {
     (void)signal;
     (void)addressee;
     g_registered_hits++;
 }
 
-static void alloc_register_target(ASignal *signal, void *addressee) {
+static void alloc_register_target(const ASignal *signal, void *addressee) {
     (void)signal;
 
     int64_t nested_id = a_signal_system_alloc();

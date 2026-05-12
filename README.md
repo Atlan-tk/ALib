@@ -276,8 +276,8 @@ AClass_Function(PingSignal);
 AClass_Generate(PingSignal);
 A_CLASS_REGISTER(PingSignal);
 
-static void on_ping(ASignal* base, void* addressee) {
-    PingSignal* sig = (void*)base;
+static void on_ping(const ASignal* base, void* addressee) {
+    const PingSignal* sig = (const PingSignal*)base;
     int* counter = addressee;
     *counter += sig->payload;
 }
@@ -291,7 +291,7 @@ int main(void) {
     RAII(PingSignal) sig = A_INIT(PingSignal);
     ((ASignal*)&sig)->id = ping_id;
     sig.payload = 3;
-    a_signal_system_transmit((ASignal*)&sig);
+    a_signal_system_transmit((const ASignal*)&sig);
 
     a_signal_system_unregister(ping_id, &counter);
     return 0;
@@ -303,6 +303,7 @@ int main(void) {
 - 同一个 `id` 下，同一个 `addressee` 只能绑定一个 `target`
 - 重复注册会设置 `AEXC_repeat_write`
 - `a_signal_system_unregister(id, addressee)` 按 `id + addressee` 解绑
+- 回调接收到的是只读 `const ASignal*`，接收者不应修改信号内容
 - 派发前会复制当前接收者列表，因此回调内部可继续执行 `alloc/register/transmit`
 
 ## 对象语义
