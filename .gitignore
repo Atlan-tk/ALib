@@ -41,6 +41,7 @@
 *.su
 *.idb
 *.pdb
+*.local/
 
 # Kernel Module Compile Results
 *.mod*

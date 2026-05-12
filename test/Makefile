@@ -1,18 +1,15 @@
 
 CC ?= gcc
 
-WORK ?= ..
+WORK := ..
 ROOT_DIR := $(abspath $(WORK))
+LIB_TARGET := $(ROOT_DIR)/libatlan.a
 LOCAL_INCLUDE_DIR := $(ROOT_DIR)/.local/include
 LOCAL_INCLUDE_LINK := $(LOCAL_INCLUDE_DIR)/alib
-LIB_TARGET := $(ROOT_DIR)/libatlan.a
 
-CPPFLAGS += -I$(LOCAL_INCLUDE_DIR)
-CFLAGS ?= -std=c11 -Wall -Wextra -Werror -g -O0
+CFLAGS := -I$(LOCAL_INCLUDE_DIR) -Wall -Wextra -Werror -g -O0
 
-SRC := $(sort $(wildcard test_*.c))
-
-HEAD :=				\
+SRC := $(sort $(wildcard *.c))
 
 OUT := $(SRC:.c=.out)
 
@@ -25,8 +22,8 @@ $(LOCAL_INCLUDE_LINK): FORCE
 	mkdir -p $(LOCAL_INCLUDE_DIR)
 	ln -snf $(ROOT_DIR)/inc $@
 
-%.out: %.c $(HEAD) $(LIB_TARGET) | $(LOCAL_INCLUDE_LINK)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $< $(LIB_TARGET)
+%.out: %.c $(LIB_TARGET) | $(LOCAL_INCLUDE_LINK)
+	$(CC) $(CFLAGS) -o $@ $< $(LIB_TARGET)
 
 # Clean target
 clean:
@@ -36,3 +33,4 @@ clean:
 .PHONY: all clean FORCE
 
 FORCE:
+

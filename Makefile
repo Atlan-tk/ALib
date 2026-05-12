@@ -1,22 +1,21 @@
 CC ?= gcc
 AR ?= ar
 
-PREFIX ?= /usr/local
 DESTDIR ?=
-INCLUDEDIR ?= $(PREFIX)/include/alib
+PREFIX ?= /usr/local
 LIBDIR ?= $(PREFIX)/lib
+INCLUDEDIR ?= $(PREFIX)/include/alib
+
 DESTROOT := $(patsubst %/,%,$(DESTDIR))
-INSTALL_INCLUDEDIR := $(if $(DESTROOT),$(DESTROOT),)$(INCLUDEDIR)
 INSTALL_LIBDIR := $(if $(DESTROOT),$(DESTROOT),)$(LIBDIR)
+INSTALL_INCLUDEDIR := $(if $(DESTROOT),$(DESTROOT),)$(INCLUDEDIR)
 
 SRC_DIR := src
 INC_DIR := inc
 TEST_DIR := test
 SAMPLE_DIR := sample
 
-CPPFLAGS := -I$(INC_DIR)
-CFLAGS ?= -std=c11 -Wall -Wextra -Werror -O2 -fPIC
-DEPFLAGS := -MMD -MP
+CFLAGS := -I$(INC_DIR) -Wall -Wextra -Werror -O2 -fPIC -MMD -MP
 ARFLAGS ?= rcs
 
 LIB_NAME := libatlan.a
@@ -37,7 +36,7 @@ $(LIB_NAME): $(OBJS)
 	$(AR) $(ARFLAGS) $@ $^
 
 %.o: %.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	$(RM) $(OBJS) $(DEPS) $(LIB_NAME)

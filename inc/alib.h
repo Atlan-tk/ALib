@@ -20,11 +20,32 @@ extern "C" {
     #error "Please use a compiler that supports GNU extensions: gcc, clang, icc, armcc"
 #endif /* gcc or clang */
 
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ < 202311L)
+
+#include <stddef.h>
+#include <stdbool.h>
+
+#ifndef auto
+#define auto __auto_type
+#endif /* auto */
+
+#ifndef nullptr
+#define nullptr NULL
+#endif /* nullptr */
+
+#ifndef thread_local
+#define thread_local _Thread_local
+#endif /* thread_local */
+
+#endif /* __STDC_VERSION__ < c23 */
+
 #endif /* no __cplusplus */
+
 
 
 #include <string.h>
 #include <stdint.h>
+#include <assert.h>
 
 /* utils */
 /********************************************************************/
@@ -84,36 +105,6 @@ extern "C" {
 #define __a_likely(x)   __builtin_expect(!!(x), true)
 #define __a_unlikely(x) __builtin_expect(!!(x), false)
 
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ < 202311L)
-
-#include <stdbool.h>
-
-#ifndef auto
-#define auto __auto_type
-#endif /* auto */
-
-#ifndef alignas
-#define alignas _Alignas
-#endif /* alignas */
-
-#ifndef alignof
-#define alignof _Alignof
-#endif /* alignof */
-
-#ifndef nullptr
-#define nullptr NULL
-#endif /* nullptr */
-
-#ifndef thread_local
-#define thread_local _Thread_local
-#endif /* thread_local */
-
-#ifndef static_assert
-#define static_assert _Static_assert
-#endif /* static_assert */
-
-#endif /* __STDC_VERSION__ < c23 */
-
 __unused void  alib_free(void* p);
 __unused void* alib_alloc(uint32_t size);
 __unused void* alib_realloc(void* p, uint32_t size);
@@ -132,7 +123,7 @@ typedef struct{
 }astr_t;
 
 static inline astr_t astr_new(const char* s){
-    return (astr_t){ .s = s, .len = strlen(s) };
+    return (astr_t){ .s = s, .len = (uint32_t)strlen(s) };
 }
 
 static inline int __a_strcmp(const char* s0, const char* s1){
@@ -166,6 +157,7 @@ enum AEXC_t{
     AEXC_no_permissions = -7,
     AEXC_invalid_function = -8,
     AEXC_repeat_write = -9,
+    AEXC_system_error = -10,
 };
 extern thread_local int __A_EXC_VALUE__;
 static inline void aExcClean() { __A_EXC_VALUE__ = 0; }
@@ -477,4 +469,3 @@ __unused static inline void a_class_dest(void* _self){
 #endif /* __cplusplus */
 
 #endif /* __alib_type_h__ */
-
