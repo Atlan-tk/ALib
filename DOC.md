@@ -13,7 +13,7 @@
 - [9. 异常模型](#9-异常模型)
 - [10. 统一迭代器](#10-统一迭代器)
 - [11. 容器说明](#11-容器说明)
-- [12. 字符串与指针](#12-字符串与指针)
+- [12. 字符串、指针与信号](#12-字符串指针与信号)
 - [13. 自定义类型](#13-自定义类型)
 - [14. 内存分配器与弱符号](#14-内存分配器与弱符号)
 - [15. 测试与本地验证](#15-测试与本地验证)
@@ -130,6 +130,7 @@ make uninstall PREFIX=/usr/local
 #include <alib/aline.h>
 #include <alib/astring.h>
 #include <alib/aclass.h>
+#include <alib/asignal.h>
 ```
 
 这对应安装后的目录布局：
@@ -1081,7 +1082,7 @@ A_TYPE_REGISTER(AHash(AString, int));
 
 ---
 
-## 12. 字符串与指针
+## 12. 字符串、指针与信号
 
 ### 12.1 AString
 
@@ -1183,6 +1184,75 @@ RAII(AShPtr(AString)) alias = A_COPY(AShPtr(AString), sp);
 alias.p->f->pushBack(alias.p, '!');
 assert(strcmp(sp.p->s, "hello!") == 0);    // 两个句柄共享同一个 AString
 assert(strcmp(src.s, "hello") == 0);       // 源对象与共享块彼此独立
+```
+
+### 12.4 ASignal：进程内信号派发
+
+头文件：`inc/asignal.h`
+
+`ASignal` 不是 POSIX signal 封装，而是一套进程内的轻量事件/消息派发机制。
+
+它由两部分组成：
+
+- `ASignal`：所有业务信号的基类，保存 `id`、`value`、`sender`、`name`、`code`
+- 全局信号系统：负责按 `id` 维护接收者列表，并在发送时调用目标函数
+
+目标函数签名：
+
+```c
+typedef void (*ASignalTarget)(ASignal* signal, void* addressee);
+```
+
+核心接口：
+
+- `a_signal_system_alloc()`：申请一个新的全局信号 `id`
+- `a_signal_system_register(id, addressee, target)`：注册接收者和回调
+- `a_signal_system_transmit(signal)`：发送信号
+- `a_signal_system_unregister(id, addressee)`：按 `id + addressee` 注销
+
+语义约定：
+
+- 同一个 `id` 下，同一个 `addressee` 只允许绑定一个 `target`
+- 重复注册会设置 `AEXC_repeat_write`
+- 负 `id` 或越界 `id` 会设置 `AEXC_overstep`
+- 发送前会复制当前接收者列表，因此回调里可以继续执行注册、分配新 `id`、再次发送等操作
+
+典型用法：
+
+```c
+#include <alib/alib.h>
+#include <alib/asignal.h>
+
+typedef struct PingSignal PingSignal;
+
+AClass_Inherit(PingSignal, ASignal);
+AClass_Struct(PingSignal,
+    int payload;
+);
+AClass_Function(PingSignal);
+AClass_Generate(PingSignal);
+A_CLASS_REGISTER(PingSignal);
+
+static void on_ping(ASignal* base, void* addressee) {
+    PingSignal* sig = (void*)base;
+    int* counter = addressee;
+    *counter += sig->payload;
+}
+
+int main(void) {
+    int64_t ping_id = a_signal_system_alloc();
+    int counter = 0;
+
+    a_signal_system_register(ping_id, &counter, on_ping);
+
+    RAII(PingSignal) sig = A_INIT(PingSignal);
+    ((ASignal*)&sig)->id = ping_id;
+    sig.payload = 3;
+
+    a_signal_system_transmit((ASignal*)&sig);
+    a_signal_system_unregister(ping_id, &counter);
+    return 0;
+}
 ```
 
 ---

@@ -19,7 +19,7 @@ extern "C" {
         #error "Please use a compiler that supports GNU extensions: gcc, clang, icc, armcc"
     #endif /* gcc or clang */
 
-    #if defined(__STDC_VERSION__) && (__STDC_VERSION__ < 202311L)
+    #if defined(__STDC_VERSION__) && (__STDC_VERSION__ < 202000L)
         #include <stddef.h>
         #include <stdbool.h>
 
@@ -227,7 +227,11 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
         aExcClean();                                                                                        \
         if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
         if(__a_unlikely(that == nullptr)) { __A_OBJ_INIT_FUNC_SELF(T)(self); return; }                      \
-        memset(self, 0, sizeof(T)); if(__A_OBJ_COPY(T) != nullptr) __A_OBJ_COPY(T)(self, that);             \
+        memset(self, 0, sizeof(T)); if(__A_OBJ_COPY(T) != nullptr){                                         \
+            __A_OBJ_COPY(T)(self, that);                                                                    \
+        }else{                                                                                              \
+            memcpy(self, that, sizeof(T));                                                                  \
+        }                                                                                                   \
         if(aExcOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
     }                                                                                                       \
     __unused static inline int __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){                     \

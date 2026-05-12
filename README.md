@@ -50,6 +50,7 @@ ALib 是一个基于 C11 和 GNU 扩展实现的轻量级泛型容器库。它�
 - `atree.h`：红黑树映射
 - `ahash.h`：哈希表映射
 - `astring.h`：字符串
+- `asignal.h`：进程内信号派发系统
 - `aptr.h`：独占指针与共享指针
 
 ## 项目结构
@@ -248,6 +249,62 @@ A_CALL(sub, MyClass).print((void*)&sub);  // 输出: sub: hello
 - 根基类 `Atlan` 自身只保存虚表指针；其根虚表至少包含 `flag` 和内部析构入口 `dest`
 - 子类覆盖函数时，`A_SET_VTAB(T)` 在对象首次实例化时调用
 
+## 信号系统
+
+`ASignal` 不是 POSIX signal 的封装，而是一套进程内的轻量事件派发接口。
+
+它的核心模型是：
+
+- 每一种业务信号都继承自 `ASignal`
+- 运行时先用 `a_signal_system_alloc()` 申请一个全局信号 `id`
+- 接收者通过 `a_signal_system_register(id, addressee, target)` 绑定回调
+- 发送者构造信号对象后调用 `a_signal_system_transmit(...)`
+
+最小示例：
+
+```c
+#include <alib/alib.h>
+#include <alib/asignal.h>
+
+typedef struct PingSignal PingSignal;
+
+AClass_Inherit(PingSignal, ASignal);
+AClass_Struct(PingSignal,
+    int payload;
+);
+AClass_Function(PingSignal);
+AClass_Generate(PingSignal);
+A_CLASS_REGISTER(PingSignal);
+
+static void on_ping(ASignal* base, void* addressee) {
+    PingSignal* sig = (void*)base;
+    int* counter = addressee;
+    *counter += sig->payload;
+}
+
+int main(void) {
+    int64_t ping_id = a_signal_system_alloc();
+    int counter = 0;
+
+    a_signal_system_register(ping_id, &counter, on_ping);
+
+    RAII(PingSignal) sig = A_INIT(PingSignal);
+    ((ASignal*)&sig)->id = ping_id;
+    sig.payload = 3;
+    a_signal_system_transmit((ASignal*)&sig);
+
+    a_signal_system_unregister(ping_id, &counter);
+    return 0;
+}
+```
+
+使用约定：
+
+- 同一个 `id` 下，同一个 `addressee` 只能绑定一个 `target`
+- 重复注册会设置 `AEXC_repeat_write`
+- `a_signal_system_unregister(id, addressee)` 按 `id + addressee` 解绑
+- 派发前会复制当前接收者列表，因此回调内部可继续执行 `alloc/register/transmit`
+
 ## 对象语义
 
 可以把 ALib 看成"容器拥有元素"的值语义库：
@@ -321,6 +378,7 @@ if (aExcOccur()) {
 - 若把外部缓冲区包装成 `AString` 并长期存入容器，请先转成拥有型字符串
 - 顺序容器的 `at(index)` 在非空时通常会把越界索引截断到最后一个元素，而不是统一报错
 - `AHash` 的比较语义依赖迭代顺序，而不是数学意义上的"无序集合相等"
+- `ASignal` 是进程内事件机制，不是操作系统信号；同一 `id` 下单个 `addressee` 只能绑定一个回调
 - 尽可能避免使用goto
 
 ## 指针句柄
