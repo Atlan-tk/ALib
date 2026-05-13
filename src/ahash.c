@@ -110,9 +110,8 @@ static inline void __Ahash_dest_arr(__Ahash* hash){
     }
     alib_free(hash->bucket_arr);
 }
-static inline int __Ahash_reHash(__Ahash* hash){
-    uint32_t cap = hash->bucket_num * 2;
-    if(__a_unlikely(cap == 0)){
+static inline int __Ahash_reHash(__Ahash* hash, uint32_t cap){
+    if(__a_unlikely(cap < 16)){
         cap = 16;
     }
 
@@ -150,6 +149,14 @@ static inline int __Ahash_reHash(__Ahash* hash){
     hash->bucket_arr = arr;
     hash->bucket_num = cap;
     return 0;
+}
+static inline int __Ahash_reHash_up(__Ahash* hash){
+    uint32_t cap = hash->bucket_num * 2;
+    return __Ahash_reHash(hash, cap);
+}
+static inline int __Ahash_reHash_down(__Ahash* hash){
+    uint32_t cap = (hash->bucket_num + 1) / 2;
+    return __Ahash_reHash(hash, cap);
 }
 static inline int __Ahash_add(__Ahash* hash, void* obj){
     uint32_t obj_size = hash->size;
@@ -216,8 +223,11 @@ static inline int __Ahash_del(__Ahash* hash, const void* k){
     return 0;
 }
 static inline int __Ahash_reCap(__Ahash* hash){
-    if(__a_unlikely(hash->bucket_num == 0 || hash->num * 2 / 3 > hash->bucket_num)){
-        return __Ahash_reHash(hash);
+    if(__a_unlikely(hash->bucket_num == 0 || hash->num * 2 / 3 >= hash->bucket_num)){
+        return __Ahash_reHash_up(hash);
+    }
+    if(__a_unlikely(hash->bucket_num != 0 && hash->num * 3 <= hash->bucket_num)){
+        return __Ahash_reHash_down(hash);
     }
     return 0;
 }

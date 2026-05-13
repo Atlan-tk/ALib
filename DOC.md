@@ -1194,29 +1194,34 @@ assert(strcmp(src.s, "hello") == 0);       // 源对象与共享块彼此独立
 
 它由两部分组成：
 
-- `ASignal`：所有业务信号的基类，保存 `id`、`value`、`sender`、`name`、`code`
+- `ASignal`：所有业务信号的基类，保存 `id`、`value`、`sender`
 - 全局信号系统：负责按 `id` 维护接收者列表，并在发送时调用目标函数
 
 目标函数签名：
 
 ```c
-typedef void (*ASignalTarget)(const ASignal* signal, void* addressee);
+void target(const ASignal* signal, void* addressee);
 ```
 
 核心接口：
 
-- `a_signal_system_alloc()`：申请一个新的全局信号 `id`
-- `a_signal_system_register(id, addressee, target)`：注册接收者和回调
-- `a_signal_system_transmit(signal)`：发送信号
-- `a_signal_system_unregister(id, addressee)`：按 `id + addressee` 注销
+- `a_signal_alloc()`：申请一个新的全局信号 `id`
+- `a_signal_connection(id, addressee, target)`：注册接收者和回调
+- `a_signal_transmit(signal)`：发送信号
+- `a_signal_disconnect(id, addressee)` / `a_target_disconnect(addressee, id)`：按单条连接解绑
+- `a_signal_disconnect_all(id)` / `a_target_disconnect_all(addressee)`：按整组连接解绑
 
 语义约定：
 
+- `id` 必须来自 `a_signal_alloc()`，未分配或越界 `id` 会设置 `AEXC_outdomain`
 - 同一个 `id` 下，同一个 `addressee` 只允许绑定一个 `target`
 - 重复注册会设置 `AEXC_repeat_write`
-- 负 `id` 或越界 `id` 会设置 `AEXC_overstep`
+- 已分配但当前没有监听者的 `id` 上，发送与批量断开都是 no-op
 - 回调接收到的是只读 `const ASignal*`，不应在监听者中修改信号内容
-- 发送前会复制当前接收者列表，因此回调里可以继续执行注册、分配新 `id`、再次发送等操作
+- 发送前会复制当前接收者列表，并按这份快照顺序调用；因此同线程回调里后续执行的 `connection` / `disconnect` / `disconnect_all` 只影响下一次派发
+- 当前实现会在整个回调链期间持有递归全局锁；因此同线程回调允许重入 signal API，但其它线程上的 signal API 调用会阻塞到当前回调链结束
+- 回调里不要等待一个还需要调用 signal API 的其它线程，否则可能形成锁等待
+- 回调函数无需自行清理或处理中间异常；当前实现会在每个回调返回后清理异常状态，后续会由统一的异常收集机制负责汇总与上报
 
 典型用法：
 
@@ -1241,17 +1246,17 @@ static void on_ping(const ASignal* base, void* addressee) {
 }
 
 int main(void) {
-    int64_t ping_id = a_signal_system_alloc();
+    Aint ping_id = a_signal_alloc();
     int counter = 0;
 
-    a_signal_system_register(ping_id, &counter, on_ping);
+    a_signal_connection(ping_id, &counter, on_ping);
 
     RAII(PingSignal) sig = A_INIT(PingSignal);
     ((ASignal*)&sig)->id = ping_id;
     sig.payload = 3;
 
-    a_signal_system_transmit((const ASignal*)&sig);
-    a_signal_system_unregister(ping_id, &counter);
+    a_signal_transmit((const ASignal*)&sig);
+    a_signal_disconnect(ping_id, &counter);
     return 0;
 }
 ```
