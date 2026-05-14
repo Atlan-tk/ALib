@@ -1218,10 +1218,34 @@ void target(const ASignal* signal, void* addressee);
 - 重复注册会设置 `AEXC_repeat_write`
 - 已分配但当前没有监听者的 `id` 上，发送与批量断开都是 no-op
 - 回调接收到的是只读 `const ASignal*`，不应在监听者中修改信号内容
-- 发送前会复制当前接收者列表，并按这份快照顺序调用；因此同线程回调里后续执行的 `connection` / `disconnect` / `disconnect_all` 只影响下一次派发
-- 当前实现会在整个回调链期间持有递归全局锁；因此同线程回调允许重入 signal API，但其它线程上的 signal API 调用会阻塞到当前回调链结束
-- 回调里不要等待一个还需要调用 signal API 的其它线程，否则可能形成锁等待
-- 回调函数无需自行清理或处理中间异常；当前实现会在每个回调返回后清理异常状态，后续会由统一的异常收集机制负责汇总与上报
+- 发送前会复制当前接收者列表，并按这份快照顺序调用；因此回调里新增 `connection` 只影响下一次派发
+- 回调里执行 `disconnect` / `disconnect_all` 会直接失败并设置 `AEXC_repeat_write`；也不要在回调里析构任何仍处于连接状态的对象，否则会留下悬垂指针
+- 连接表锁只在建立快照时短暂持有；回调链期间持有的是派发读锁，因此其它线程上的 `disconnect` / `disconnect_all` 会等到当前回调链结束
+- 回调里不要等待其它线程完成 signal API 操作，尤其是 `disconnect` / `disconnect_all`，否则可能形成锁等待
+- 异常收集是显式启用的：默认 `exc_list == nullptr`，此时发送器不会保留回调异常，调用者也无法事后读取这些异常
+- 若要收集回调异常，调用者需要先执行一次 `signal->f->setExcList(signal)` 分配异常列表
+- 建议不要复用同一个 signal 实例；更推荐每次发送都新建一个 signal 对象，用完即销毁（或离开作用域自动析构），这样可避免旧的 `exc_list` 内容或嵌套派发结果混入下一次发送
+- 启用 `exc_list` 后，发送器会在每个回调返回后收集异常，并在派发结束后统一以 `AEXC_response_exc` 上报；调用者可通过 `signal->f->popExc(signal)` 或直接读取 `exc_list` 取回 `AResponseExc`
+
+异常收集示例：
+
+```c
+RAII(PingSignal) sig = A_INIT(PingSignal);
+ASignal *base = (ASignal *)&sig;
+
+base->f->setExcList(base);   /* 只需分配一次 */
+
+base->id = ping_id;
+sig.payload = 3;
+a_signal_transmit(base);
+
+if(aExcGet() == AEXC_response_exc){
+    while(!base->exc_list->f->empty(base->exc_list)){
+        AResponseExc ev = base->f->popExc(base);
+        /* ev.addressee / ev.exc_value */
+    }
+}
+```
 
 典型用法：
 

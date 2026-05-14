@@ -136,7 +136,7 @@ __unused static inline void a_class_dest(void* _self);
 
 /* exception handling */
 /********************************************************************/
-enum AEXC_t{
+typedef enum{
     AEXC_NORMAL = 0,
 
     AEXC_nullptr = -1,
@@ -149,11 +149,13 @@ enum AEXC_t{
     AEXC_invalid_function = -8,
     AEXC_repeat_write = -9,
     AEXC_system_error = -10,
-};
+    AEXC_response_exc = -11,    //信号响应异常
+    AEXC_collect_failed = -12,  //异常收集失败
+}AEXC_t;
 extern thread_local int __A_EXC_VALUE__;
 static inline void aExcClean() { __A_EXC_VALUE__ = 0; }
 static inline bool aExcOccur() { return __A_EXC_VALUE__ != 0; };
-static inline void aExcSet(enum AEXC_t v) { __A_EXC_VALUE__ = v; };
+static inline void aExcSet(AEXC_t v) { __A_EXC_VALUE__ = v; };
 static inline int  aExcGet() { return __A_EXC_VALUE__; };
 
 
