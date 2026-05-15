@@ -267,6 +267,7 @@ static void test_signal_transmit_reentrant(void) {
 
 static int g_registered_hits = 0;
 static Aint g_register_target_id = -1;
+static int g_collect_target_hits = 0;
 
 static void registered_target(const ASignal *signal, void *addressee) {
     (void)signal;
@@ -283,6 +284,15 @@ static void alloc_register_target(const ASignal *signal, void *addressee) {
 
     a_signal_connection(g_register_target_id, addressee, registered_target);
     assert(!aExcOccur());
+}
+
+static void collect_target(const ASignal *signal, void *addressee) {
+    (void)signal;
+    int *hit_counter = addressee;
+
+    (*hit_counter)++;
+    g_collect_target_hits++;
+    aExcSet(AEXC_outdomain);
 }
 
 static void test_signal_callback_alloc_and_register(void) {
@@ -312,6 +322,49 @@ static void test_signal_callback_alloc_and_register(void) {
     assert(g_registered_hits == 1);
 }
 
+static void test_signal_collect_exceptions(void) {
+    Aint id = a_signal_alloc();
+    assert(!aExcOccur());
+    assert(id >= 0);
+
+    int receiver = 0;
+    g_collect_target_hits = 0;
+
+    a_signal_connection(id, &receiver, collect_target);
+    assert(!aExcOccur());
+
+    RAII(ASignal) sig = A_INIT(ASignal);
+    assert(!aExcOccur());
+    sig.id = id;
+    sig.sender = &receiver;
+
+    RAII(AExcCollector) collector = A_INIT(AExcCollector);
+    assert(!aExcOccur());
+
+    a_signal_transmit(&sig, &collector);
+    assert(aExcGet() == AEXC_response_exc);
+    assert(collector.id == id);
+    assert(g_collect_target_hits == 1);
+    assert(receiver == 1);
+    assert(collector.list.f->getNumber(&collector.list) == 1);
+
+    aExcClean();
+    AExcEnd ev = AExcCollector_pop(&collector);
+    assert(!aExcOccur());
+    assert(ev.addressee == &receiver);
+    assert(ev.exc_value == AEXC_outdomain);
+    assert(collector.list.f->empty(&collector.list));
+
+    a_signal_transmit(&sig);
+    assert(aExcGet() == AEXC_response_exc);
+    aExcClean();
+    assert(g_collect_target_hits == 2);
+    assert(receiver == 2);
+
+    a_signal_disconnect_all(id);
+    assert(!aExcOccur());
+}
+
 int main(void) {
     test_signal_type_helpers();
     test_signal_transmit_basic();
@@ -320,6 +373,7 @@ int main(void) {
     test_invalid_id_rejected();
     test_signal_transmit_reentrant();
     test_signal_callback_alloc_and_register();
+    test_signal_collect_exceptions();
     printf("All ASignal tests passed.\n");
     return 0;
 }

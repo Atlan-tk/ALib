@@ -9,62 +9,42 @@
 #include <asignal.h>
 #include <stdatomic.h>
 
-void ASignal_setExcList(ASignal* self){
+AExcEnd AExcCollector_pop(AExcCollector* self){
+    AExcEnd ret = {};
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
-        return;
-    }
-    auto list = self->exc_list;
-    if(list == nullptr){
-        self->exc_list = A_NEW(ALine(AResponseExc));
-    }
-}
-void ASignal_cleanExc(const ASignal* self){
-    if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
-        return;
-    }
-
-    auto list = self->exc_list;
-    if(list != nullptr && list->f->getNumber(list) != 0){
-        A_DEST(ALine(AResponseExc), *list);
-        *list = A_INIT(ALine(AResponseExc));
-    }
-
-    return;
-}
-AResponseExc ASignal_popExc(const ASignal* self){
-    AResponseExc ret = {};
-
-    if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
         return ret;
     }
-
-    auto list = self->exc_list;
-    if(list != nullptr){
-        list->f->popBack(list, &ret);
-    }
-
+    auto list = &self->list;
+    list->f->popBack(list, &ret);
     return ret;
 }
 
 /* 异常收集 */
-static inline void ASignal_exc_collect(ASignal* self, void* addressee, AEXC_t ev){
-    auto list = self->exc_list;
-    if(__a_unlikely(list == nullptr)) return;
-
-    aExcClean();
-    list->f->pushBack(list, (AResponseExc){ addressee, ev});
-    if(aExcOccur()){
-        aExcSet(AEXC_collect_failed);
+void AExcCollector_collect(AExcCollector* self, void* addressee, AEXC_t ev){
+    if(__a_unlikely(self == nullptr)){
+        return;
     }
+    auto list = &self->list; aExcClean();
+    list->f->pushBack(list, (AExcEnd){ addressee, ev});
+    self->exc = aExcGet(); aExcClean();
 }
 /* 异常列表是否为空 */
-static inline bool ASignal_exc_empty(const ASignal* self){
-    auto list = self->exc_list;
-    if(__a_unlikely(list == nullptr)) return true;
-    return list->f->empty(list);
+bool AExcCollector_empty(const AExcCollector* self){
+    if(__a_unlikely(self == nullptr)){
+        return true;
+    }
+    auto list = &self->list;
+    auto ret = list->f->empty(list);
+    return ret;
+}
+
+uint32_t AExcCollector_getNumber(const AExcCollector* self){
+    if(__a_unlikely(self == nullptr)){
+        return 0;
+    }
+    auto list = &self->list;
+    auto ret =  list->f->getNumber(list);
+    return ret;
 }
 
 
@@ -566,7 +546,39 @@ Aint a_signal_alloc(){
     return ASignalSystem_alloc(&a_signal_system);
 }
 
-void a_signal_transmit(const ASignal* signal){
+static inline void a_signal_call(const ASignal* signal, Aint id, ASignalTower* tower, AExcCollector* collector){
+    bool response_exc = false;
+
+    a_call_num++;
+
+    if(collector != nullptr){
+        collector->id = id;
+    }
+
+    aExcClean();
+
+    forEach(it, tower->tar_list){
+        auto call = it.p->call;
+        auto addressee = it.p->addressee;
+
+        call(signal, addressee);
+
+        if(aExcOccur()){
+            response_exc = true;
+            AEXC_t ev = aExcGet(); aExcClean();
+            AExcCollector_collect(collector, addressee, ev);
+            if(collector && collector->exc){
+                break;
+            }
+        }
+    }
+
+    if(response_exc) aExcSet(AEXC_response_exc);
+
+    a_call_num--;
+}
+
+void __a_signal_transmit(const ASignal* signal, AExcCollector* collector){
     if(!a_system_flag){
         aExcSet(AEXC_system_error);
         return;
@@ -601,32 +613,7 @@ void a_signal_transmit(const ASignal* signal){
 
     A_DEST(AAutoKey, autokey_g);
 
-    if(a_call_num == 0){
-        signal->f->cleanExc(signal);
-    }
-    a_call_num++;
-
-    do{
-        aExcClean();
-
-        forEach(it, tower.tar_list){
-            auto call = it.p->call; auto addressee = it.p->addressee;
-            call(signal, addressee);
-
-            if(aExcOccur()){
-                AEXC_t ev = aExcGet(); aExcClean();
-                ASignal_exc_collect((void*)signal, addressee, ev);
-                if(aExcOccur()){
-                    break;
-                }
-            }
-        }
-
-        if(!ASignal_exc_empty(signal)){
-            aExcSet(AEXC_response_exc);
-        }
-    }while(0);
-    a_call_num--;
+    a_signal_call(signal, id, &tower, collector);
 }
 
 void a_signal_connection(Aint id, const void* addressee, void(*call)(const ASignal*, void*)){

@@ -82,8 +82,9 @@ extern "C" {
 #define __a_type_check(T, obj)                                      \
     _Generic(*(typeof(obj)*)0, typeof(T): true, default: false)     \
 
-#define __a_type_assert(T, obj)                                     \
+#define __a_type_assert(T, obj)({                                   \
     static_assert(__a_type_check(T, (obj)), "Error: Type mismatch");\
+})                                                                  \
 
 #define __a_argn_assert(n, ...)                                     \
     static_assert( __aNarg_n(0, ##__VA_ARGS__) <= n,                \
@@ -150,7 +151,6 @@ typedef enum{
     AEXC_repeat_write = -9,
     AEXC_system_error = -10,
     AEXC_response_exc = -11,    //信号响应异常
-    AEXC_collect_failed = -12,  //异常收集失败
 }AEXC_t;
 extern thread_local int __A_EXC_VALUE__;
 static inline void aExcClean() { __A_EXC_VALUE__ = 0; }

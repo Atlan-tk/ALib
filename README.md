@@ -259,6 +259,7 @@ A_CALL(sub, MyClass).print((void*)&sub);  // 输出: sub: hello
 - 运行时先用 `a_signal_alloc()` 申请一个全局信号 `id`
 - 接收者通过 `a_signal_connection(id, addressee, target)` 绑定回调
 - 发送者构造信号对象后调用 `a_signal_transmit(...)`
+- 当前源码只提供接收者辅助基类 `AReceEnd`；发送端若要长期保存 `id` 或做自动清理，需要自行封装
 
 最小示例：
 
@@ -307,31 +308,38 @@ int main(void) {
 - `a_signal_disconnect_all(id)` / `a_target_disconnect_all(addressee)` 解绑整组连接
 - 已分配但当前没有监听者的 `id` 上，发送与批量断开都是 no-op
 - 回调接收到的是只读 `const ASignal*`，接收者不应修改信号内容
+- `signal->sender` 只是业务透传指针；lib 不管理它指向对象的生命周期
 - 发射前会复制当前接收者列表，并按这份快照顺序调用；因此回调里新增 `connection` 只影响下一次派发
 - 回调里执行 `disconnect` / `disconnect_all` 会直接失败并设置 `AEXC_repeat_write`；也不要在回调里析构任何仍处于连接状态的对象，否则会留下悬垂指针
 - 连接表锁只在建立快照时短暂持有；回调链期间持有的是派发读锁，因此其它线程上的 `disconnect` / `disconnect_all` 会等到当前回调链结束
 - 回调里不要等待其它线程完成 signal API 操作，尤其是 `disconnect` / `disconnect_all`，否则可能形成锁等待
-- 异常收集是显式启用的：默认 `exc_list == nullptr`，此时发送器不会保留回调异常，调用者也无法事后读取这些异常
-- 若要收集回调异常，调用者需要先执行一次 `signal->f->setExcList(signal)` 分配异常列表
-- 建议不要复用同一个 signal 实例；更推荐每次发送都新建一个 signal 对象，用完即销毁（或离开作用域自动析构），这样可避免旧的 `exc_list` 内容或嵌套派发结果混入下一次发送
-- 启用 `exc_list` 后，发送器会在每个回调返回后收集异常，并在派发结束后统一以 `AEXC_response_exc` 上报；调用者可通过 `signal->f->popExc(signal)` 或直接读取 `exc_list` 取回 `AResponseExc`
+- 只要任一回调函数设置了异常，派发结束后当前线程错误码就会统一变成 `AEXC_response_exc`
+- 若要检查“是谁抛了异常、异常值是什么”，调用者需要准备一个 `AExcCollector`，并调用 `a_signal_transmit(signal, &collector)`
+- 当前源码不再提供发送者基类 `ATranEnd`；发送端需自行持有 `id`，并直接调用 `a_signal_transmit(...)`
+- `AExcCollector` 会把每条异常记录为 `AExcEnd { addressee, exc_value }` 追加到 `collector.list`，并把本次发送的 `signal->id` 写入 `collector.id`
+- `AExcCollector` 不提供自动清理/重置语义；若递归、嵌套或跨多次发送复用，旧记录可能继续保留，且 `collector.id` 可能被后一次发送覆盖
+- `AExcCollector` 因此不建议递归、嵌套或跨多次发送复用；更推荐每次发送临时创建一个 collector，用完即释放，由误用带来的混入结果需由调用者自行承担
+- 当至少收集到一条回调异常时，派发结束后会统一设置 `AEXC_response_exc`；若写入 collector 失败，底层错误码会保存在 `collector.exc`，且本轮派发会提前停止
 
 异常收集示例：
 
 ```c
 RAII(PingSignal) sig = A_INIT(PingSignal);
+RAII(AExcCollector) collector = A_INIT(AExcCollector);
 ASignal *base = (ASignal *)&sig;
-
-base->f->setExcList(base);   /* 只需分配一次 */
 
 base->id = ping_id;
 sig.payload = 3;
-a_signal_transmit(base);
+a_signal_transmit(base, &collector);
 
 if(aExcGet() == AEXC_response_exc){
-    while(!base->exc_list->f->empty(base->exc_list)){
-        AResponseExc ev = base->f->popExc(base);
+    aExcClean();  /* 先消费聚合错误，再逐条读取 collector */
+    while(!collector.f->empty(&collector)){
+        AExcEnd ev = collector.f->pop(&collector);
         /* ev.addressee / ev.exc_value */
+    }
+    if(collector.exc != 0){
+        /* collector 写入失败时记录底层错误码 */
     }
 }
 ```
@@ -400,6 +408,7 @@ if (aExcOccur()) {
 - `AEXC_init_failed`
 - `AEXC_alloc_failed`
 - `AEXC_invalid_function`
+- `AEXC_response_exc`
 
 ## 重要使用约定
 

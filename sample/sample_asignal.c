@@ -13,8 +13,12 @@
 #include <stdio.h>
 
 typedef struct PingSignal PingSignal;
-typedef struct PingSource PingSource;
 typedef struct PingReceiver PingReceiver;
+
+typedef struct {
+    Aint id;
+    const char* name;
+} PingSource;
 
 AClass_Inherit(PingSignal, ASignal);
 AClass_Struct(PingSignal,
@@ -23,17 +27,6 @@ AClass_Struct(PingSignal,
 AClass_Function(PingSignal);
 AClass_Generate(PingSignal);
 A_CLASS_REGISTER(PingSignal);
-
-AClass_Inherit(PingSource, ATranEnd);
-AClass_Struct(PingSource,
-    const char* name;
-);
-AClass_Function(PingSource);
-AClass_Generate(PingSource);
-static void A_OBJ_INIT(PingSource)(PingSource* self) {
-    self->name = "source";
-}
-A_CLASS_REGISTER(PingSource);
 
 AClass_Inherit(PingReceiver, AReceEnd);
 AClass_Struct(PingReceiver,
@@ -59,8 +52,23 @@ static int print_exc(const char* step) {
     return -1;
 }
 
+static int ping_source_init(PingSource* source, const char* name) {
+    if (source == NULL) {
+        aExcSet(AEXC_nullptr);
+        return -1;
+    }
+
+    source->id = a_signal_alloc();
+    source->name = name;
+    return print_exc("a_signal_alloc");
+}
+
 static Aint ping_id(const PingSource* source) {
-    return A_CALL(*source, ATranEnd).getID((const ATranEnd*)source);
+    if (source == NULL) {
+        aExcSet(AEXC_nullptr);
+        return -1;
+    }
+    return source->id;
 }
 
 static void ping_target(const ASignal* base, void* addressee) {
@@ -80,13 +88,9 @@ static void ping_target(const ASignal* base, void* addressee) {
             receiver->name, signal->payload, source->name, receiver->total);
 }
 
-static void drain_signal_exceptions(ASignal* base) {
-    if (base->exc_list == NULL) {
-        return;
-    }
-
-    while (!base->exc_list->f->empty(base->exc_list)) {
-        AResponseExc ev = base->f->popExc(base);
+static void drain_signal_exceptions(AExcCollector* collector) {
+    while (!collector->list.f->empty(&collector->list)) {
+        AExcEnd ev = AExcCollector_pop(collector);
         const PingReceiver* receiver = ev.addressee;
         printf("  collected exception from %s: %d\n",
                 receiver->name, ev.exc_value);
@@ -106,26 +110,27 @@ static int emit_ping(PingSource* source, int payload, bool collect_exc) {
     signal.payload = payload;
 
     if (collect_exc) {
-        base->f->setExcList(base);
-        if (print_exc("setExcList") != 0) {
-            return -1;
+        RAII(AExcCollector) collector = A_INIT(AExcCollector);
+
+        a_signal_transmit(base, &collector);
+        if (aExcGet() == AEXC_response_exc) {
+            printf("emit_ping(payload=%d) collected callback errors for id=%d:\n",
+                    payload, collector.id);
+            aExcClean();
+            drain_signal_exceptions(&collector);
+            return 0;
         }
+
+        return print_exc("a_signal_transmit");
     }
 
-    A_CALL(*source, ATranEnd).transmit(base);
-    if (aExcGet() == AEXC_response_exc) {
-        printf("emit_ping(payload=%d) collected callback errors:\n", payload);
-        drain_signal_exceptions(base);
-        aExcClean();
-        return 0;
-    }
-
-    return print_exc("transmit");
+    a_signal_transmit(base);
+    return print_exc("a_signal_transmit");
 }
 
 int main(void) {
-    RAII(PingSource) source = A_INIT(PingSource);
-    if (print_exc("A_INIT(PingSource)") != 0) {
+    PingSource source = {0};
+    if (ping_source_init(&source, "ticker") != 0) {
         return 1;
     }
 
@@ -139,15 +144,11 @@ int main(void) {
         return 1;
     }
 
-    source.name = "ticker";
     fast.name = "fast";
     guard.name = "guard";
     guard.reject_negative = true;
 
     Aint id = ping_id(&source);
-    if (print_exc("getID") != 0) {
-        return 1;
-    }
 
     printf("Ping signal id = %d\n", id);
 
@@ -170,6 +171,6 @@ int main(void) {
     }
 
     printf("final totals: fast=%d guard=%d\n", fast.total, guard.total);
-    printf("PingSource/PingReceiver inherit ATranEnd/AReceEnd, so they auto-disconnect on scope exit.\n");
+    printf("PingReceiver inherits AReceEnd and auto-disconnects on scope exit; sender id is owned by user code.\n");
     return 0;
 }
