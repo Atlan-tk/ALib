@@ -163,6 +163,11 @@ int __Alist_pushBack(__Alist* list, const void* source){
 }
 
 void __Alist_rm_node(__Alist* list, __AlsNode* node, bool de){
+    if(__a_unlikely(node == nullptr)){
+        aExcSet(AEXC_overstep);
+        return;
+    }
+
     if(node->prev != nullptr){
         node->prev->next = node->next;
     }
@@ -252,4 +257,23 @@ void __Alist_take(__Alist* list, uint32_t index, void* tar){
     }
 }
 
+void __Alist_take_node(__Alist* list, __AlsNode* node, void* tar){
+    if(tar != nullptr) memset(tar, 0, list->size);
 
+    if(__a_unlikely(node == nullptr)){
+        aExcSet(AEXC_overstep);
+        return;
+    }
+
+    if(__a_unlikely(list->num == 0)){
+        aExcSet(AEXC_overstep);
+        return;
+    }
+    if(tar == nullptr){
+        __Alist_rm_node(list, node, true);
+        return;
+    }else{
+        memcpy(tar, __Alist_getObj(node), list->size);
+        __Alist_rm_node(list, node, false);
+    }
+}

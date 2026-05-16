@@ -3,6 +3,7 @@
 #include <alib/astring.h>
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 AList_Define(int);
 AList_Generate(int);
@@ -11,6 +12,48 @@ A_TYPE_REGISTER(AList(int));
 AList_Define(AString);
 AList_Generate(AString);
 A_TYPE_REGISTER(AList(AString));
+
+static uint32_t g_alib_free_calls = 0;
+
+void alib_free(void *p) {
+    if (p != NULL) {
+        g_alib_free_calls++;
+    }
+    free(p);
+}
+
+void *alib_alloc(uint32_t size) {
+    return malloc(size);
+}
+
+void *alib_realloc(void *p, uint32_t size) {
+    return realloc(p, size);
+}
+
+static void assert_int_list_eq(const AList(int) *list, const int *expected, uint32_t n) {
+    assert(list->f->getNumber(list) == n);
+    for (uint32_t i = 0; i < n; i++) {
+        int *p = list->f->at(list, i);
+        assert(p != NULL);
+        assert(*p == expected[i]);
+    }
+}
+
+static void assert_astring_list_eq(const AList(AString) *list, const char *const *expected, uint32_t n) {
+    assert(list->f->getNumber(list) == n);
+    for (uint32_t i = 0; i < n; i++) {
+        AString *p = list->f->at(list, i);
+        assert(p != NULL);
+        assert(strcmp(p->s, expected[i]) == 0);
+    }
+}
+
+static AString make_owned_astring(const char *s) {
+    AString out = A_INIT(AString);
+    AString literal = AString_new((char *)s);
+    out.f->addBack(&out, literal);
+    return out;
+}
 
 static void test_alist_int(void) {
     RAII(AList(int)) list = A_INIT(AList(int));
@@ -65,6 +108,121 @@ static void test_alist_int(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
+static void test_alist_rm_p(void) {
+    RAII(AList(int)) list = A_INIT(AList(int));
+    assert(!aExcOccur());
+
+    for (int i = 0; i < 5; i++) {
+        list.f->pushBack(&list, i);
+        assert(!aExcOccur());
+    }
+
+    int *mid = list.f->at(&list, 2);
+    list.f->rm_p(&list, mid);
+    assert(!aExcOccur());
+    {
+        const int expected[] = {0, 1, 3, 4};
+        assert_int_list_eq(&list, expected, 4);
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    int *head = list.f->at(&list, 0);
+    list.f->rm_p(&list, head);
+    assert(!aExcOccur());
+    {
+        const int expected[] = {1, 3, 4};
+        assert_int_list_eq(&list, expected, 3);
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    int *tail = list.f->at(&list, list.f->getNumber(&list) - 1);
+    list.f->rm_p(&list, tail);
+    assert(!aExcOccur());
+    {
+        const int expected[] = {1, 3};
+        assert_int_list_eq(&list, expected, 2);
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    list.f->rm_p(&list, list.f->at(&list, 0));
+    assert(!aExcOccur());
+    {
+        const int expected[] = {3};
+        assert_int_list_eq(&list, expected, 1);
+    }
+
+    list.f->rm_p(&list, list.f->at(&list, 0));
+    assert(!aExcOccur());
+    assert(list.f->empty(&list));
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    list.f->rm_p(&list, NULL);
+    assert(aExcGet() == AEXC_overstep);
+    aExcClean();
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+}
+
+static void test_alist_take_p(void) {
+    RAII(AList(int)) list = A_INIT(AList(int));
+    assert(!aExcOccur());
+
+    for (int i = 0; i < 5; i++) {
+        list.f->pushBack(&list, i);
+        assert(!aExcOccur());
+    }
+
+    int taken = -1;
+    list.f->take_p(&list, list.f->at(&list, 2), &taken);
+    assert(!aExcOccur());
+    assert(taken == 2);
+    {
+        const int expected[] = {0, 1, 3, 4};
+        assert_int_list_eq(&list, expected, 4);
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    taken = -1;
+    list.f->take_p(&list, list.f->at(&list, 0), &taken);
+    assert(!aExcOccur());
+    assert(taken == 0);
+    {
+        const int expected[] = {1, 3, 4};
+        assert_int_list_eq(&list, expected, 3);
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    list.f->take_p(&list, list.f->at(&list, list.f->getNumber(&list) - 1), NULL);
+    assert(!aExcOccur());
+    {
+        const int expected[] = {1, 3};
+        assert_int_list_eq(&list, expected, 2);
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    taken = -1;
+    list.f->take_p(&list, list.f->at(&list, 0), &taken);
+    assert(!aExcOccur());
+    assert(taken == 1);
+    {
+        const int expected[] = {3};
+        assert_int_list_eq(&list, expected, 1);
+    }
+
+    taken = -1;
+    list.f->take_p(&list, list.f->at(&list, 0), &taken);
+    assert(!aExcOccur());
+    assert(taken == 3);
+    assert(list.f->empty(&list));
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    taken = 1234;
+    list.f->take_p(&list, NULL, &taken);
+    assert(aExcGet() == AEXC_overstep);
+    assert(taken == 0);
+    aExcClean();
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+}
+
 static void test_alist_astring(void) {
     RAII(AList(AString)) list = A_INIT(AList(AString));
     assert(!aExcOccur());
@@ -115,10 +273,203 @@ static void test_alist_astring(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
+static void test_alist_astring_rm_p(void) {
+    RAII(AList(AString)) list = A_INIT(AList(AString));
+    assert(!aExcOccur());
+
+    {
+        RAII(AString) tmp = make_owned_astring("alpha");
+        assert(!aExcOccur());
+        list.f->pushBack(&list, tmp);
+        assert(!aExcOccur());
+    }
+    {
+        RAII(AString) tmp = make_owned_astring("beta");
+        assert(!aExcOccur());
+        list.f->pushBack(&list, tmp);
+        assert(!aExcOccur());
+    }
+    {
+        RAII(AString) tmp = make_owned_astring("gamma");
+        assert(!aExcOccur());
+        list.f->pushBack(&list, tmp);
+        assert(!aExcOccur());
+    }
+
+    {
+        uint32_t frees_before = g_alib_free_calls;
+        AString *mid = list.f->at(&list, 1);
+        list.f->rm_p(&list, mid);
+        assert(!aExcOccur());
+        assert(g_alib_free_calls == frees_before + 2);
+        {
+            const char *expected[] = {"alpha", "gamma"};
+            assert_astring_list_eq(&list, expected, 2);
+        }
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    {
+        uint32_t frees_before = g_alib_free_calls;
+        AString *head = list.f->at(&list, 0);
+        list.f->rm_p(&list, head);
+        assert(!aExcOccur());
+        assert(g_alib_free_calls == frees_before + 2);
+        {
+            const char *expected[] = {"gamma"};
+            assert_astring_list_eq(&list, expected, 1);
+        }
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    {
+        AString literal = AString_new("literal");
+        uint32_t frees_before_push = g_alib_free_calls;
+        list.f->pushBack(&list, literal);
+        assert(!aExcOccur());
+        assert(g_alib_free_calls == frees_before_push);
+    }
+    {
+        uint32_t frees_before = g_alib_free_calls;
+        AString *tail = list.f->at(&list, 1);
+        list.f->rm_p(&list, tail);
+        assert(!aExcOccur());
+        assert(g_alib_free_calls == frees_before + 1);
+        {
+            const char *expected[] = {"gamma"};
+            assert_astring_list_eq(&list, expected, 1);
+        }
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    {
+        RAII(AString) tmp = make_owned_astring("delta");
+        assert(!aExcOccur());
+        list.f->pushBack(&list, tmp);
+        assert(!aExcOccur());
+    }
+    {
+        uint32_t frees_before = g_alib_free_calls;
+        AString *tail = list.f->at(&list, 1);
+        list.f->rm_p(&list, tail);
+        assert(!aExcOccur());
+        assert(g_alib_free_calls == frees_before + 2);
+        {
+            const char *expected[] = {"gamma"};
+            assert_astring_list_eq(&list, expected, 1);
+        }
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    {
+        uint32_t frees_before = g_alib_free_calls;
+        AString *last = list.f->at(&list, 0);
+        list.f->rm_p(&list, last);
+        assert(!aExcOccur());
+        assert(g_alib_free_calls == frees_before + 2);
+        assert(list.f->empty(&list));
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+}
+
+static void test_alist_astring_take_p(void) {
+    RAII(AList(AString)) list = A_INIT(AList(AString));
+    assert(!aExcOccur());
+
+    {
+        RAII(AString) tmp = make_owned_astring("alpha");
+        assert(!aExcOccur());
+        list.f->pushBack(&list, tmp);
+        assert(!aExcOccur());
+    }
+    {
+        RAII(AString) tmp = make_owned_astring("beta");
+        assert(!aExcOccur());
+        list.f->pushBack(&list, tmp);
+        assert(!aExcOccur());
+    }
+    {
+        RAII(AString) tmp = make_owned_astring("gamma");
+        assert(!aExcOccur());
+        list.f->pushBack(&list, tmp);
+        assert(!aExcOccur());
+    }
+
+    {
+        uint32_t frees_before = g_alib_free_calls;
+        RAII(AString) taken = A_INIT(AString);
+        list.f->take_p(&list, list.f->at(&list, 1), &taken);
+        assert(!aExcOccur());
+        assert(strcmp(taken.s, "beta") == 0);
+        assert(g_alib_free_calls == frees_before + 1);
+        {
+            const char *expected[] = {"alpha", "gamma"};
+            assert_astring_list_eq(&list, expected, 2);
+        }
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    {
+        AString literal = AString_new("literal");
+        list.f->pushBack(&list, literal);
+        assert(!aExcOccur());
+    }
+    {
+        uint32_t frees_before = g_alib_free_calls;
+        RAII(AString) taken = A_INIT(AString);
+        list.f->take_p(&list, list.f->at(&list, 2), &taken);
+        assert(!aExcOccur());
+        assert(strcmp(taken.s, "literal") == 0);
+        assert(g_alib_free_calls == frees_before + 1);
+        {
+            const char *expected[] = {"alpha", "gamma"};
+            assert_astring_list_eq(&list, expected, 2);
+        }
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    {
+        uint32_t frees_before = g_alib_free_calls;
+        list.f->take_p(&list, list.f->at(&list, 0), NULL);
+        assert(!aExcOccur());
+        assert(g_alib_free_calls == frees_before + 2);
+        {
+            const char *expected[] = {"gamma"};
+            assert_astring_list_eq(&list, expected, 1);
+        }
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    {
+        uint32_t frees_before = g_alib_free_calls;
+        RAII(AString) taken = A_INIT(AString);
+        list.f->take_p(&list, list.f->at(&list, 0), &taken);
+        assert(!aExcOccur());
+        assert(strcmp(taken.s, "gamma") == 0);
+        assert(g_alib_free_calls == frees_before + 1);
+        assert(list.f->empty(&list));
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    {
+        RAII(AString) taken = A_INIT(AString);
+        uint32_t frees_before = g_alib_free_calls;
+        list.f->take_p(&list, NULL, &taken);
+        assert(aExcGet() == AEXC_overstep);
+        assert(taken.s == NULL);
+        assert(g_alib_free_calls == frees_before);
+        aExcClean();
+    }
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+}
+
 int main(void) {
     test_alist_int();
+    test_alist_rm_p();
+    test_alist_take_p();
     test_alist_astring();
+    test_alist_astring_rm_p();
+    test_alist_astring_take_p();
     printf("All AList tests passed.\n");
     return 0;
 }
-

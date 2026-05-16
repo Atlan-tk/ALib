@@ -35,12 +35,15 @@ int __Alist_cmpd(const __Alist* list, const __Alist* that_list);
 
 void*     __Alist_at          (const __Alist* list, uint32_t index);
 void      __Alist_rm          (__Alist* list, uint32_t index);
+void      __Alist_rm_node     (__Alist* list, __AlsNode* node, bool de);
 int       __Alist_ins         (__Alist* list, uint32_t index, const void* obj);
 int       __Alist_pushBack    (__Alist* list, const void* obj);
 int       __Alist_pushFront   (__Alist* list, const void* obj);
 void      __Alist_popBack     (__Alist* list, void* tar);
 void      __Alist_popFront    (__Alist* list, void* tar);
 void      __Alist_take        (__Alist* list, uint32_t index, void* tar);
+void      __Alist_take_node   (__Alist* list, __AlsNode* node, void* tar);
+
 
 
 static inline __AlsNode* __Alist_getNode(const void* d){
@@ -71,8 +74,10 @@ static inline void* __Alist_getObj(__AlsNode* node){
         void    (*dest)(void*);                                                             \
         T*      (*const at)       (const AList(T)* self, uint32_t index);                   \
         void    (*const rm)       (AList(T)* self, uint32_t index);                         \
+        void    (*const rm_p)     (AList(T)* self, T* p);                                   \
         void    (*const ins)      (AList(T)* self, uint32_t index, const T obj);            \
         void    (*const take)     (AList(T)* self, uint32_t index, T* tar);                 \
+        void    (*const take_p)     (AList(T)* self, T* p, T* tar);                         \
         void    (*const pushBack) (AList(T)* self, const T obj);                            \
         void    (*const pushFront)(AList(T)* self, const T obj);                            \
         void    (*const popBack)  (AList(T)* self, T* tar);                                 \
@@ -87,8 +92,10 @@ static inline void* __Alist_getObj(__AlsNode* node){
                                                                                             \
     static inline T* __Alsf(T,at)(const AList(T)* self, uint32_t i);                        \
     static inline void __Alsf(T,rm)(AList(T)* self, uint32_t i);                            \
+    static inline void __Alsf(T,rm_p)(AList(T)* self, T* p);                                \
     static inline void __Alsf(T,ins)(AList(T)*self, uint32_t i, const T obj);               \
     static inline void __Alsf(T,take)(AList(T)* self,uint32_t i, T* tar);                   \
+    static inline void __Alsf(T,take_p)(AList(T)* self, T* p, T* tar);                      \
     static inline void __Alsf(T,pushBack)(AList(T)* self, const T obj);                     \
     static inline void __Alsf(T,pushFront)(AList(T)* self, const T obj);                    \
     static inline void __Alsf(T,popBack)(AList(T)* self, T* tar);                           \
@@ -109,8 +116,10 @@ static inline void* __Alist_getObj(__AlsNode* node){
         (void*)__A_OBJ_DEST_FUNC_SELF(AList(T)),                                            \
         __Alsf(T,at),                                                                       \
         __Alsf(T,rm),                                                                       \
+        __Alsf(T,rm_p),                                                                     \
         __Alsf(T,ins),                                                                      \
         __Alsf(T,take),                                                                     \
+        __Alsf(T,take_p),                                                                   \
         __Alsf(T,pushBack),                                                                 \
         __Alsf(T,pushFront),                                                                \
         __Alsf(T,popBack),                                                                  \
@@ -130,12 +139,17 @@ static inline void* __Alist_getObj(__AlsNode* node){
     static inline void __Alsf(T,rm)(AList(T)* self, uint32_t index){                        \
         __Alist_rm(&self->list, index);                                                     \
     }                                                                                       \
-                                                                                            \
+    static inline void __Alsf(T,rm_p)(AList(T)* self, T* p){                                \
+        __Alist_rm_node(&self->list, __Alist_getNode(p), true);                             \
+    }                                                                                       \
     static inline void __Alsf(T,ins)(AList(T)* self,uint32_t index,const T obj){            \
         __Alist_ins(&self->list, index, &obj);                                              \
     }                                                                                       \
     static inline void __Alsf(T,take)(AList(T)* self,uint32_t index, T* tar){               \
         __Alist_take(&self->list, index, tar);                                              \
+    }                                                                                       \
+    static inline void __Alsf(T,take_p)(AList(T)* self, T* p, T* tar){                      \
+        __Alist_take_node(&self->list, __Alist_getNode(p), tar);                            \
     }                                                                                       \
     static inline void __Alsf(T,pushBack)(AList(T)* self, const T obj){                     \
         __Alist_pushBack(&self->list, &obj);                                                \
