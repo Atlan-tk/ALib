@@ -423,8 +423,8 @@ int __Ahash_cmpd(const __Ahash* self, const __Ahash* that){
         }
     }
 
-    __Aiter it_self; __Ahash_get_head(self, &it_self);
-    __Aiter it_that; __Ahash_get_head(that, &it_that);
+    __Aiter it_self = {}; __Ahash_get_head(self, &it_self);
+    __Aiter it_that = {}; __Ahash_get_head(that, &it_that);
     while(__Aiter_exist(self, &it_self) && __Aiter_exist(that, &it_that)){
         char* obj_self = (char*)(it_self.p);
         char* obj_that = (char*)(it_that.p);
