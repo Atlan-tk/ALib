@@ -60,6 +60,8 @@ typedef struct{
     Aint        id;
     const void* addressee;
     void        (*call)(const ASignal* signal, void* addressee);
+    uint32_t    call_num;
+    bool        dis_request;
 }ALink;
 A_TYPE_REGISTER(ALink);
 
@@ -109,7 +111,7 @@ static inline uint32_t ASignalTower_find_i(const ASignalTower* self, const void*
     auto list = &self->linkpList;
     for(uint32_t i = 0; i < list->f->getNumber(list); i++){
         auto pp = list->f->at(list, i);
-        if(pp != nullptr && (*pp)->addressee == addressee){
+        if(pp != nullptr && *pp != nullptr && (*pp)->addressee == addressee){
             return i;
         }
     }
@@ -197,7 +199,7 @@ static inline int ASignalTower_call(const ASignalTower* self, const ASignal* sig
         aExcSet(AEXC_nullptr);
         return 0;
     }
-    if(__a_unlikely(signal == nullptr)){
+    if(__a_unlikely(signal == nullptr || signal->id <= 0)){
         aExcSet(AEXC_outdomain);
         return 0;
     }
@@ -212,7 +214,7 @@ static inline int ASignalTower_call(const ASignalTower* self, const ASignal* sig
         }
 
         aExcClean();
-        link->call(signal, (void*)(link->addressee));
+        if(!link->dis_request) link->call(signal, (void*)(link->addressee));
         if(aExcOccur()){
             ret = AEXC_response_exc;
             AEXC_t ev = aExcGet(); aExcClean();
@@ -292,7 +294,7 @@ static inline void ASignalRadio_rm(ASignalRadio* self, Aint id){
         aExcSet(AEXC_nullptr);
         return;
     }
-    if(__a_unlikely(id < 0)){
+    if(__a_unlikely(id <= 0)){
         aExcSet(AEXC_outdomain);
         return;
     }
@@ -502,7 +504,7 @@ static inline void ASignalSystem_add(ASignalSystem* self, Aint id, const void* a
 
     auto pool = &self->linkPool;
     {
-        pool->f->pushFront(pool, (ALink){ id, addressee, call });
+        pool->f->pushFront(pool, (ALink){ .id = id, .addressee = addressee, .call = call });
         if(aExcOccur()){
             return;
         }
@@ -539,6 +541,11 @@ static inline void ASignalSystem_rm_link(ASignalSystem* self, ALink* link){
     }
 
     aExcClean();
+    if(link->call_num != 0){
+        //调用期间不允许删除，仅置位dis_request
+        link->dis_request = true;
+        return;
+    }
 
     auto tower = ASignalSystem_find_forid(self, link->id);
     if(tower != nullptr){
@@ -650,6 +657,62 @@ static inline bool ASignalSystem_exist(const ASignalSystem* self, Aint id, const
 
     return ASignalTower_exist(tower, addressee);
 }
+static inline ASignalTower ASignalSystem_get_tran_list(ASignalSystem* self, const ASignal* signal){
+    ASignalTower tower = {};
+
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return tower;
+    }
+
+    if(__a_unlikely(signal == nullptr || signal->id <= 0 || signal->id >= self->count)){
+        aExcSet(AEXC_outdomain);
+        return tower;
+    }
+
+    auto id = signal->id;
+    auto tower_p = ASignalSystem_find_forid(self, id);
+    if(tower_p == nullptr){
+        aExcSet(AEXC_outdomain);
+        return tower;
+    }
+
+    tower = A_COPY(ASignalTower, *tower_p);
+    if(aExcOccur()){
+        return tower;
+    }
+
+    return tower;
+}
+static void ASignalSystem_set_call(ASignalSystem* self, ASignalTower tower){
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+
+    forEach(it, tower.linkpList){
+        if(it.p != nullptr && *it.p != nullptr){
+            auto link = *it.p;
+            link->call_num++;
+        }
+    }
+}
+static void ASignalSystem_clean_call(ASignalSystem* self, ASignalTower tower){
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+
+    forEach(it, tower.linkpList){
+        if(it.p != nullptr && *it.p != nullptr){
+            auto link = *it.p;
+            link->call_num--;
+            if(link->dis_request){
+                ASignalSystem_rm_link(self, link);
+            }
+        }
+    }
+}
 
 
 
@@ -698,7 +761,7 @@ __attribute__((destructor)) static inline void a_signal_system_poweroff(){
 
 
 
-Aint a_signal_alloc(){
+Aint a_signal_alloc(void){
     aExcClean();
 
     if(!a_system_flag){
@@ -709,52 +772,70 @@ Aint a_signal_alloc(){
     return ASignalSystem_alloc(&a_signal_system);
 }
 
-void __a_signal_transmit(const ASignal* signal, AExcCollector* collector){
+int __a_signal_transmit(const ASignal* signal, AExcCollector* collector){
+    int ret = 0;
+
     if(!a_system_flag){
         aExcSet(AEXC_system_error);
-        return;
+        return ret;
     }
 
     if(__a_unlikely(signal == nullptr)){
         aExcSet(AEXC_nullptr);
-        return;
+        return ret;
     }
 
     auto id = signal->id;
-
-    aExcClean();
-    RAII(AAutoKey) autokey_c = {}; if(a_call_num == 0) autokey_c = AMtxRW_rlock(&a_call_lock);
-    if(aExcOccur()){
-        return;
-    }
-    RAII(AAutoKey) autokey_g = AMtxRW_rlock(&a_global_lock);
-    if(aExcOccur()){
-        return;
-    }
-
-    auto connector = ASignalSystem_find_forid(&a_signal_system, id);
-    if(connector == nullptr){
-        return;
-    }
-
     if(collector != nullptr){
         collector->id = id;
     }
 
-    RAII(ASignalTower) tower = A_COPY(ASignalTower, *connector);
+    aExcClean();
+
+    RAII(AAutoKey) autokey_c = {}; if(a_call_num == 0) autokey_c = AMtxRW_rlock(&a_call_lock);
     if(aExcOccur()){
-        return;
+        return ret;
     }
 
-    A_DEST(AAutoKey, autokey_g);
+    RAII(ASignalTower) tower = {};
+
+    {
+        RAII(AAutoKey) autokey_g = AMtxRW_wlock(&a_global_lock);
+        if(aExcOccur()){
+            return ret;
+        }
+
+        tower = ASignalSystem_get_tran_list(&a_signal_system, signal);
+        if(aExcOccur()){
+            return ret;
+        }
+
+        ASignalSystem_set_call(&a_signal_system, tower);
+        if(aExcOccur()){
+            return ret;
+        }
+    }
 
     a_call_num++;
-
-    if(ASignalTower_call(&tower, signal, collector) == AEXC_response_exc){
-        aExcSet(AEXC_response_exc);
+    {
+        aExcClean();
+        if(ASignalTower_call(&tower, signal, collector) == AEXC_response_exc){
+            ret = AEXC_response_exc;
+        }
+        aExcClean();
     }
 
+    do{
+        RAII(AAutoKey) autokey_g = AMtxRW_wlock(&a_global_lock);
+        if(aExcOccur()){
+            break;
+        }
+
+        ASignalSystem_clean_call(&a_signal_system, tower);
+    }while(0);
+
     a_call_num--;
+    return ret;
 }
 
 void a_signal_connection(Aint id, const void* addressee, void(*call)(const ASignal*, void*)){
@@ -771,8 +852,6 @@ void a_signal_connection(Aint id, const void* addressee, void(*call)(const ASign
 
     if(!ASignalSystem_exist(&a_signal_system, id, addressee)){
         ASignalSystem_add(&a_signal_system, id, (void*)addressee, call);
-    }else{
-        aExcSet(AEXC_repeat_write);
     }
 }
 
@@ -781,14 +860,9 @@ void a_signal_disconnect(Aint id, const void* addressee){
         aExcSet(AEXC_system_error);
         return;
     }
-
-    if(a_call_num != 0){
-        aExcSet(AEXC_repeat_write);
-        return;
-    }
-
     aExcClean();
-    RAII(AAutoKey) autokey_c = AMtxRW_wlock(&a_call_lock);
+    
+    RAII(AAutoKey) autokey_c = {}; if(a_call_num == 0) autokey_c = AMtxRW_wlock(&a_call_lock);
     if(aExcOccur()){
         return;
     }
@@ -797,7 +871,12 @@ void a_signal_disconnect(Aint id, const void* addressee){
         return;
     }
 
-    ASignalSystem_rm_one(&a_signal_system, id, (void*)addressee);
+    auto link = ASignalSystem_find(&a_signal_system, id, addressee);
+    if(link == nullptr){
+        return;
+    }
+
+    ASignalSystem_rm_link(&a_signal_system, link);
 }
 
 void a_signal_disconnect_all(Aint id){
@@ -805,14 +884,9 @@ void a_signal_disconnect_all(Aint id){
         aExcSet(AEXC_system_error);
         return;
     }
-
-    if(a_call_num != 0){
-        aExcSet(AEXC_repeat_write);
-        return;
-    }
-
     aExcClean();
-    RAII(AAutoKey) autokey_c = AMtxRW_wlock(&a_call_lock);
+    
+    RAII(AAutoKey) autokey_c = {}; if(a_call_num == 0) autokey_c = AMtxRW_wlock(&a_call_lock);
     if(aExcOccur()){
         return;
     }
@@ -829,14 +903,9 @@ void a_target_disconnect_all(const void* addressee){
         aExcSet(AEXC_system_error);
         return;
     }
-
-    if(a_call_num != 0){
-        aExcSet(AEXC_repeat_write);
-        return;
-    }
-
     aExcClean();
-    RAII(AAutoKey) autokey_c = AMtxRW_wlock(&a_call_lock);
+    
+    RAII(AAutoKey) autokey_c = {}; if(a_call_num == 0) autokey_c = AMtxRW_wlock(&a_call_lock);
     if(aExcOccur()){
         return;
     }
@@ -845,6 +914,6 @@ void a_target_disconnect_all(const void* addressee){
         return;
     }
 
-    ASignalSystem_rm_forad(&a_signal_system, (void*)addressee);
+    ASignalSystem_rm_forad(&a_signal_system, addressee);
 }
 

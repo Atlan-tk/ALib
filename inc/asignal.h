@@ -98,12 +98,13 @@ A_CLASS_REGISTER(AExcCollector);
 
 /* 信号系统API */
 /* 分配信号id */
-Aint a_signal_alloc();
+Aint a_signal_alloc(void);
 
 /* 发送信号 */
 /* 信号发出后后调用对应的靶函数 */
 /* collector用于收集靶函数抛出的异常 */
-void __a_signal_transmit(const ASignal* signal, AExcCollector* collector);
+/* 返回值表示靶函数是否抛出了异常，其取值仅为0或AEXC_response_exc */
+int __a_signal_transmit(const ASignal* signal, AExcCollector* collector);
 
 #define _a_signal_transmit(signal, collector, ...)({                                \
     auto __a_si = (signal); auto __a_co = (collector);                              \
@@ -140,9 +141,8 @@ void a_target_disconnect_all(const void* addressee);
 /*
  *             使用约定
  * 1 已连接信号的对象在析构前必须断开连接
- * 2 靶函数中disconnect目标对象会直接失败
- * 3 靶函数中不允许析构任何被连接的对象，否则会造成垂悬指针
- * 4 不在靶函数中等待其他线程的信号操作，否则会死锁
+ * 2 不在靶函数中等待其他线程的信号操作，否则可能会死锁
+ * 3 可以在靶函数中断开连接，但尽量不要析构目标对象，若必须析构，则析构后不可再使用
  *
  * 只要满足上面的约定即可安全使用对象系统
  */

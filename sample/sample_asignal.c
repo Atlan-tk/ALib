@@ -112,20 +112,19 @@ static int emit_ping(PingSource* source, int payload, bool collect_exc) {
     if (collect_exc) {
         RAII(AExcCollector) collector = A_INIT(AExcCollector);
 
-        a_signal_transmit(base, &collector);
-        if (aExcGet() == AEXC_response_exc) {
+        int ret = a_signal_transmit(base, &collector);
+        if (ret == AEXC_response_exc) {
             printf("emit_ping(payload=%d) collected callback errors for id=%d:\n",
                     payload, collector.id);
-            aExcClean();
             drain_signal_exceptions(&collector);
             return 0;
         }
 
-        return print_exc("a_signal_transmit");
+        return ret == 0 ? 0 : print_exc("a_signal_transmit");
     }
 
-    a_signal_transmit(base);
-    return print_exc("a_signal_transmit");
+    int ret = a_signal_transmit(base);
+    return ret == AEXC_response_exc ? 0 : print_exc("a_signal_transmit");
 }
 
 int main(void) {

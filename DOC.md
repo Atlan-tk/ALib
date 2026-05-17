@@ -918,11 +918,11 @@ A_CLASS_REGISTER(MySignal);
 | `a_signal_alloc()` | 无 | 新的正整数信号 id；失败时通常为 `-1` | `AEXC_system_error` | 申请一个新的信号类型 id |
 | `__a_signal_transmit(const ASignal* signal, AExcCollector* collector)` | 信号指针、可选收集器 | 发送信号 | `AEXC_system_error`、`AEXC_nullptr`、`AEXC_outdomain`、`AEXC_response_exc` | 低层实现函数；业务代码通常调用 `a_signal_transmit` 宏 |
 | `a_signal_transmit(signal, ...)` | 变参宏：必传 `signal`，可选 1 个 `AExcCollector*` | 发送信号 | 同 `__a_signal_transmit` | 宏变参上限 1；会做编译期类型断言 |
-| `a_signal_connection(Aint id, const void* addressee, void(*call)(const ASignal*, void*))` | 信号 id、接收者地址、回调函数 | 建立连接 | `AEXC_outdomain`、`AEXC_repeat_write`、底层分配异常 | 同一个 `(id, addressee)` 只允许存在一条连接 |
-| `a_signal_disconnect(Aint id, const void* addressee)` | 信号 id、接收者地址 | 删除一条连接 | `AEXC_outdomain`、`AEXC_repeat_write` | 在回调执行期间调用会被拒绝；“连接不存在但参数合法”通常静默返回 |
+| `a_signal_connection(Aint id, const void* addressee, void(*call)(const ASignal*, void*))` | 信号 id、接收者地址、回调函数 | 建立连接 | `AEXC_outdomain`、底层分配异常 | 同一个 `(id, addressee)` 若已存在连接，则静默忽略（不会覆盖） |
+| `a_signal_disconnect(Aint id, const void* addressee)` | 信号 id、接收者地址 | 删除一条连接 | `AEXC_outdomain` | 在回调执行期间调用会延迟到本轮派发结束后执行；“连接不存在但参数合法”通常静默返回 |
 | `a_target_disconnect(const void* addressee, Aint id)` | 接收者地址、信号 id | 删除一条连接 | 同 `a_signal_disconnect` | 只是参数顺序相反的内联包装 |
-| `a_signal_disconnect_all(Aint id)` | 信号 id | 删除该信号 id 的全部连接 | `AEXC_outdomain`、`AEXC_repeat_write` | 若该 id 当前没有连接，通常静默返回 |
-| `a_target_disconnect_all(const void* addressee)` | 接收者地址 | 删除该接收者的全部连接 | `AEXC_outdomain`、`AEXC_repeat_write` | 在回调执行期间调用同样会被拒绝 |
+| `a_signal_disconnect_all(Aint id)` | 信号 id | 删除该信号 id 的全部连接 | `AEXC_outdomain` | 若该 id 当前没有连接，通常静默返回 |
+| `a_target_disconnect_all(const void* addressee)` | 接收者地址 | 删除该接收者的全部连接 | `AEXC_outdomain` | 在回调执行期间调用同样会延迟到本轮派发结束后执行 |
 
 #### 5.15.5 `a_signal_transmit` 宏的变参规则
 
@@ -945,11 +945,12 @@ a_signal_transmit(signal, &collector);
 - 发送信号是同步行为：所有当前连接的回调都在调用线程内执行。
 - 派发开始前，系统会拷贝当前信号 id 对应的连接快照；因此“回调里新增的连接”不会参与当前这一轮派发，只会影响后续派发。
 - 如果某个回调设置了异常：
-  - 无收集器时：本次派发结束后错误槽会是 `AEXC_response_exc`；
-  - 有收集器时：错误槽仍会是 `AEXC_response_exc`，同时收集器中追加一条 `AExcEnd`。
-- 收集器的记录顺序是“回调执行顺序追加、`pop` 时逆序弹出”。
-- 向一个“已分配但当前无人连接”的合法 `id` 发送信号，不报错，只是什么也不发生。
-- 向一个“从未分配过或超出当前范围”的 `id` 发送信号，会报 `AEXC_outdomain`。
+  - `a_signal_transmit` 返回 `AEXC_response_exc` 表示有回调抛出异常（否则返回 0）；
+  - 无收集器时：返回 `AEXC_response_exc`，但异常槽（`aExcGet()`）已在返回到达前被清理；
+  - 有收集器时：返回 `AEXC_response_exc`，同时收集器中追加一条 `AExcEnd`，异常槽同样已清理。
+- 收集器的记录顺序是”回调执行顺序追加、`pop` 时逆序弹出”。
+- 向一个”已分配但当前无人连接”的合法 `id` 发送信号，会报 `AEXC_outdomain`。
+- 向一个”从未分配过或超出当前范围”的 `id` 发送信号，同样会报 `AEXC_outdomain`。
 
 #### 5.15.7 `AReceEnd`
 
@@ -973,7 +974,7 @@ a_signal_transmit(signal, &collector);
 当前实现要求：
 
 1. 已连接的接收者对象在析构前必须断开连接，或者直接继承 `AReceEnd`。  
-2. 回调执行期间不允许做破坏性断连（`disconnect` / `disconnect_all`），否则会报 `AEXC_repeat_write`。  
+2. 回调执行期间可以断连（`disconnect` / `disconnect_all`），但实际操作会延迟到本轮派发结束后执行。  
 3. 回调里不要析构任何仍处于连接表中的接收者对象，否则会制造悬空指针。  
 4. 回调里不要等待其他线程执行信号连接 / 断开操作，否则可能形成锁等待。  
 

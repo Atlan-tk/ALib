@@ -67,11 +67,6 @@ static void test_signal_transmit_basic(void) {
     sig.value = 42;
     sig.sender = &receiver0;
 
-    a_signal_transmit(&sig);
-    assert(!aExcOccur());
-    assert(receiver0.hits == 0);
-    assert(receiver1.hits == 0);
-
     a_signal_connection(id, &receiver0, count_target);
     assert(!aExcOccur());
     a_signal_connection(id, &receiver1, count_target);
@@ -100,12 +95,13 @@ static void test_signal_transmit_basic(void) {
     assert(!aExcOccur());
 
     a_signal_transmit(&sig);
-    assert(!aExcOccur());
+    assert(aExcGet() == AEXC_outdomain);
+    aExcClean();
     assert(receiver0.hits == 1);
     assert(receiver1.hits == 2);
 }
 
-static void test_signal_reject_duplicate_addressee(void) {
+static void test_signal_duplicate_addressee_ignored(void) {
     Aint id = a_signal_alloc();
     assert(!aExcOccur());
     assert(id >= 0);
@@ -117,8 +113,7 @@ static void test_signal_reject_duplicate_addressee(void) {
     assert(!aExcOccur());
 
     a_signal_connection(id, &receiver, duplicate_target);
-    assert(aExcGet() == AEXC_repeat_write);
-    aExcClean();
+    assert(!aExcOccur());
 
     RAII(ASignal) sig = A_INIT(ASignal);
     assert(!aExcOccur());
@@ -135,7 +130,8 @@ static void test_signal_reject_duplicate_addressee(void) {
     assert(!aExcOccur());
 
     a_signal_transmit(&sig);
-    assert(!aExcOccur());
+    assert(aExcGet() == AEXC_outdomain);
+    aExcClean();
     assert(receiver.hits == 1);
     assert(g_duplicate_target_hits == 0);
 }
@@ -182,9 +178,11 @@ static void test_disconnect_all_helpers(void) {
     assert(!aExcOccur());
 
     a_signal_transmit(&sig0);
-    assert(!aExcOccur());
+    assert(aExcGet() == AEXC_outdomain);
+    aExcClean();
     a_signal_transmit(&sig1);
-    assert(!aExcOccur());
+    assert(aExcGet() == AEXC_outdomain);
+    aExcClean();
     assert(receiver.hits == 2);
 
     a_signal_disconnect_all(id1);
@@ -341,23 +339,21 @@ static void test_signal_collect_exceptions(void) {
     RAII(AExcCollector) collector = A_INIT(AExcCollector);
     assert(!aExcOccur());
 
-    a_signal_transmit(&sig, &collector);
-    assert(aExcGet() == AEXC_response_exc);
+    int ret = a_signal_transmit(&sig, &collector);
+    assert(ret == AEXC_response_exc);
     assert(collector.id == id);
     assert(g_collect_target_hits == 1);
     assert(receiver == 1);
     assert(collector.list.f->getNumber(&collector.list) == 1);
 
-    aExcClean();
     AExcEnd ev = AExcCollector_pop(&collector);
     assert(!aExcOccur());
     assert(ev.addressee == &receiver);
     assert(ev.exc_value == AEXC_outdomain);
     assert(collector.list.f->empty(&collector.list));
 
-    a_signal_transmit(&sig);
-    assert(aExcGet() == AEXC_response_exc);
-    aExcClean();
+    ret = a_signal_transmit(&sig);
+    assert(ret == AEXC_response_exc);
     assert(g_collect_target_hits == 2);
     assert(receiver == 2);
 
@@ -368,7 +364,7 @@ static void test_signal_collect_exceptions(void) {
 int main(void) {
     test_signal_type_helpers();
     test_signal_transmit_basic();
-    test_signal_reject_duplicate_addressee();
+    test_signal_duplicate_addressee_ignored();
     test_disconnect_all_helpers();
     test_invalid_id_rejected();
     test_signal_transmit_reentrant();
