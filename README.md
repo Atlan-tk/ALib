@@ -203,7 +203,7 @@ A_TYPE_REGISTER(ATree(int, AString));
 
 ## 更多文档
 
-- 详细设计说明：`DOC.md`
+- 完整模块/API 手册：`DOC.md`
 - 示例代码：`sample/`
 - 行为回归测试：`test/`
 

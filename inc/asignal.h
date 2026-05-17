@@ -45,8 +45,8 @@ A_CLASS_REGISTER(ASignal);
 
 /* 异常收集器 */
 typedef struct{
-    void*   addressee;
-    AEXC_t  exc_value;
+    const void* addressee;
+    AEXC_t      exc_value;
 }AExcEnd;
 A_TYPE_REGISTER(AExcEnd);
 

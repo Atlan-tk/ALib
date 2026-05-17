@@ -1,56 +1,37 @@
 # ALib 开发文档
 
-本文基于当前仓库中的 `inc/`、`src/`、`sample/` 和 `test/` 代码重写，重点说明 ALib 现在已经实现了什么、接口语义是什么，以及它与 GLib 的设计差异。
+本文以 `inc/` 中的公共头文件为准，系统说明 ALib 当前提供的模块、类型、宏和函数，以及它们的参数、返回值、异常语义与使用约定。
+
+文档范围约定：
+
+- 以 `__` 开头的符号视为内部实现细节，不建议业务代码直接调用，本文不逐一展开。
+- 其余函数、类型、函数式宏，以及容器/类生成宏都视为公共 API。
+- “异常”统一指线程局部错误槽 `aExc*` 中的错误码；除特别说明外，ALib 不通过返回错误码表示失败。
 
 ## 1. 项目定位
 
-ALib 的目标不是把 GLib 原样搬到 C11 之外，而是解决另一个问题：
+ALib 是一个面向 C11 + GNU 扩展的底层工具库，核心目标不是复刻 GLib 全家桶，而是把下面几件事组合成一套统一接口：
 
-在纯 C 里，如何让容器、对象和资源管理尽量具备下面这些特性：
+- 编译期绑定元素类型的泛型容器
+- 统一的对象初始化 / 拷贝 / 析构 / 比较 / 哈希协议
+- 近似 RAII 的资源释放方式
+- 轻量单继承类系统与虚函数表
+- 进程内信号派发和锁封装
 
-- 容器类型在编译期就绑定元素类型
-- 对象的初始化、拷贝、析构和比较有统一入口
-- 容器默认按值拷贝、按值析构，而不是把生命周期全留给调用方
-- 能用接近 RAII 的方式管理栈上对象和锁
-- 在不引入完整运行时反射系统的前提下，提供一套轻量级单继承和虚函数表机制
+一句话概括：ALib 更像“把 STL 式值语义和轻量对象模型带进 C 的实验性基础库”。
 
-因此，ALib 的定位可以描述为：
-
-- 面向 C11 + GNU 扩展的底层工具库
-- 在方向上对标 GLib，但范围更窄、更偏容器与对象管理
-- 在使用体验上借鉴一部分 STL 的值语义和容器思路
-- 在工程成熟度和生态广度上，明显比 GLib 更轻、更实验性
-
-它更适合：
-
-- 纯 C 项目中的内部基础库
-- 对类型约束和对象生命周期有明确要求的模块化代码
-- 希望在 C 中获得“泛型容器 + RAII 风格管理 + 轻量对象模型”的项目
-
-它不追求：
-
-- 纯 ISO C 的最小兼容集
-- GLib 全家桶式的运行时设施
-- 语言层级等价于 C++ STL / RAII / 类系统
-
-## 2. 仓库结构与构建产物
+## 2. 仓库结构与构建
 
 ```text
 ALib/
 ├── inc/       # 公共头文件
-├── src/       # 非模板部分实现
+├── src/       # 非模板实现
 ├── sample/    # 示例程序
-├── test/      # 行为测试
+├── test/      # 回归测试
 ├── Makefile
 ├── README.md
 └── DOC.md
 ```
-
-构建结果：
-
-- 静态库：`libatlan.a`
-- 安装头文件目录：`PREFIX/include/alib`
-- 安装库目录：`PREFIX/lib`
 
 常用命令：
 
@@ -61,478 +42,774 @@ make -C test
 make install PREFIX=/usr/local
 ```
 
-`sample/Makefile` 和 `test/Makefile` 会自动创建 `.local/include/alib -> inc/` 的符号链接，因此在仓库里直接构建示例和测试即可，不需要先执行系统级安装。
+默认产物：
 
-## 3. 核心设计
+- 静态库：`libatlan.a`
+- 安装头文件目录：`PREFIX/include/alib`
+- 安装库目录：`PREFIX/lib`
 
-### 3.1 类型注册：`A_TYPE_REGISTER` 是整个库的中心
+## 3. 先读这些通用约定
 
-ALib 并没有 GLib 那样的通用运行时类型系统，而是通过宏约定每个类型的基础操作：
+### 3.1 编译环境
 
-- 初始化：`A_OBJ_INIT(T)`
-- 析构：`A_OBJ_DEST(T)`
-- 拷贝：`A_OBJ_COPY(T)`
-- 比较：`A_OBJ_CMPD(T)`
-- 哈希：`A_OBJ_HASH(T)`
+ALib 依赖：
 
-通过：
+- C11
+- GNU 扩展（`__auto_type`、`typeof`、`cleanup`、`weakref` 等）
+- `<threads.h>`
+
+因此推荐直接使用仓库内的 `Makefile`，或者在外部工程中保持等价编译条件。
+
+### 3.2 类型协议：所有容器都依赖 `A_TYPE_REGISTER`
+
+对“普通类型”，ALib 通过下面五个名字约定类型行为：
+
+- `A_OBJ_INIT(T)`
+- `A_OBJ_DEST(T)`
+- `A_OBJ_COPY(T)`
+- `A_OBJ_CMPD(T)`
+- `A_OBJ_HASH(T)`
+
+再通过：
 
 ```c
 A_TYPE_REGISTER(T);
 ```
 
-把这些操作收束到统一入口后，库里的容器、指针包装和辅助宏都可以对任意已注册类型工作。
+把这些行为接入统一接口。容器、指针包装、哈希、树、RAII 宏都会复用这套协议。
 
-重要的是：这些基础函数不是全部强制要求提供。
+如果用户没有自己实现这些函数，ALib 会回退到默认行为：
 
-如果你没有自己实现，ALib 会退回默认策略：
-
-- init：零初始化
-- dest：清零，不做额外释放
+- init：清零
+- dest：清零
 - copy：按字节复制
-- cmpd：基础类型用自动比较，字符串用字符串比较，其余类型退回 `memcmp`
-- hash：未定义时退回原始内存哈希
+- cmpd：基础类型自动比较，字符串按字符串比较，其余类型退回 `memcmp`
+- hash：未定义时退回原始字节哈希
 
-这是一种“编译期协议”，而不是 GLib/GObject 的运行时反射。
+### 3.3 类协议：类类型使用 `A_CLASS_REGISTER`
 
-### 3.2 已内建注册的类型
+对“类类型”，ALib 在普通类型协议上再加一层：
 
-`alib.h` 已经为这些常用类型准备了基础行为：
+- 首字段为函数表指针 `f`
+- 支持单继承
+- 构造 / 拷贝 / 析构时自动处理父类链
+- 多态析构通过 `f->dest` 完成
 
-- 整数与浮点：`int`、`long`、`short`、`float`、`double`
-- 定长整数：`int8_t` ~ `uint64_t`
-- 布尔和字符：`bool`、`char`
-- 指针/字符串别名：`cptr_t`、`cstr_t`
-- 简单字符串视图：`astr_t`
-- 基类：`Atlan`
-
-因此诸如 `ALine(int)`、`AHash(int, int)` 这类实例化不需要先单独注册 `int`。
-
-### 3.3 生命周期宏
-
-ALib 把对象生命周期统一成几组宏：
-
-- `A_INIT(T)`：创建并初始化一个栈上对象
-- `A_COPY(T, obj)`：按该类型定义的 copy 规则复制对象
-- `A_DEST(T, obj)`：析构一个栈上对象
-- `A_NEW(T)`：在堆上分配并初始化对象
-- `A_CPNEW(T, obj)`：在堆上复制构造对象
-- `A_DELETE(T, p)`：析构并释放堆对象
-- `A_MOVE(obj)`：移动对象并把原对象清零
-- `RAII(T)`：用 GNU `cleanup` 在离开作用域时自动析构
-
-例子：
+类定义最后要用：
 
 ```c
-RAII(AString) s = A_INIT(AString);
-RAII(AString) cp = A_COPY(AString, s);
+A_CLASS_REGISTER(T);
 ```
 
-这也是 ALib 和 GLib 很不一样的地方：ALib 把“对象值语义”放到了容器和基础宏的第一位，而 GLib 大量对象 API 仍以显式申请/释放和指针持有约定为中心。
+### 3.4 异常模型
 
-### 3.4 异常模型：线程局部错误槽，而不是异常栈
-
-ALib 没有 C++ 异常，也不采用 `GError**` 风格 API。它使用一个线程局部整型错误槽：
+ALib 不使用 C++ 异常，也不采用 `GError**` 风格。失败通过线程局部错误槽传递：
 
 - `aExcClean()`：清空错误槽
-- `aExcOccur()`：判断是否存在错误
-- `aExcSet(v)`：设置错误码
+- `aExcOccur()`：是否有错误
+- `aExcSet(v)`：写入错误码
 - `aExcGet()`：读取错误码
 
-常见错误码包括：
+常见错误码：
 
-- `AEXC_nullptr`
-- `AEXC_overstep`
-- `AEXC_outdomain`
-- `AEXC_alloc_failed`
-- `AEXC_init_failed`
-- `AEXC_repeat_write`
-- `AEXC_system_error`
-- `AEXC_response_exc`
+- `AEXC_nullptr`：空指针 / 空对象
+- `AEXC_overstep`：越界、取空、查无此项
+- `AEXC_outdomain`：参数超出允许域
+- `AEXC_alloc_failed`：内存分配失败
+- `AEXC_init_failed`：初始化 / 拷贝构造失败
+- `AEXC_repeat_write`：重复写入或不允许的写时机
+- `AEXC_system_error`：线程 / 锁 / 系统调用失败
+- `AEXC_response_exc`：信号回调抛出了异常
 
-这个模型的特征是：
+使用建议：每次关键操作后尽快检查错误槽，因为后续调用可能覆盖前一次错误。
 
-- 成本低，调用简单
-- 适合库内部联动和 RAII 风格清理
-- 不是多层堆叠错误模型
-- 后续操作可能覆盖前一个错误，因此调用方需要尽快检查和消费
+### 3.5 所有权术语
 
-换句话说，ALib 的错误处理更像“线程本地状态位”，而不是 GLib 的 `GError` 对象链路。
+本文统一使用这些词：
 
-### 3.5 分配器钩子
+- 借用（borrowed）：只引用外部对象，不负责释放
+- 拥有（owning）：对象负责释放其内部资源
+- 深拷贝：复制后两份对象生命周期独立
+- 浅拷贝：复制后共享底层资源或只是别名
+- 取出（take/pop 到 `tar`）：把元素所有权交给调用方；调用方后续负责析构
 
-`src/alib.c` 里默认提供了弱符号：
+### 3.6 迭代器失效规则
 
-- `alib_alloc`
-- `alib_realloc`
-- `alib_free`
-- `alib_new`
-- `alib_cpnew`
-- `alib_delete`
+统一保守规则：
 
-默认实现直接转到 `malloc/realloc/free`，但你可以在自己的程序中重写这些符号，把 ALib 接到自定义分配器、内存池或审计层上。
+- 只要容器结构发生变化，旧迭代器就视为失效。
+- 结构变化包括 `ins`、`rm`、`take`、`push*`、`pop*`、哈希 rehash、树旋转 / 节点删除等。
+- 迭代器更适合“只读遍历”或“修改当前元素内容但不改容器结构”。
 
-这类钩子是全局策略，不像 GLib 某些容器是在实例层面注入析构/比较/哈希函数。
+### 3.7 泛型容器的三步法
 
-### 3.6 统一迭代器协议
+绝大多数容器都按下面三步生成：
 
-所有序列容器和映射容器都暴露统一的迭代入口：
+```c
+ALine_Define(MyType);
+ALine_Generate(MyType);
+A_TYPE_REGISTER(ALine(MyType));
+```
 
-- `head()` / `tail()`：得到首尾迭代器
-- `next()` / `prev()`：前进与后退
-- `forEach(it, con)` / `forEachRev(it, con)`：正向/反向遍历
+映射容器则使用键值双类型：
 
-统一迭代器 `AIter(ContainerType)` 至少包含：
+```c
+ATree_Define(KeyType, ValueType);
+ATree_Generate(KeyType, ValueType);
+A_TYPE_REGISTER(ATree(KeyType, ValueType));
+```
 
-- `p`：当前元素指针
-- `con`：所属容器
+### 3.8 容器方法的共同语义
+
+序列容器和映射容器里反复出现这些规则：
+
+- 插入型 API（`ins`、`push*`）先执行 `A_COPY`，因此容器保存的是值副本。
+- `take` / `pop` 如果 `tar != nullptr`，元素会被“搬出”给调用方；如果 `tar == nullptr`，容器会直接析构该元素。
+- `at` 返回的是容器内部元素地址；只在当前容器结构不变时有效。
+- `getNumber` / `empty` 不设置异常。
+
+## 4. 公共模块一览
+
+| 头文件 | 主要内容 |
+| --- | --- |
+| `alib.h` | 类型协议、对象生命周期、异常槽、内存钩子、哈希辅助 |
+| `aiter.h` | 统一迭代器协议 |
+| `aclass.h` | 轻量类系统 |
+| `aline.h` | 动态数组 |
+| `alist.h` | 双向链表 |
+| `adeque.h` | 分块双端队列 |
+| `astack.h` | 栈 |
+| `aqueue.h` | 队列 |
+| `asortque.h` | 有序数组队列 |
+| `atree.h` | 红黑树映射 |
+| `ahash.h` | 哈希映射 |
+| `astring.h` | 字符串对象 |
+| `aptr.h` | 独占 / 共享指针包装 |
+| `alock.h` | 互斥锁、递归锁、读写锁、自动解锁 token |
+| `asignal.h` | 信号系统、接收者基类、异常收集器 |
+
+## 5. 完整模块与 API 参考
+
+### 5.1 `alib.h`
+
+`alib.h` 是所有其他头文件的基础，定义了：
+
+- 基础类型别名
+- 异常槽
+- 对象生命周期宏
+- 类型 / 类注册协议
+- 分配器钩子
+- 哈希辅助函数
+
+#### 5.1.1 基础类型与枚举
+
+| API | 类别 | 说明 |
+| --- | --- | --- |
+| `cptr_t` | 类型别名 | `void*`；常用于“原始地址比较 / 传递” |
+| `cstr_t` | 类型别名 | `char*`；默认比较为字符串比较，默认哈希为 `alib_hash_str` |
+| `longlong` | 类型别名 | `long long` |
+| `astr_t` | 结构体 | 字符串视图，字段为 `const char* s` 和 `uint32_t len` |
+| `AEXC_t` | 枚举 | 线程局部错误槽使用的错误码 |
+| `Atlan` | 基类 | 所有类类型的隐式根基类，仅含 `f` 指针 |
+
+#### 5.1.2 `astr_t` 相关 API
+
+| API | 参数 | 返回值 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `astr_new(const char* s)` | `s`：非空、以 `\0` 结尾的 C 字符串 | `astr_t` | 无 | 仅构造视图，不分配内存；`len` 不包含终止符 |
+
+注意：`astr_new` 内部直接调用 `strlen(s)`，因此 `s == nullptr` 不属于受支持输入。
+
+#### 5.1.3 内存与对象分配钩子
+
+| API | 参数 | 返回值 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `alib_alloc(uint32_t size)` | 分配字节数 | `void*` 或 `nullptr` | 默认不主动写异常 | 默认弱符号，内部转到 `malloc` |
+| `alib_realloc(void* p, uint32_t size)` | 原地址、目标大小 | 新地址或 `nullptr` | 默认不主动写异常 | 默认弱符号，内部转到 `realloc` |
+| `alib_free(void* p)` | 待释放地址，可为 `nullptr` | 无 | 无 | 默认弱符号，内部转到 `free` |
+| `alib_new(uint32_t size, void(*init_func)(void*))` | 大小、初始化函数 | 已初始化对象地址或 `nullptr` | `AEXC_alloc_failed`；或 `init_func` 自己设置的异常 | 先分配，再调用初始化；初始化失败会自动释放并返回 `nullptr` |
+| `alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*))` | 大小、源对象、拷贝函数 | 新对象地址或 `nullptr` | `AEXC_alloc_failed`；或 `copy_func` 自己设置的异常 | 先分配，再复制；复制失败会自动释放 |
+| `alib_delete(void* p, void(*dest_func)(void*))` | 对象地址、析构函数 | 无 | 由 `dest_func` 决定 | `p == nullptr` 时直接返回；若 `dest_func != nullptr` 先析构再释放 |
+
+如果你要把 ALib 接到自定义分配器、对象池或调试分配层，通常就是重写这些弱符号。
+
+#### 5.1.4 哈希辅助函数
+
+| API | 参数 | 返回值 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `alib_hash(const void* k, uint32_t size_k)` | 原始字节地址与长度 | `uint32_t` 哈希值 | 无 | FNV-1a 风格哈希；`k == nullptr` 或 `size_k == 0` 时返回 `0` |
+| `alib_hash_str(const char* s)` | C 字符串，可为 `nullptr` | `uint32_t` 哈希值 | 无 | `s == nullptr` 时返回 `0` |
+
+#### 5.1.5 异常槽 API
+
+| API | 参数 | 返回值 | 说明 |
+| --- | --- | --- | --- |
+| `aExcClean()` | 无 | 无 | 清空当前线程错误槽 |
+| `aExcOccur()` | 无 | `bool` | 当前线程是否存在错误 |
+| `aExcSet(AEXC_t v)` | 错误码 | 无 | 覆盖写入当前线程错误槽 |
+| `aExcGet()` | 无 | `int` | 读取当前线程错误槽的当前值 |
+
+#### 5.1.6 常用对象生命周期宏
+
+| API | 参数 | 表达式结果 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `A_INIT(T)` | `T`：已注册类型 | 返回一个 `T` 值对象 | 类型自己的 init 过程可能设置异常 | 适合栈对象初始化；失败时返回“已清理过”的零值对象 |
+| `A_DEST(T, obj)` | `obj`：`T` 类型的非常量左值 | 析构 `obj` 并清零 | 类型自己的 dest 过程可能设置异常 | 对类类型会自动走多态析构 |
+| `A_COPY(T, obj)` | `obj`：`T` 类型对象 | 返回一个复制后的 `T` | 类型自己的 copy 过程可能设置异常 | 失败时返回“已清理过”的零值对象 |
+| `A_CMPD(T, obj0, obj1)` | 两个 `T` 对象 | `int`，`0` 表示相等 | 通常无；若比较函数自己写异常则会透出 | 基础排序约定：大于返回正，小于返回负 |
+| `A_MOVE(obj)` | 非常量左值 | 返回旧值，并把源对象按字节清零 | 无 | 适合显式转移所有权 |
+| `A_LEFT(obj)` | 右值表达式 | 把右值转成可取地址的临时左值 | 无 | 多用于需要左值语境的宏调用 |
+| `RAII(T)` | 类型名 | 不是函数调用；用于声明变量 | 无 | 依赖 GNU `cleanup`；离开作用域自动析构 |
+| `A_NEW(T)` | `T`：已注册类型 | `T*` 或 `nullptr` | `AEXC_alloc_failed` / 类型 init 异常 | 堆上分配并初始化 |
+| `A_CPNEW(T, obj)` | `obj`：`T` 对象 | `T*` 或 `nullptr` | `AEXC_alloc_failed` / 类型 copy 异常 | 堆上复制构造 |
+| `A_DELETE(T, p)` | `p`：`T*` | 无 | 类型 dest 异常可能透出 | 析构并释放堆对象 |
+
+#### 5.1.7 类型 / 类注册宏
+
+| API | 参数 | 返回 / 效果 | 说明 |
+| --- | --- | --- | --- |
+| `A_TYPE_REGISTER(T)` | 普通类型名 `T` | 生成 `T` 的统一包装函数与默认回退行为 | 普通结构体、容器实例、指针包装都用它接入对象协议 |
+| `A_CLASS_REGISTER(T)` | 类类型名 `T` | 生成类类型包装函数并接入父类链、多态析构 | 只有使用 `AClass_*` 定义的类才应调用 |
+| `A_OBJ_INIT(T)` / `A_OBJ_DEST(T)` / `A_OBJ_COPY(T)` / `A_OBJ_CMPD(T)` / `A_OBJ_HASH(T)` | 类型名 `T` | 这些宏本身不是运行时调用，而是“用户实现类型钩子时的命名规则” | 自定义类型时按这些名字实现函数 |
+| `A_SET_VTAB(T)` | 类类型名 `T` | 类 vtable 初始化钩子的命名规则 | 仅类系统使用 |
+| `A_FUNC(T)` / `A_FUNC_TAB(T)` | 类型名 `T` | 函数表类型名 / 函数表变量名的命名规则 | 主要用于容器和类生成宏 |
+
+#### 5.1.8 其他公共工具宏
+
+| API | 参数 | 返回 / 效果 | 说明 |
+| --- | --- | --- | --- |
+| `container_of(ptr, type, member)` | 成员指针、宿主类型、成员名 | 宿主结构体指针 | 经典 `container_of`，适合 intrusive 结构或手写对象系统 |
+
+### 5.2 `aiter.h`
+
+`aiter.h` 定义统一迭代器协议。所有支持迭代的容器都会暴露首尾迭代器、前后移动函数，以及统一的 `forEach` / `forEachRev` 宏。
+
+#### 5.2.1 类型与生成宏
+
+| API | 参数 | 返回 / 效果 | 说明 |
+| --- | --- | --- | --- |
+| `AIter(CT)` | 容器类型名 `CT` | 迭代器类型名 | 例如 `AIter(ALine(int))` |
+| `AIter_Define(CT)` | 容器类型名 `CT` | 为该容器生成迭代器结构定义 | 一般由容器宏内部调用，用户很少手写 |
+
+迭代器公共字段：
+
+- `p`：当前元素指针；为空表示无效或到尾后位置
+- `con`：所属容器指针
 - `i`：逻辑索引
-- `r`：部分容器内部使用的额外位置字段
+- `r`：某些容器内部使用的辅助位置字段
 
-对调用者来说，最常用的是：
+#### 5.2.2 迭代辅助宏
 
-```c
-forEach(it, line) {
-    printf("%d\n", *it.p);
-}
-```
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AItHead(con)` | 容器对象左值 | 返回头迭代器 | 无 | 展开时只求值一次 |
+| `AItTail(con)` | 容器对象左值 | 返回尾迭代器 | 无 | 展开时只求值一次 |
+| `AItExist(it)` | 迭代器变量 | `bool` | 无 | 依赖 `it.con->f->getNumber()`；容器为空或越界时为假 |
+| `AItNext(it)` | 迭代器变量 | 前进到下一个元素 | 无 | 依赖容器自己的 `next` 实现 |
+| `AItPrev(it)` | 迭代器变量 | 后退到上一个元素 | 无 | 依赖容器自己的 `prev` 实现 |
+| `forEach(it, con)` | 迭代器变量名、容器对象 | 正向遍历宏 | 无 | 等价于 `for (auto it = AItHead(...); AItExist(it); AItNext(it))` |
+| `forEachRev(it, con)` | 迭代器变量名、容器对象 | 反向遍历宏 | 无 | 等价于 `for (auto it = AItTail(...); AItExist(it); AItPrev(it))` |
 
-映射容器还会提供 `getk(it)` 用来取出当前键。
+#### 5.2.3 使用建议
 
-### 3.7 迭代器失效规则
+- `it.p` 的静态类型是当前容器元素指针类型，不需要手动转换。
+- 结构修改后旧迭代器失效，应重新获取。
+- 映射容器遍历值时，键要通过 `getk(it)` 取出。
 
-ALib 的迭代器本质上是“当前元素地址 + 容器指针 + 辅助位置”的轻量快照，不是为结构修改设计的稳定游标。
+### 5.3 `aclass.h`
 
-保守且推荐的使用规则是：
-
-- 只要容器结构发生变化，就把已有迭代器视为失效
-- 结构变化包括：`ins`、`rm`、`take`、`pushBack`、`pushFront`、`popBack`、`popFront`
-- 对映射容器还包括：`ins`、`rm`、`take` 触发的节点替换、rehash、桶搬移或树结构调整
-- 容器析构、整容器拷贝后替换、重新初始化后，旧迭代器也全部失效
-
-原因很直接：
-
-- 顺序容器可能扩容、缩容或搬移底层存储
-- 链表和树虽然某些节点地址在个别操作后可能仍然存在，但当前迭代器并没有“删除后返回下一个位置”的契约
-- 哈希表插入/删除可能触发 rehash，导致桶数组和元素地址整体变化
-- 迭代器里的 `i`、`r` 和 `p` 都可能与修改后的容器状态不再一致
-
-因此，ALib 迭代器更适合：
-
-- 只读遍历
-- 修改当前元素内容，但不改容器结构
-
-不适合：
-
-- 边遍历边插入元素
-- 边遍历边删除元素
-- 把当前迭代器长期缓存起来，跨容器修改后继续使用
-
-如果确实需要一边扫描一边修改，建议改成下面这些模式：
-
-- 顺序容器：先记下索引，再按索引做修改；或先收集待删元素，遍历结束后再删
-- 映射容器：先收集键，再统一 `rm` / `take`
-- `AList(T)`：即使有 `rm_p` / `take_p`，也应在删除后立即丢弃旧迭代器，不要继续依赖当前遍历状态
-
-## 4. 泛型容器的生成方式
-
-### 4.1 基本套路
-
-ALib 的泛型容器不是模板实例化，也不是 `void*` 容器，而是用宏生成具体类型：
-
-```c
-ALine_Define(int);
-ALine_Generate(int);
-A_TYPE_REGISTER(ALine(int));
-```
-
-对应关系通常是：
-
-1. `XXX_Define(...)`：声明容器结构和函数表
-2. `XXX_Generate(...)`：生成具体类型的静态内联实现
-3. `A_TYPE_REGISTER(XXX(...))`：让容器本身也成为可复制、可析构、可嵌套的对象
-
-映射容器则使用键和值两个类型参数：
-
-```c
-ATree_Define(int, AString);
-ATree_Generate(int, AString);
-A_TYPE_REGISTER(ATree(int, AString));
-```
-
-### 4.2 类型行为如何传递到容器
-
-容器不会保存“每个元素自己的回调指针”，而是直接复用元素类型的基础行为：
-
-- 拷贝元素时调用 `A_COPY(T, obj)`
-- 删除元素时调用 `A_DEST(T, obj)`
-- 排序/比较时调用 `A_CMPD(T, lhs, rhs)`
-- 哈希键时调用 `A_OBJ_HASH(T)` 或原始内存哈希
-
-这也是 ALib 和 GLib 常见容器的一大差异：
-
-- ALib：元素行为由“类型注册”统一决定
-- GLib：元素行为常由“容器实例 + 用户回调”决定
-
-### 4.3 边界语义需要特别记住
-
-当前代码里，顺序容器大体分成两类越界规则：
-
-- 容器为空：`at()`、`pop()`、`take()` 等会设置 `AEXC_overstep`
-- 容器非空但索引过大：多数 `at(index)` 会把索引截断到最后一个元素
-
-这和很多标准容器不同，文档和调用代码都应显式说明。
-
-映射容器的规则更直接：
-
-- `ATree(K,V)::at()` / `AHash(K,V)::at()` 找不到键时返回 `NULL`
-- 同时会设置 `AEXC_overstep`
-
-## 5. 模块详解
-
-### 5.1 `ALine(T)`：动态数组
-
-`ALine(T)` 基于连续内存数组实现，支持：
-
-- `at`
-- `rm`
-- `ins`
-- `take`
-- `pushBack` / `pushFront`
-- `popBack` / `popFront`
-- `getNumber`
-- `empty`
-
-特点：
-
-- 适合需要顺序访问和尾部追加的场景
-- 元素以值方式存储
-- 拷贝容器时会深拷贝元素（深度由元素类型自己的 copy 语义决定）
-- 支持统一迭代器
-
-### 5.2 `AList(T)`：双向链表
-
-`AList(T)` 使用双向链表，接口与 `ALine(T)` 接近，但额外提供：
-
-- `rm_p(self, p)`
-- `take_p(self, p, tar)`
-
-这两个接口直接按元素地址定位节点，效率更高，但也更危险。
-
-安全使用约束：
-
-- `p` 必须来自这个链表当前仍有效的节点
-- 最稳妥的来源是同一容器的 `at()` 返回值或迭代器当前元素
-- 一旦节点已删除、容器已析构、或容器经历重建，就不能继续持有旧地址
-
-### 5.3 `ADeque(T)`、`AStack(T)`、`AQueue(T)`
-
-这三者共享分块双端队列存储思路：
-
-- `ADeque(T)`：通用双端队列，支持头尾压入/弹出
-- `AStack(T)`：基于 `ADeque` 暴露 `push` / `pop` 的栈接口
-- `AQueue(T)`：基于 `ADeque` 暴露 `push` / `pop` 的队列接口
-
-它们的共同特点：
-
-- 仍然是值语义容器
-- 仍然可以 `A_COPY` 整个容器
-- 仍然使用统一迭代器
-- `at(index)` 也是非空时截断到尾元素
-
-### 5.4 `ASortque(T)`：有序数组队列
-
-`ASortque(T)` 本质上是“始终保持升序的数组容器”，核心接口包括：
-
-- `ins(obj)`：按比较结果插入到合适位置
-- `popMin` / `popMax`
-- `rm` / `take`
-
-语义要点：
-
-- 有序性由 `A_CMPD(T, lhs, rhs)` 决定
-- 插入不是稳定排序承诺，而是当前比较规则下的有序插入
-- 非空时 `at(index >= num)` 同样截断到尾元素
-
-如果元素比较规则本身不稳定或依赖外部状态，不要用它承载关键排序语义。
-
-### 5.5 `ATree(K,V)`：红黑树映射
-
-`ATree(K,V)` 是有序映射，支持：
-
-- `at(k)`
-- `rm(k)`
-- `ins(k, v)`
-- `take(k, tar)`
-- `getk(it)`
-- 顺序迭代
-
-代码行为说明：
-
-- 按 `K` 的比较函数组织红黑树
-- 再次插入相同键时会替换已有键值对内容
-- 遍历顺序是键的有序顺序
-- `take(k, tar)` 只把值拿出来；键会在内部按类型语义析构
-
-如果你希望稳定的有序遍历，`ATree` 是当前仓库里最合适的映射实现。
-
-### 5.6 `AHash(K,V)`：哈希映射
-
-`AHash(K,V)` 支持和 `ATree` 类似的外部接口，但内部使用哈希桶。
-
-关键差异和注意事项：
-
-- 同键 `ins(k, v)` 也是替换语义
-- 键哈希优先使用 `A_OBJ_HASH(K)`；未提供时退回 `alib_hash()` 对原始字节做哈希
-- 如果键类型带有填充字节、指针间接语义或自定义相等规则，强烈建议自己实现 `A_OBJ_HASH(K)` 和 `A_OBJ_CMPD(K)`
-- 迭代顺序取决于桶布局和元素插入路径，不保证稳定
-- `A_CMPD(AHash(...), lhs, rhs)` 比较的是迭代顺序下的元素序列，不等价于“数学意义上的无序集合相等”
-
-最后一点非常重要：两个键值完全相同、但插入顺序不同的哈希表，比较结果可能不同。这是当前实现的既定行为。
-
-### 5.7 `AString`：低层字符串对象
-
-`AString` 不是 GLib `GString` 的对等替代，而是更轻的字节串对象。
-
-接口包括：
-
-- `rm`
-- `ins`
-- `pushBack` / `pushFront`
-- `popBack` / `popFront`
-- `addBack` / `addFront`
-- `truncate`
-- `getNumber`
-- `getCapacity`
-- `empty`
-
-语义要点：
-
-1. `AString_new(char* s)` 只是包装已有字符指针，不会立刻复制。  
-2. `noLiteral == false` 时，字符串被视为非拥有型引用；首次写入会转成堆内存。  
-3. 如果传入的是字符串字面量，这个行为很方便；如果传入的是栈缓冲区或临时内存，调用方必须在原缓冲区失效前完成一次真正的复制。  
-4. `A_COPY(AString, s)` 对拥有型字符串会深拷贝，对字面量包装会共享指针；后续写入时再分配可写缓冲。  
-5. 当前字符串语义是“字节串”，没有 UTF-8 校验、Unicode 处理和本地化辅助。
-
-一个安全用法是：
-
-```c
-char buf[32];
-snprintf(buf, sizeof(buf), "hello-%d", 7);
-
-RAII(AString) owned = A_INIT(AString);
-RAII(AString) tmp = AString_new(buf);
-owned.f->addBack(&owned, tmp);
-```
-
-这会把 `buf` 的内容复制进 `owned`，而不是让 `owned` 直接悬空引用栈内存。
-
-### 5.8 `APtr(T)` 与 `AShPtr(T)`
-
-#### `APtr(T)`
-
-`APtr(T)` 是“拥有型指针包装 + 弱别名复制”的语义：
-
-- `APtrNew(T)`：分配并拥有一个 `T`
-- `APtrCPNew(T, obj)`：复制构造并拥有一个 `T`
-- 拷贝 `APtr(T)` 时，新对象只保存同一个原始指针，但 `strong_flag = false`
-
-因此它并不等价于 `unique_ptr`：
-
-- 复制不会转移所有权
-- 弱副本析构时不会释放对象
-- 只有强拥有者析构时才释放对象
-
-如果你需要真正的所有权转移，请用 `A_MOVE` 或显式把旧对象置空，而不是直接拷贝。
-
-#### `AShPtr(T)`
-
-`AShPtr(T)` 是带原子引用计数的共享指针：
-
-- `AShPtrNew(T)`：创建一个默认值对象，引用计数 1
-- `AShPtrCPNew(T, obj)`：创建一个拷贝对象，引用计数 1
-- `A_COPY(AShPtr(T), p)`：引用计数加一
-- 最后一个共享者析构时释放底层对象
-
-需要注意：
-
-- 原子引用计数只保证 retain/release 本身安全
-- 被共享对象内部并不会自动加锁
-- 如果多个线程会同时修改 `*p.p`，仍需要外部同步
-
-### 5.9 `AClass_*`：轻量单继承类系统
-
-ALib 的类系统基于虚函数表和结构体首成员布局，提供：
+`aclass.h` 提供轻量单继承类系统。它不是完整反射框架，只解决：
 
 - 单继承
-- 构造/析构链
-- 运行时多态析构
+- 函数表
+- 父类链初始化 / 拷贝 / 析构
+- 多态析构
 - 虚函数覆盖
 
-常见宏：
+#### 5.3.1 推荐定义顺序
 
-- `AClass_Inherit(T, Base)`
-- `AClass_Struct(T, ...)`
-- `AClass_Function(T, ...)`
-- `AClass_Generate(T, ...)`
-- `A_CLASS_REGISTER(T)`
-- `A_CALL(obj)` / `A_CALL(obj, Base)`
-- `A_COVER_FUNC(self, Base, name, func)`
+```c
+AClass_Inherit(MyType, BaseType);
+AClass_Struct(MyType,
+    int value;
+);
+AClass_Function(MyType,
+    void (*const speak)(const MyType* self);
+);
+AClass_Generate(MyType, mytype_speak);
+A_CLASS_REGISTER(MyType);
+```
 
-和 GLib/GObject 相比，它更轻也更窄：
+如果没有显式父类，`AClass_Inherit(T)` 会默认继承 `Atlan`。
 
-- 只有单继承
-- 没有属性系统
-- 没有信号元信息
-- 没有运行时反射或 introspection
-- 更像“带 vtable 的对象协议”，而不是完整对象框架
+#### 5.3.2 类定义宏
 
-这个系统适合内部抽象层，不适合对外暴露需要长期 ABI 演化的复杂类库。
+| API | 参数 | 返回 / 效果 | 异常 / 约束 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AClass_Inherit(T, ...)` | `T`：当前类名；可选第 2 个参数：父类名 | 生成前置声明、函数表声明、继承关系 | 宏变参，最多 1 个父类；父类必须已经是类类型 | 省略父类时默认继承 `Atlan` |
+| `AClass_Struct(T, ...)` | 类名、成员声明列表 | 定义类结构体 | 无 | 结构体首部会自动放入 `f` 与父类基布局 |
+| `AClass_Function(T, ...)` | 类名、函数表字段列表 | 定义 `A_FUNC(T)` 结构体 | 无 | 结构体首部会自动保留父类函数表布局 |
+| `AClass_Generate(T, ...)` | 类名、函数表初始化项 | 生成弱符号函数表 `A_FUNC_TAB(T)` | 宏变参 | 初始化项顺序必须与 `AClass_Function` 里新增字段一致 |
+| `A_CLASS_REGISTER(T)` | 类名 | 把类接入对象系统和多态析构系统 | 父类链必须完整 | 生成构造 / 拷贝 / 析构包装函数 |
 
-### 5.10 `ASignal`、`AReceEnd` 与 `AExcCollector`
+#### 5.3.3 虚函数调用与覆盖
 
-ALib 提供了一个进程内信号系统，用于“信号 id -> 接收者回调”的连接和派发。
+| API | 参数 | 返回 / 效果 | 异常 / 约束 | 说明 |
+| --- | --- | --- | --- | --- |
+| `A_CALL(obj, ...)` | 对象值 `obj`；可选 1 个静态类型参数 | 返回函数表左值 | 宏变参，最多 1 个附加参数 | 常见写法：`A_CALL(obj).foo(&obj)` 或 `A_CALL(obj, Base).foo((Base*)&obj)` |
+| `A_COVER_FUNC(self, T, name, func)` | 当前对象指针、要操作的类类型、函数表字段名、新函数指针 | 修改当前类的函数表槽位 | 无 | 通常只在 `A_SET_VTAB(T)` 中使用 |
+| `A_SET_VTAB(T)` | 类名 | 自定义 vtable 初始化钩子的命名规则 | 无 | 若用户实现该函数，会在对象 init/copy 时调用，用于覆盖虚函数 |
 
-核心接口：
+#### 5.3.4 重要语义
 
-- `a_signal_alloc()`：分配新的信号 id
-- `a_signal_connection(id, addressee, callback)`：连接回调
-- `a_signal_disconnect(id, addressee)`：断开单个连接
-- `a_signal_disconnect_all(id)`：删除某个信号 id 的全部连接
-- `a_target_disconnect_all(addressee)`：删除某个接收者的全部连接
-- `a_signal_transmit(signal, collector?)`：同步派发信号
+- ALib 只支持单继承。
+- 类对象的复制会先复制父类部分，再复制子类新增字段。
+- `A_DEST(T, obj)` 对类类型会自动走多态析构，而不是单纯调用静态类型的 `A_OBJ_DEST(T)`。
+- 不要把 `A_FUNC_TAB(T)` 当作线程安全可变全局对象随意改写；常规做法是在 `A_SET_VTAB(T)` 里局部覆盖槽位。
 
-相关类型：
+### 5.4 `aline.h` — `ALine(T)`
 
-- `ASignal`：信号基类，包含 `id`、`value`、`sender`
-- `AReceEnd`：接收者基类，析构时自动 `disconnect_all`
-- `AExcCollector`：收集回调执行过程中抛出的异常
+`ALine(T)` 是连续内存动态数组，适合随机访问、顺序遍历和头尾插入。
 
-当前实现特征：
+#### 5.4.1 生成方式
 
-- 子系统通过 `constructor` / `destructor` 自动启动和关闭
-- 内部使用读写锁保护全局连接表
-- 支持回调中再次发送信号（重入发送）
-- 支持在回调中申请新的信号 id 和注册新的连接
-- 不允许在信号回调执行过程中做破坏性的断连操作，否则会报 `AEXC_repeat_write`
-- 同一个 `(id, addressee)` 只能注册一个连接，重复连接会报 `AEXC_repeat_write`
+```c
+ALine_Define(T);
+ALine_Generate(T);
+A_TYPE_REGISTER(ALine(T));
+```
 
-它和 GLib/GObject 信号最大的不同在于：
+前提：`T` 已完成 `A_TYPE_REGISTER(T)` 或 `A_CLASS_REGISTER(T)`。
 
-- 这里只是轻量级的进程内观察者机制
-- 没有类型化参数列表、没有元对象层、没有信号声明系统
-- 更适合内部模块通信，不适合公开的对象元编程接口
+#### 5.4.2 结构与访问入口
 
-### 5.11 `ALock`、`AMtx`、`ARecursion`、`AMtxRW`
+- 容器对象类型：`ALine(T)`
+- 函数表类型：`A_FUNC(ALine(T))`
+- 统一调用入口：`line.f->method(&line, ...)`
 
-锁模块基于 C11 `<threads.h>`：
+#### 5.4.3 API 说明
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `ALine(T)` | `T`：元素类型 | 生成具体容器类型名 | 无 | 类型名宏 |
+| `ALine_Define(T)` | 元素类型 | 声明容器结构和函数表 | 无 | 仅生成声明 |
+| `ALine_Generate(T)` | 元素类型 | 生成静态内联实现 | 无 | 需在一个可见编译单元中展开 |
+| `line.f->at(&line, index)` | `index: uint32_t` | `T*` 或 `nullptr` | 空容器时 `AEXC_overstep` | 非空越界时会截断到尾元素 |
+| `line.f->rm(&line, index)` | 索引 | 删除元素 | 一般无；空容器直接返回 | 非空越界时删除尾元素；删除时会 `A_DEST(T, element)` |
+| `line.f->ins(&line, index, obj)` | 索引、待插入对象 | 插入副本 | `A_COPY(T,obj)` 的异常；`AEXC_alloc_failed` | `index > num` 时按 `num` 处理，相当于追加 |
+| `line.f->take(&line, index, tar)` | 索引、可选输出指针 | 取出元素 | 空容器时 `AEXC_overstep` | `tar != nullptr` 时把元素交给调用方；否则直接析构 |
+| `line.f->pushBack(&line, obj)` | 对象 | 尾插副本 | `A_COPY` 异常；`AEXC_alloc_failed` | 常用追加接口 |
+| `line.f->pushFront(&line, obj)` | 对象 | 头插副本 | `A_COPY` 异常；`AEXC_alloc_failed` | 可能触发搬移 |
+| `line.f->popBack(&line, tar)` | 可选输出指针 | 弹出尾元素 | 空容器时 `AEXC_overstep` | `tar == nullptr` 时容器直接析构该元素 |
+| `line.f->popFront(&line, tar)` | 可选输出指针 | 弹出首元素 | 空容器时 `AEXC_overstep` | 可能触发前移 |
+| `line.f->getNumber(&line)` | 无 | `uint32_t` | 无 | 当前元素个数 |
+| `line.f->empty(&line)` | 无 | `bool` | 无 | 是否为空 |
+| `line.f->head(&line)` / `tail(&line)` | 无 | `AIter(ALine(T))` | 无 | 首 / 尾迭代器 |
+| `line.f->next(&it)` / `prev(&it)` | 迭代器指针 | 推进迭代器 | 无 | 与 `AItNext` / `AItPrev` 一致 |
+
+#### 5.4.4 使用建议
+
+- `at()` 返回内部地址，结构修改后立即失效。
+- `rm()` 在空容器上是静默 no-op，而 `pop*()` / `take()` 会报 `AEXC_overstep`；两类 API 的边界风格不同。
+- 如果你需要严格索引检查，请先比较 `index < getNumber()`。
+
+### 5.5 `alist.h` — `AList(T)`
+
+`AList(T)` 是双向链表，保留统一迭代器接口，并额外暴露按节点地址删除 / 取出的能力。
+
+#### 5.5.1 生成方式
+
+```c
+AList_Define(T);
+AList_Generate(T);
+A_TYPE_REGISTER(AList(T));
+```
+
+#### 5.5.2 API 说明
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AList(T)` / `AList_Define(T)` / `AList_Generate(T)` | 同 `ALine(T)` | 生成类型与实现 | 无 | 用法与 `ALine` 相同 |
+| `list.f->at(&list, index)` | 索引 | `T*` 或 `nullptr` | 空容器时 `AEXC_overstep` | 非空越界时截断到尾节点 |
+| `list.f->rm(&list, index)` | 索引 | 删除节点 | 空容器时 `AEXC_overstep` | 非空越界时删除尾节点 |
+| `list.f->rm_p(&list, p)` | `p: T*` | 删除 `p` 所在节点 | `p == nullptr` 时 `AEXC_overstep` | `p` 必须来自当前链表的有效节点；传入外部指针属于未受支持用法 |
+| `list.f->ins(&list, index, obj)` | 索引、对象 | 插入副本 | `A_COPY` 异常；`AEXC_alloc_failed` | `index > num` 时按 `num` 处理 |
+| `list.f->take(&list, index, tar)` | 索引、可选输出 | 取出节点元素 | 空容器时 `AEXC_overstep` | `tar == nullptr` 时直接析构 |
+| `list.f->take_p(&list, p, tar)` | 元素地址、可选输出 | 取出指定节点元素 | `p == nullptr` 时 `AEXC_overstep` | 同样要求 `p` 属于当前链表 |
+| `list.f->pushBack(&list, obj)` | 对象 | 尾插副本 | `A_COPY` 异常；`AEXC_alloc_failed` | |
+| `list.f->pushFront(&list, obj)` | 对象 | 头插副本 | `A_COPY` 异常；`AEXC_alloc_failed` | |
+| `list.f->popBack(&list, tar)` | 可选输出 | 弹出尾节点 | 空容器时 `AEXC_overstep` | |
+| `list.f->popFront(&list, tar)` | 可选输出 | 弹出头节点 | 空容器时 `AEXC_overstep` | |
+| `list.f->getNumber(&list)` / `empty(&list)` | 无 | 个数 / 是否为空 | 无 | |
+| `head` / `tail` / `next` / `prev` | 见统一迭代器 | 迭代支持 | 无 | |
+
+#### 5.5.3 `rm_p` / `take_p` 的安全边界
+
+这两个 API 很方便，但必须满足：
+
+- `p` 来自同一个 `AList(T)` 当前仍存在的节点；
+- `p` 没有因为删除、容器析构或结构重建而失效；
+- 删除后旧迭代器和旧地址都应立刻废弃。
+
+最稳妥的来源是：
+
+- `list.f->at(&list, index)`
+- 当前遍历中的 `it.p`
+
+### 5.6 `adeque.h` — `ADeque(T)`
+
+`ADeque(T)` 是分块双端队列，兼顾头尾操作与较平滑的扩缩容成本。
+
+#### 5.6.1 生成方式
+
+```c
+ADeque_Define(T);
+ADeque_Generate(T);
+A_TYPE_REGISTER(ADeque(T));
+```
+
+#### 5.6.2 API 说明
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `ADeque(T)` / `ADeque_Define(T)` / `ADeque_Generate(T)` | 元素类型 | 生成类型与实现 | 无 | |
+| `deq.f->at(&deq, index)` | 索引 | `T*` 或 `nullptr` | 空容器时 `AEXC_overstep` | 非空越界时截断到尾元素 |
+| `deq.f->pushBack(&deq, obj)` | 对象 | 尾插副本 | `A_COPY` 异常；`AEXC_alloc_failed` | |
+| `deq.f->pushFront(&deq, obj)` | 对象 | 头插副本 | `A_COPY` 异常；`AEXC_alloc_failed` | |
+| `deq.f->popBack(&deq, tar)` | 可选输出 | 弹出尾元素 | 空容器时 `AEXC_overstep` | |
+| `deq.f->popFront(&deq, tar)` | 可选输出 | 弹出首元素 | 空容器时 `AEXC_overstep` | |
+| `deq.f->getNumber(&deq)` / `empty(&deq)` | 无 | 个数 / 是否为空 | 无 | |
+| `head` / `tail` / `next` / `prev` | 迭代器 | 迭代支持 | 无 | |
+
+#### 5.6.3 语义补充
+
+- `ADeque(T)` 只暴露双端接口，不提供中间插入 / 删除。
+- `at(0)` 是当前队首，`at(getNumber()-1)` 是当前队尾。
+- 内部是分块存储，`at()` 返回的指针同样会在结构修改后失效。
+
+### 5.7 `astack.h` — `AStack(T)`
+
+`AStack(T)` 建立在 `ADeque(T)` 之上，暴露栈语义。
+
+#### 5.7.1 生成方式
+
+```c
+AStack_Define(T);
+AStack_Generate(T);
+A_TYPE_REGISTER(AStack(T));
+```
+
+#### 5.7.2 API 说明
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AStack(T)` / `AStack_Define(T)` / `AStack_Generate(T)` | 元素类型 | 生成类型与实现 | 无 | |
+| `stack.f->at(&stack, index)` | 索引 | `T*` 或 `nullptr` | 空栈时 `AEXC_overstep` | 非空越界时截断到栈顶；`at(0)` 是底部，`at(last)` 是栈顶 |
+| `stack.f->push(&stack, obj)` | 对象 | 压栈副本 | `A_COPY` 异常；`AEXC_alloc_failed` | 对应底层 `pushBack` |
+| `stack.f->pop(&stack, tar)` | 可选输出 | 弹出栈顶 | 空栈时 `AEXC_overstep` | `tar == nullptr` 时直接析构弹出的元素 |
+| `stack.f->getNumber(&stack)` / `empty(&stack)` | 无 | 个数 / 是否为空 | 无 | |
+| `head` / `tail` / `next` / `prev` | 迭代器 | 迭代支持 | 无 | 正向遍历从底到顶 |
+
+### 5.8 `aqueue.h` — `AQueue(T)`
+
+`AQueue(T)` 同样建立在 `ADeque(T)` 之上，暴露 FIFO 队列语义。
+
+#### 5.8.1 生成方式
+
+```c
+AQueue_Define(T);
+AQueue_Generate(T);
+A_TYPE_REGISTER(AQueue(T));
+```
+
+#### 5.8.2 API 说明
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AQueue(T)` / `AQueue_Define(T)` / `AQueue_Generate(T)` | 元素类型 | 生成类型与实现 | 无 | |
+| `queue.f->at(&queue, index)` | 索引 | `T*` 或 `nullptr` | 空队列时 `AEXC_overstep` | 非空越界时截断到队尾；`at(0)` 是下一个将被弹出的元素 |
+| `queue.f->push(&queue, obj)` | 对象 | 入队副本 | `A_COPY` 异常；`AEXC_alloc_failed` | 对应底层 `pushBack` |
+| `queue.f->pop(&queue, tar)` | 可选输出 | 弹出队首 | 空队列时 `AEXC_overstep` | 对应底层 `popFront` |
+| `queue.f->getNumber(&queue)` / `empty(&queue)` | 无 | 个数 / 是否为空 | 无 | |
+| `head` / `tail` / `next` / `prev` | 迭代器 | 迭代支持 | 无 | 正向遍历顺序与出队顺序一致 |
+
+### 5.9 `asortque.h` — `ASortque(T)`
+
+`ASortque(T)` 是“始终保持升序”的数组容器，适合做小到中等规模、需要频繁取最小 / 最大值的有序集合。
+
+#### 5.9.1 生成方式
+
+```c
+ASortque_Define(T);
+ASortque_Generate(T);
+A_TYPE_REGISTER(ASortque(T));
+```
+
+#### 5.9.2 API 说明
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `ASortque(T)` / `ASortque_Define(T)` / `ASortque_Generate(T)` | 元素类型 | 生成类型与实现 | 无 | |
+| `sq.f->at(&sq, index)` | 索引 | `T*` 或 `nullptr` | 空容器时 `AEXC_overstep` | 非空越界时截断到最大元素 |
+| `sq.f->rm(&sq, index)` | 索引 | 删除一个元素 | 空容器时静默返回 | 非空越界时删除最大元素 |
+| `sq.f->ins(&sq, obj)` | 对象 | 按序插入副本 | `A_COPY` 异常；`AEXC_alloc_failed` | 排序依据是 `A_CMPD(T, lhs, rhs)`；允许重复值 |
+| `sq.f->take(&sq, index, tar)` | 索引、可选输出 | 取出元素 | 空容器时 `AEXC_overstep` | 非空越界时取最大元素 |
+| `sq.f->popMax(&sq, tar)` | 可选输出 | 弹出最大元素 | 空容器时 `AEXC_overstep` | 对应内部尾弹出 |
+| `sq.f->popMin(&sq, tar)` | 可选输出 | 弹出最小元素 | 空容器时 `AEXC_overstep` | 对应内部首弹出 |
+| `sq.f->getNumber(&sq)` / `empty(&sq)` | 无 | 个数 / 是否为空 | 无 | |
+| `head` / `tail` / `next` / `prev` | 迭代器 | 迭代支持 | 无 | 正向遍历顺序就是升序顺序 |
+
+#### 5.9.3 排序语义
+
+- 排序完全依赖 `A_CMPD(T, lhs, rhs)`。
+- 相同元素允许重复插入。
+- 对“相等元素”的相对顺序没有稳定性承诺，不要把它当成稳定排序容器。
+
+### 5.10 `atree.h` — `ATree(TK, TV)`
+
+`ATree(TK, TV)` 是红黑树有序映射。优点是键有序、遍历顺序稳定，且插入 / 删除 / 查找的渐进复杂度稳定。
+
+#### 5.10.1 生成方式
+
+```c
+ATree_Define(TK, TV);
+ATree_Generate(TK, TV);
+A_TYPE_REGISTER(ATree(TK, TV));
+```
+
+前提：
+
+- `TK` 已注册，并提供稳定的 `A_CMPD(TK, ...)`
+- `TV` 已注册
+
+#### 5.10.2 API 说明
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `ATree(TK,TV)` / `ATree_Define(TK,TV)` / `ATree_Generate(TK,TV)` | 键类型、值类型 | 生成类型与实现 | 无 | |
+| `tree.f->at(&tree, key)` | 键值 `key` | `TV*` 或 `nullptr` | 键不存在时 `AEXC_overstep` | 返回内部值地址 |
+| `tree.f->rm(&tree, key)` | 键值 | 删除键值对 | 键不存在时 `AEXC_overstep` | 删除时会析构键和值 |
+| `tree.f->ins(&tree, key, value)` | 键、值 | 插入 / 替换 | `A_COPY` 异常；`AEXC_alloc_failed` | 同键再次插入是 upsert：旧键值对会被析构并被新副本替换 |
+| `tree.f->take(&tree, key, tar)` | 键、可选输出值指针 | 删除并取出值 | 键不存在时 `AEXC_overstep` | 键始终由容器内部析构；`tar != nullptr` 时值交给调用方，否则直接析构值 |
+| `tree.f->getNumber(&tree)` | 无 | `uint32_t` | 无 | 当前节点数 |
+| `tree.f->empty(&tree)` | 无 | `bool` | 无 | 树根是否为空 |
+| `tree.f->head(&tree)` / `tail(&tree)` | 无 | 迭代器 | 无 | `head` 指向最小键，`tail` 指向最大键 |
+| `tree.f->next(&it)` / `prev(&it)` | 迭代器指针 | 前进 / 后退 | 无 | 中序遍历 |
+| `tree.f->getk(it)` | 迭代器值 | `TK` | `it.p == nullptr` 时 `AEXC_overstep` | 按 C 的值返回语义取出当前键；不会调用 `A_COPY(TK, ...)` |
+
+#### 5.10.3 使用建议
+
+- 需要稳定有序遍历时，优先用 `ATree` 而不是 `AHash`。
+- 如果键类型的“数学相等”与默认字节比较不一致，请显式实现 `A_OBJ_CMPD(TK)`。
+- `getk(it)` 只是按 C 的值返回语义把键拿出来，不会走 `A_COPY(TK, ...)`。
+- 对 POD / 标量键可以直接用；对 `AString` 这类带资源的键，应把返回值视作临时借用别名，若要长期保存请立刻做一次显式 `A_COPY(TK, key)`。
+
+### 5.11 `ahash.h` — `AHash(TK, TV)`
+
+`AHash(TK, TV)` 是哈希映射，接口外形和 `ATree` 接近，但迭代顺序不稳定，更适合按键查找密集的场景。
+
+#### 5.11.1 生成方式
+
+```c
+AHash_Define(TK, TV);
+AHash_Generate(TK, TV);
+A_TYPE_REGISTER(AHash(TK, TV));
+```
+
+#### 5.11.2 键类型要求
+
+哈希映射对键类型比树更敏感。建议：
+
+- 至少实现稳定的 `A_OBJ_CMPD(TK)`；
+- 如果键不是纯 POD 或者有明确的“逻辑相等”定义，再显式实现 `A_OBJ_HASH(TK)`。
+
+如果不实现 `A_OBJ_HASH(TK)`，ALib 会退回到 `alib_hash()` 对原始字节做哈希；这对包含 padding、指针、未规范化表示的结构体并不总是可靠。
+
+#### 5.11.3 API 说明
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AHash(TK,TV)` / `AHash_Define(TK,TV)` / `AHash_Generate(TK,TV)` | 键类型、值类型 | 生成类型与实现 | 无 | |
+| `hash.f->at(&hash, key)` | 键值 | `TV*` 或 `nullptr` | 键不存在时 `AEXC_overstep` | 返回内部值地址 |
+| `hash.f->rm(&hash, key)` | 键值 | 删除键值对 | 键不存在时 `AEXC_overstep` | 删除时析构键和值 |
+| `hash.f->ins(&hash, key, value)` | 键、值 | 插入 / 替换 | `A_COPY` 异常；`AEXC_alloc_failed` | 同键再次插入会替换旧值；内部可能触发 rehash |
+| `hash.f->take(&hash, key, tar)` | 键、可选输出值指针 | 删除并取出值 | 键不存在时 `AEXC_overstep` | 键总是由容器内部析构 |
+| `hash.f->getNumber(&hash)` / `empty(&hash)` | 无 | 个数 / 是否为空 | 无 | |
+| `hash.f->head(&hash)` / `tail(&hash)` | 无 | 迭代器 | 无 | 迭代顺序与桶布局相关，不稳定 |
+| `hash.f->next(&it)` / `prev(&it)` | 迭代器指针 | 推进 / 后退 | 无 | |
+| `hash.f->getk(it)` | 迭代器值 | `TK` | `it.p == nullptr` 时 `AEXC_overstep` | 按 C 的值返回语义取出当前键；不会调用 `A_COPY(TK, ...)` |
+
+#### 5.11.4 重要语义
+
+- `AHash` 的迭代顺序不保证稳定；不要依赖“插入顺序”或“键排序顺序”。
+- `getk(it)` 同样只是按 C 的值返回语义取键；对拥有型键应把它视作临时借用别名，若要长期保存请立刻显式 `A_COPY(TK, key)`。
+- `A_CMPD(AHash(...), lhs, rhs)` 比较的是当前迭代顺序下的键值序列，不等价于“集合意义上的相等”。
+- `ins()` 是 upsert，而不是“拒绝重复键”。
+
+### 5.12 `astring.h` — `AString`
+
+`AString` 是低层字节串对象。它不做 Unicode 语义处理，重点是：
+
+- 支持拥有 / 借用两种状态
+- 在第一次写入借用字符串时自动转为可写堆内存
+- 保持和 ALib 其他对象一致的复制 / 析构语义
+
+#### 5.12.1 结构字段
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `f` | `const A_FUNC(AString)*` | 函数表 |
+| `noLiteral` | `bool` | `false` 表示当前仅借用外部字符串；`true` 表示当前字符串缓冲区由对象拥有 |
+| `number` | `uint32_t` | 当前字符数，不含终止符 |
+| `capacity` | `uint32_t` | 当前缓冲容量，单位为字节；借用状态下一般为 `0` |
+| `s` | `char*` | 字符串缓冲区地址，可为 `nullptr` |
+
+#### 5.12.2 创建与查询 API
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AString_new(char* s)` | `s`：可为 `nullptr` 的 C 字符串指针 | 返回 `AString` 值对象 | 无 | 只做包装，不复制内容；`s` 若是栈缓冲区，必须在其失效前把内容复制到拥有型字符串 |
+| `AString_getNumber(const AString* self)` | 指针 | `uint32_t` | 无 | 当前长度 |
+| `AString_getCapacity(const AString* self)` | 指针 | `uint32_t` | 无 | 当前容量 |
+| `AString_empty(const AString* self)` | 指针 | `bool` | 无 | 是否为空 |
+
+#### 5.12.3 编辑 API
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AString_rm(AString* self, uint32_t index)` | 索引 | 删除一个字符 | 分配失败时 `AEXC_alloc_failed` | `index >= number` 时静默返回；若当前是借用字符串，写入前会先分配可写副本 |
+| `AString_ins(AString* self, uint32_t index, char c)` | 索引、字符 | 插入字符 | `index > number` 时 `AEXC_overstep`；分配失败时 `AEXC_alloc_failed` | 支持在头部 / 中间 / 尾部插入 |
+| `AString_pushBack(AString* self, char c)` | 字符 | 追加字符 | 见 `AString_ins` | 等价于在尾部插入 |
+| `AString_pushFront(AString* self, char c)` | 字符 | 头插字符 | 见 `AString_ins` | |
+| `AString_popBack(AString* self)` | 无 | 返回被弹出的字符，空串时返回 `'\0'` | 分配失败时 `AEXC_alloc_failed` | 空串时不报异常 |
+| `AString_popFront(AString* self)` | 无 | 返回被弹出的字符，空串时返回 `'\0'` | 分配失败时 `AEXC_alloc_failed` | 空串时不报异常 |
+| `AString_addBack(AString* self, AString that)` | 目标串、源串（按值传入） | 尾部拼接 | 分配失败时 `AEXC_alloc_failed` | 支持自拼接；若 `self` 与 `that` 指向同一缓冲，会先复制临时副本 |
+| `AString_addFront(AString* self, AString that)` | 同上 | 头部拼接 | 分配失败时 `AEXC_alloc_failed` | 同样支持自拼接 |
+| `AString_truncate(AString* self, uint32_t index)` | 截断位置 | 仅保留前 `index` 个字符 | 分配失败时 `AEXC_alloc_failed` | `index >= number` 时静默返回 |
+
+#### 5.12.4 复制 / 析构语义
+
+- `A_INIT(AString)` 创建空字符串对象；初始字段清零、无缓冲区，首次写入时再按需分配。
+- `AString_new("literal")` 创建借用型字符串包装，不立刻分配内存。
+- `A_COPY(AString, s)` 的行为：
+  - 如果 `s` 是拥有型字符串，会深拷贝缓冲区；
+  - 如果 `s` 是借用型字符串，会复制指针，仍保持借用型；后续首次写入时才转成拥有型。
+- `A_DEST(AString, s)` 只在 `s.noLiteral == true` 时释放缓冲区。
+
+#### 5.12.5 最重要的坑
+
+`AString_new(buf)` 不是“复制字符串”，而是“借用 `buf`”。
+
+安全模式：
+
+```c
+char buf[32] = "hello";
+RAII(AString) owned = A_INIT(AString);
+owned.f->addBack(&owned, AString_new(buf));
+```
+
+这样 `owned` 会变成真正拥有内容的字符串；如果只是把 `AString_new(buf)` 本身长时间保存，`buf` 一旦失效就会悬空。
+
+### 5.13 `aptr.h` — `APtr(T)` 与 `AShPtr(T)`
+
+`aptr.h` 提供两类指针包装：
+
+- `APtr(T)`：强拥有者 + 弱别名模型
+- `AShPtr(T)`：原子引用计数共享指针
+
+#### 5.13.1 `APtr(T)`
+
+##### 生成方式
+
+```c
+APtr_Define(T);
+APtr_Generate(T);
+A_TYPE_REGISTER(APtr(T));
+```
+
+##### 结构字段
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `p` | `T*` | 指向被管理对象 |
+| `strong_flag` | `bool` | `true` 表示当前包装对象负责释放 `p`；`false` 表示只是弱别名 |
+
+##### API 说明
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `APtr(T)` | 元素类型 | 生成类型名 | 无 | |
+| `APtr_Define(T)` / `APtr_Generate(T)` | 元素类型 | 生成声明与实现 | 无 | |
+| `APtrNew(T)` | 类型名 | 返回一个强拥有的 `APtr(T)` | `A_NEW(T)` 的异常 | 相当于为 `T` 执行默认构造并接管所有权 |
+| `APtrCPNew(T, obj)` | `obj: T` | 返回一个强拥有的 `APtr(T)` | `A_CPNEW(T,obj)` 的异常 | 为 `obj` 的堆副本创建拥有者 |
+| `A_COPY(APtr(T), ptr)` | `APtr(T)` 对象 | 返回一个新的 `APtr(T)` | 通常无 | 新对象仅保存同一个 `p`，但 `strong_flag == false` |
+| `A_DEST(APtr(T), ptr)` | `APtr(T)` 左值 | 可能析构并释放 `p` | 被释放对象的析构异常可能透出 | 只有 `strong_flag == true` 的那一份会释放对象 |
+
+##### 使用警告
+
+`APtr(T)` 不是 `unique_ptr` 的等价物。复制后：
+
+- 原对象仍然是拥有者；
+- 新对象只是观察者；
+- 如果拥有者先析构，所有弱别名都会悬空。
+
+如果要转移所有权，请用 `A_MOVE` 或手工重置原对象，不要直接复制。
+
+#### 5.13.2 `AShPtr(T)`
+
+##### 生成方式
+
+```c
+AShPtr_Define(T);
+AShPtr_Generate(T);
+A_TYPE_REGISTER(AShPtr(T));
+```
+
+##### 结构字段
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `p` | `T*` | 指向共享对象的实际数据区 |
+
+##### API 说明
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AShPtr(T)` | 元素类型 | 生成类型名 | 无 | |
+| `AShPtr_Define(T)` / `AShPtr_Generate(T)` | 元素类型 | 生成声明与实现 | 无 | |
+| `AShPtrNew(T)` | 类型名 | 返回引用计数为 1 的共享指针 | 分配 / 初始化异常 | 构造一个默认值对象 |
+| `AShPtrCPNew(T, obj)` | `obj: T` | 返回引用计数为 1 的共享指针 | 分配 / 复制异常 | 构造 `obj` 的堆副本 |
+| `A_COPY(AShPtr(T), sp)` | 共享指针对象 | 返回共享同一底层对象的新共享指针 | 极端情况下可能 `AEXC_init_failed` | 复制时原子增加引用计数 |
+| `A_DEST(AShPtr(T), sp)` | 共享指针左值 | 递减引用计数 | 被管理对象析构异常可能透出 | 最后一个持有者析构时释放底层对象 |
+
+##### 并发注意事项
+
+- 引用计数增加 / 减少是原子安全的；
+- 被共享对象 `*p` 自身并不会自动加锁；
+- 多线程同时修改 `*sp.p` 时仍需外部同步。
+
+### 5.14 `alock.h` — 锁与自动解锁
+
+`alock.h` 建立在 C11 `<threads.h>` 上，提供：
 
 - `AMtx`：普通互斥锁
 - `ARecursion`：递归互斥锁
 - `AMtxRW`：读写锁
-- `AAutoKey`：自动解锁辅助对象
+- `AAutoKey`：自动解锁 token
 
-使用方式：
+#### 5.14.1 类型总览
+
+| API | 类别 | 说明 |
+| --- | --- | --- |
+| `ALock` | 类基类 | 所有锁类型的共同基类，内部持有 `mtx_t` |
+| `AAutoKey` | 普通类型 | RAII 解锁 token，析构时执行保存的解锁函数 |
+| `AMtx` | 类 | 普通互斥锁 |
+| `ARecursion` | 类 | 递归互斥锁 |
+| `AMtxRW` | 类 | 基于 `mtx_t + cnd_t` 实现的读写锁，带写者优先倾向 |
+
+#### 5.14.2 `AAutoKey`
+
+`AAutoKey` 常见用法：
 
 ```c
 RAII(AAutoKey) key = AMtx_lock(&lock);
@@ -541,406 +818,204 @@ if (aExcOccur()) {
 }
 ```
 
-离开作用域时，`AAutoKey` 会自动调用对应的解锁函数。
+语义：
 
-这体现了 ALib 的一条主线：
+- `AAutoKey` 析构时，如果内部 `lock` 和 `unlock` 都非空，就自动解锁。
+- `A_COPY(AAutoKey, key)` 会得到一个“空 token”，不会复制解锁责任；因此它天然近似不可复制。
 
-- 即使底层还是 C API
-- 也尽量把资源释放收束到统一的对象析构流程里
+#### 5.14.3 公共函数
 
-## 6. 与 GLib 的差异：设计层面逐项说明
+| API | 参数 | 返回值 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `ALock_unlock(ALock* self)` | 锁基类指针 | 无 | 无 | 当前实现是空内联占位函数，通常不直接调用 |
+| `ALock_uplock(ALock* self)` | 锁基类指针 | 无 | 无 | 当前实现是空内联占位函数，通常不直接调用 |
+| `AMtx_lock(AMtx* self)` | 普通互斥锁指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 成功时返回带解锁器的 token |
+| `ARecursion_lock(ARecursion* self)` | 递归锁指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 同一线程可重入 |
+| `AMtxRW_rlock(AMtxRW* self)` | 读写锁指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 获取读锁；存在等待写者时新读者也会阻塞 |
+| `AMtxRW_wlock(AMtxRW* self)` | 读写锁指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 获取写锁；需要等待现有读者和写者全部离开 |
 
-### 6.1 容器：编译期类型绑定 vs 运行时回调绑定
+#### 5.14.4 初始化 / 拷贝 / 析构语义
 
-GLib 容器常见模式是：
+- `A_INIT(AMtx)` / `A_INIT(ARecursion)` / `A_INIT(AMtxRW)` 会创建一个新的未持有锁实例。
+- `A_COPY(AMtx)` / `A_COPY(ARecursion)` / `A_COPY(AMtxRW)` **不会复制锁状态**，而是创建一把新的、未加锁的同类锁。
+- 锁对象析构时会销毁底层系统锁 / 条件变量。
 
-- 元素以 `gpointer` 进入容器
-- 比较/销毁/哈希行为按容器实例传入
-- 元素的真实类型更多靠调用者自己维护
+#### 5.14.5 使用建议
 
-ALib 的做法是：
+- 优先使用 `RAII(AAutoKey)` 管理解锁，不要手工模拟“多 return 点解锁”。
+- 不要复制 `AAutoKey` 并试图让多个 token 共同管理一次加锁；复制后的 token 是空对象。
+- `AMtxRW` 对写者更友好：只要有写者等待，新读者就会阻塞，避免写者饥饿。
 
-- 容器实例化时就写死元素类型
-- 元素行为统一来自 `A_TYPE_REGISTER`
-- 容器内部默认按值拷贝、按值析构
+### 5.15 `asignal.h` — 信号系统与接收者基类
 
-优点：
+`asignal.h` 提供进程内同步派发信号系统。它支持：
 
-- 调用端更整齐
-- 类型错误更容易在编译期暴露
-- 容器嵌套更自然
+- 申请新的信号 id
+- 连接 / 断开回调
+- 同步发送信号
+- 收集回调执行时抛出的异常
+- 让接收者在析构时自动断连
 
-代价：
+#### 5.15.1 主要类型
 
-- 宏更重
-- 调试展开后的代码更复杂
-- ABI 和源码组织都更偏“头文件驱动”
+| API | 类别 | 说明 |
+| --- | --- | --- |
+| `Aint` | 类型别名 | `int32_t`，用于信号 id 和部分信号相关字段 |
+| `ASignal` | 类基类 | 信号基类，字段有 `id`、`value`、`sender` |
+| `AExcEnd` | 结构体 | 一条回调异常记录，字段为 `addressee` 和 `exc_value` |
+| `AExcCollector` | 类 | 回调异常收集器，内部维护 `ALine(AExcEnd)` |
+| `AReceEnd` | 类基类 | 接收者辅助基类，析构时自动断开其全部连接 |
 
-### 6.2 生命周期：值语义优先 vs 指针语义优先
+`AExcEnd` 字段说明：
 
-GLib 里你经常要明确区分：
+- `addressee`：发生异常的接收者地址（`const void*`）
+- `exc_value`：该回调设置的异常码
 
-- 这个函数是否接管所有权
-- 这个容器放进去的是对象指针还是字节块
-- 什么时候应该 `g_free` / `g_object_unref`
+#### 5.15.2 `ASignal`
 
-ALib 试图把这些都收束到类型的基础函数里，让容器和值对象默认遵守同一套规则。
+`ASignal` 是所有自定义信号的基类。字段：
 
-这会让内部组件更统一，但也要求你认真为自定义类型定义 copy/dest 语义。
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | `Aint` | 信号类型 id，通常由 `a_signal_alloc()` 申请 |
+| `value` | `Aint` | 信号值，用户自定义含义 |
+| `sender` | `const void*` | 发送者地址，可为任意只读指针 |
 
-### 6.3 对象系统：轻量 vtable vs 完整 GObject 体系
-
-ALib 的类系统只解决这些问题：
-
-- 继承
-- 虚函数
-- 多态析构
-
-GLib/GObject 体系还解决：
-
-- 动态类型注册
-- 属性
-- 信号元数据
-- 反射与绑定
-- 大量成熟工具链协同
-
-所以 ALib 更适合“我需要一个干净的内部多态层”，而不是“我要一个完整可扩展对象平台”。
-
-### 6.4 字符串与文本：低层字节串 vs 丰富文本工具
-
-`AString` 的能力重心是：
-
-- 持有字符串
-- 追加、插入、裁剪
-- 按对象语义复制/析构
-
-而 GLib 在文本层面有远比这丰富的能力：
-
-- UTF-8 辅助
-- Unicode 工具
-- 路径、格式化、字符串数组等辅助设施
-
-如果你的项目有明显的文本/国际化需求，ALib 不能代替 GLib 的这部分积累。
-
-### 6.5 信号：内部观察者机制 vs GObject 信号系统
-
-ALib 信号系统可以满足：
-
-- 模块内发布/订阅
-- 错误收集
-- 自动断连
-
-但它不提供：
-
-- 运行时信号描述
-- 属性/参数元信息
-- 绑定友好的反射能力
-
-它更像一个“和类系统配套的内部通知机制”。
-
-### 6.6 生态范围：ALib 更窄
-
-当前仓库明确覆盖的是：
-
-- 容器
-- 字符串
-- 指针包装
-- 类系统
-- 信号
-- 锁
-
-没有提供的典型 GLib 能力包括：
-
-- 主循环
-- 文件与路径工具集合
-- 事件源与异步 IO
-- 模块装载
-- 丰富的字符集与文本辅助
-- 公共 ABI 稳定承诺与大规模生态配套
-
-因此“对标 GLib”更准确的理解应该是：
-
-- ALib 想做 C 语言底层工具库
-- 但它聚焦的是 GLib 里“容器/基础对象组织”这一段，而不是整条生态链
-
-## 7. 使用建议与常见陷阱
-
-### 7.1 为键类型显式实现比较和哈希
-
-如果某个类型要作为 `AHash` 或 `ATree` 的键，最好显式提供：
-
-- `A_OBJ_CMPD(T)`
-- `A_OBJ_HASH(T)`
-
-尤其是：
-
-- 结构体里存在 padding
-- 键语义不是简单按字节相等
-- 键里含指针，但想按“指向内容”而不是“地址”比较
-
-否则默认回退策略可能不符合你的业务语义。
-
-### 7.2 `AString_new` 不等于复制字符串
-
-`AString_new("abc")` 适合字面量。
-
-`AString_new(buf)` 如果 `buf` 是栈数组或临时缓冲，只是借用了这个指针；必须尽快把它复制进拥有型 `AString`，否则会悬空。
-
-### 7.3 析构函数不要抛异常
-
-当前设计里，析构通常处在清理路径尾部；如果析构阶段再设置异常，会让调用栈中的错误语义变得很难判断。
-
-实际使用中，应把 `A_OBJ_DEST(T)` 当成“不失败的清理函数”来写。
-
-### 7.4 顺序容器的越界不是统一报错风格
-
-`ALine` / `AList` / `ADeque` / `AStack` / `AQueue` / `ASortque` 的 `at(index)`：
-
-- 空容器：报 `AEXC_overstep`
-- 非空越界：通常截断到最后一个元素
-
-如果你需要严格索引检查，请自己先比较 `index < getNumber()`。
-
-### 7.5 迭代器不要用作结构修改游标
-
-即使某些容器在某些操作下“看起来还能继续走”，也不要依赖这种偶然性。
-
-更稳妥的规则是：
-
-- 遍历时只读，或只改元素内容
-- 插入/删除时重新获取迭代器
-- 需要批量删改时，先收集索引、键或目标地址，再做第二轮修改
-
-尤其不要写成这种模式：
+自定义信号通常写法：
 
 ```c
-forEach(it, list) {
-    list.f->rm_p(&list, it.p);   /* 删除后 it 已不再可靠 */
-}
+AClass_Inherit(MySignal, ASignal);
+AClass_Struct(MySignal,
+    int extra;
+);
+AClass_Function(MySignal);
+AClass_Generate(MySignal);
+A_CLASS_REGISTER(MySignal);
 ```
 
-ALib 没有提供 STL 风格 “erase 后返回下一个有效迭代器” 的契约，因此删除当前元素后继续 `next(it)` 属于未受文档保障的用法。
+#### 5.15.3 `AExcCollector`
 
-### 7.6 `APtr` 复制不会转移所有权
+`AExcCollector` 用于把回调执行过程中的异常收集起来，而不是只留下最终的 `AEXC_response_exc`。
 
-很多使用者第一次看见 `APtr(T)` 会自然联想到唯一拥有者；但当前实现里：
+公共 API：
 
-- 原对象强拥有
-- 拷贝对象弱引用
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AExcCollector_pop(AExcCollector* collector)` | 收集器指针 | 返回一个 `AExcEnd` | 空列表时可能透出底层 `AEXC_overstep` | `collector == nullptr` 时返回零值记录；非空收集器按 LIFO 顺序弹出最后一条记录 |
+| `AExcCollector_empty(const AExcCollector* collector)` | 收集器指针，可为 `nullptr` | `bool` | 无 | `collector == nullptr` 时返回 `true` |
+| `AExcCollector_getNumber(const AExcCollector* collector)` | 收集器指针，可为 `nullptr` | `uint32_t` | 无 | `collector == nullptr` 时返回 `0` |
+| `A_CALL(collector, AExcCollector).pop(...)` 等 | 对象方法形式 | 与上面一致 | 同上 | 类方法表只是这些函数的包装 |
 
-所以要么坚持不复制 `APtr`，要么在文档里明确这是“拥有者 + 观察者”模式，而不是“move-only 指针”。
+`AExcCollector` 还暴露两个重要字段：
 
-### 7.7 哈希表比较不等价于集合比较
+- `id`：本次 `a_signal_transmit` 正在派发的信号 id
+- `exc`：收集器自身的异常标志；如果收集过程中连异常列表都无法追加（例如分配失败），该标志会被置位，派发过程也会中止继续收集
 
-`AHash` 的比较是按当前迭代顺序逐项比较，不应把它当作“键值集合完全相同”的数学判定。
+#### 5.15.4 信号系统公共 API
 
-如果业务上需要集合相等，请自己按键逐项比较。
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `a_signal_alloc()` | 无 | 新的正整数信号 id；失败时通常为 `-1` | `AEXC_system_error` | 申请一个新的信号类型 id |
+| `__a_signal_transmit(const ASignal* signal, AExcCollector* collector)` | 信号指针、可选收集器 | 发送信号 | `AEXC_system_error`、`AEXC_nullptr`、`AEXC_outdomain`、`AEXC_response_exc` | 低层实现函数；业务代码通常调用 `a_signal_transmit` 宏 |
+| `a_signal_transmit(signal, ...)` | 变参宏：必传 `signal`，可选 1 个 `AExcCollector*` | 发送信号 | 同 `__a_signal_transmit` | 宏变参上限 1；会做编译期类型断言 |
+| `a_signal_connection(Aint id, const void* addressee, void(*call)(const ASignal*, void*))` | 信号 id、接收者地址、回调函数 | 建立连接 | `AEXC_outdomain`、`AEXC_repeat_write`、底层分配异常 | 同一个 `(id, addressee)` 只允许存在一条连接 |
+| `a_signal_disconnect(Aint id, const void* addressee)` | 信号 id、接收者地址 | 删除一条连接 | `AEXC_outdomain`、`AEXC_repeat_write` | 在回调执行期间调用会被拒绝；“连接不存在但参数合法”通常静默返回 |
+| `a_target_disconnect(const void* addressee, Aint id)` | 接收者地址、信号 id | 删除一条连接 | 同 `a_signal_disconnect` | 只是参数顺序相反的内联包装 |
+| `a_signal_disconnect_all(Aint id)` | 信号 id | 删除该信号 id 的全部连接 | `AEXC_outdomain`、`AEXC_repeat_write` | 若该 id 当前没有连接，通常静默返回 |
+| `a_target_disconnect_all(const void* addressee)` | 接收者地址 | 删除该接收者的全部连接 | `AEXC_outdomain`、`AEXC_repeat_write` | 在回调执行期间调用同样会被拒绝 |
 
-### 7.8 信号回调里不要做破坏性断连
+#### 5.15.5 `a_signal_transmit` 宏的变参规则
 
-当前实现明确限制：
+宏定义等价于：
 
-- 不要在回调里断开当前连接对象
-- 不要在回调里析构仍然连接着的接收者对象
+```c
+a_signal_transmit(signal);
+a_signal_transmit(signal, &collector);
+```
 
-如果需要自动清理接收者，优先让接收者继承 `AReceEnd`，把断连放到析构路径里处理。
+规则：
 
-## 8. API 速查表
+- 只允许 0 或 1 个附加参数；
+- 附加参数类型必须是 `AExcCollector*`；
+- `signal` 必须是指向 `ASignal` 或其子类对象的指针；
+- 这些约束由宏内的静态断言和类型断言在编译期检查。
 
-这一节不重复展开设计背景，只按模块列出“最常用、最值得记住”的公开入口，方便查阅。
+#### 5.15.6 运行时语义
 
-### 8.1 `alib.h`：对象、异常与内存
+- 发送信号是同步行为：所有当前连接的回调都在调用线程内执行。
+- 派发开始前，系统会拷贝当前信号 id 对应的连接快照；因此“回调里新增的连接”不会参与当前这一轮派发，只会影响后续派发。
+- 如果某个回调设置了异常：
+  - 无收集器时：本次派发结束后错误槽会是 `AEXC_response_exc`；
+  - 有收集器时：错误槽仍会是 `AEXC_response_exc`，同时收集器中追加一条 `AExcEnd`。
+- 收集器的记录顺序是“回调执行顺序追加、`pop` 时逆序弹出”。
+- 向一个“已分配但当前无人连接”的合法 `id` 发送信号，不报错，只是什么也不发生。
+- 向一个“从未分配过或超出当前范围”的 `id` 发送信号，会报 `AEXC_outdomain`。
 
-- 对象生命周期：`A_INIT(T)`、`A_COPY(T, obj)`、`A_DEST(T, obj)`
-- 堆对象：`A_NEW(T)`、`A_CPNEW(T, obj)`、`A_DELETE(T, p)`
-- 作用域析构：`RAII(T)`
-- 移动语义：`A_MOVE(obj)`、`A_LEFT(obj)`
-- 类型注册：`A_TYPE_REGISTER(T)`、`A_CLASS_REGISTER(T)`
-- 异常槽：`aExcClean()`、`aExcOccur()`、`aExcSet(v)`、`aExcGet()`
-- 分配器钩子：`alib_alloc()`、`alib_realloc()`、`alib_free()`、`alib_new()`、`alib_cpnew()`、`alib_delete()`
-- 哈希辅助：`alib_hash()`、`alib_hash_str()`
+#### 5.15.7 `AReceEnd`
 
-### 8.2 `aiter.h`：统一迭代器
+`AReceEnd` 是接收者辅助基类，适合“对象析构时自动断开全部连接”的场景。
 
-- 迭代器类型：`AIter(ContainerType)`
-- 首尾迭代器：`AItHead(con)`、`AItTail(con)`
-- 迭代推进：`AItNext(it)`、`AItPrev(it)`、`AItExist(it)`
-- 遍历宏：`forEach(it, con)`、`forEachRev(it, con)`
-- 访问当前元素：`it.p`
-- 访问逻辑位置：`it.i`
-- 使用建议：只把迭代器当遍历游标，不要把它当插入/删除游标
+公共方法：
 
-### 8.3 `aline.h`：`ALine(T)`
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AReceEnd_connection(const AReceEnd* self, Aint id, void(*call)(const ASignal*, void*))` | 接收者、信号 id、回调 | 建立连接 | `AEXC_nullptr`，以及 `a_signal_connection` 的异常 | 实际上就是把 `self` 当作 `addressee` |
+| `AReceEnd_disconnect(const AReceEnd* self, Aint id)` | 接收者、信号 id | 删除该接收者在此 id 上的连接 | `AEXC_nullptr`，以及 `a_signal_disconnect` 的异常 | |
+| `A_CALL(obj, AReceEnd).connection(...)` / `disconnect(...)` | 方法表调用 | 同上 | 同上 | 面向类对象的常用调用方式 |
 
-- 生成方式：`ALine_Define(T)`、`ALine_Generate(T)`、`A_TYPE_REGISTER(ALine(T))`
-- 访问：`line.f->at(&line, index)`
-- 插入/删除：`ins`、`rm`、`take`
-- 双端操作：`pushBack`、`pushFront`、`popBack`、`popFront`
-- 状态查询：`getNumber`、`empty`
-- 典型场景：连续存储、随机访问、值语义数组
+析构语义：
 
-### 8.4 `alist.h`：`AList(T)`
+- `AReceEnd` 的析构函数会调用 `a_target_disconnect_all(self)`；
+- 因此只要你的接收者对象继承 `AReceEnd`，一般不需要手工在所有正常析构路径里逐条断连。
 
-- 生成方式：`AList_Define(T)`、`AList_Generate(T)`、`A_TYPE_REGISTER(AList(T))`
-- 访问：`list.f->at(&list, index)`
-- 按索引修改：`ins`、`rm`、`take`
-- 按元素地址修改：`rm_p`、`take_p`
-- 双端操作：`pushBack`、`pushFront`、`popBack`、`popFront`
-- 状态查询：`getNumber`、`empty`
-- 典型场景：频繁中间插入/删除，或需要稳定节点地址的链表场景
+#### 5.15.8 使用约束（非常重要）
 
-### 8.5 `adeque.h` / `astack.h` / `aqueue.h`
+当前实现要求：
 
-#### `ADeque(T)`
+1. 已连接的接收者对象在析构前必须断开连接，或者直接继承 `AReceEnd`。  
+2. 回调执行期间不允许做破坏性断连（`disconnect` / `disconnect_all`），否则会报 `AEXC_repeat_write`。  
+3. 回调里不要析构任何仍处于连接表中的接收者对象，否则会制造悬空指针。  
+4. 回调里不要等待其他线程执行信号连接 / 断开操作，否则可能形成锁等待。  
 
-- 生成方式：`ADeque_Define(T)`、`ADeque_Generate(T)`、`A_TYPE_REGISTER(ADeque(T))`
-- 访问：`at`
-- 双端操作：`pushBack`、`pushFront`、`popBack`、`popFront`
-- 状态查询：`getNumber`、`empty`
+## 6. 示例与测试入口
 
-#### `AStack(T)`
+示例程序：
 
-- 生成方式：`AStack_Define(T)`、`AStack_Generate(T)`、`A_TYPE_REGISTER(AStack(T))`
-- 栈接口：`push`、`pop`
-- 额外能力：仍支持 `at`、统一迭代器、`getNumber`、`empty`
-
-#### `AQueue(T)`
-
-- 生成方式：`AQueue_Define(T)`、`AQueue_Generate(T)`、`A_TYPE_REGISTER(AQueue(T))`
-- 队列接口：`push`、`pop`
-- 额外能力：仍支持 `at`、统一迭代器、`getNumber`、`empty`
-
-### 8.6 `asortque.h`：`ASortque(T)`
-
-- 生成方式：`ASortque_Define(T)`、`ASortque_Generate(T)`、`A_TYPE_REGISTER(ASortque(T))`
-- 访问：`at`
-- 有序插入：`ins`
-- 删除/取出：`rm`、`take`
-- 最值弹出：`popMin`、`popMax`
-- 状态查询：`getNumber`、`empty`
-- 排序依据：元素类型的 `A_CMPD(T, lhs, rhs)`
-
-### 8.7 `atree.h`：`ATree(K, V)`
-
-- 生成方式：`ATree_Define(K, V)`、`ATree_Generate(K, V)`、`A_TYPE_REGISTER(ATree(K, V))`
-- 查找：`tree.f->at(&tree, key)`
-- 插入/替换：`ins`
-- 删除/取出：`rm`、`take`
-- 遍历辅助：`head`、`tail`、`next`、`prev`、`getk`
-- 状态查询：`getNumber`、`empty`
-- 典型场景：需要稳定有序遍历的映射
-
-### 8.8 `ahash.h`：`AHash(K, V)`
-
-- 生成方式：`AHash_Define(K, V)`、`AHash_Generate(K, V)`、`A_TYPE_REGISTER(AHash(K, V))`
-- 查找：`hash.f->at(&hash, key)`
-- 插入/替换：`ins`
-- 删除/取出：`rm`、`take`
-- 遍历辅助：`head`、`tail`、`next`、`prev`、`getk`
-- 状态查询：`getNumber`、`empty`
-- 键类型建议：显式实现 `A_OBJ_CMPD(K)`，必要时实现 `A_OBJ_HASH(K)`
-
-### 8.9 `astring.h`：`AString`
-
-- 字面量/借用包装：`AString_new(char *s)`
-- 基本编辑：`rm`、`ins`、`truncate`
-- 头尾操作：`pushBack`、`pushFront`、`popBack`、`popFront`
-- 拼接：`addBack`、`addFront`
-- 状态查询：`getNumber`、`getCapacity`、`empty`
-- 重要字段：`s`、`number`、`capacity`、`noLiteral`
-
-### 8.10 `aptr.h`：`APtr(T)` 与 `AShPtr(T)`
-
-#### `APtr(T)`
-
-- 生成方式：`APtr_Define(T)`、`APtr_Generate(T)`、`A_TYPE_REGISTER(APtr(T))`
-- 创建：`APtrNew(T)`、`APtrCPNew(T, obj)`
-- 复制语义：复制后得到弱别名，`strong_flag == false`
-- 主要字段：`p`、`strong_flag`
-
-#### `AShPtr(T)`
-
-- 生成方式：`AShPtr_Define(T)`、`AShPtr_Generate(T)`、`A_TYPE_REGISTER(AShPtr(T))`
-- 创建：`AShPtrNew(T)`、`AShPtrCPNew(T, obj)`
-- 复制语义：复制时原子增加引用计数
-- 主要字段：`p`
-
-### 8.11 `aclass.h`：轻量类系统
-
-- 继承声明：`AClass_Inherit(T)`、`AClass_Inherit(T, Base)`
-- 数据结构：`AClass_Struct(T, ...)`
-- 虚函数表：`AClass_Function(T, ...)`
-- 生成虚表：`AClass_Generate(T, ...)`
-- 注册类：`A_CLASS_REGISTER(T)`
-- 调用虚函数：`A_CALL(obj)`、`A_CALL(obj, Base)`
-- 覆盖父类函数：`A_COVER_FUNC(self, Base, name, func)`
-- 自定义虚表初始化：`A_SET_VTAB(T)`
-
-### 8.12 `asignal.h`：信号系统
-
-- 基类：`ASignal`
-- 接收者辅助基类：`AReceEnd`
-- 异常收集器：`AExcCollector`
-- 申请信号 id：`a_signal_alloc()`
-- 发送信号：`a_signal_transmit(signal)`、`a_signal_transmit(signal, &collector)`
-- 建立连接：`a_signal_connection(id, addressee, callback)`
-- 断开连接：`a_signal_disconnect(id, addressee)`、`a_target_disconnect(addressee, id)`
-- 批量断开：`a_signal_disconnect_all(id)`、`a_target_disconnect_all(addressee)`
-- 收集异常：`AExcCollector_pop()`、`AExcCollector_empty()`、`AExcCollector_getNumber()`
-
-### 8.13 `alock.h`：锁与自动解锁
-
-- 基类：`ALock`
-- 自动解锁辅助对象：`AAutoKey`
-- 普通互斥锁：`AMtx`、`AMtx_lock()`
-- 递归锁：`ARecursion`、`ARecursion_lock()`
-- 读写锁：`AMtxRW`、`AMtxRW_rlock()`、`AMtxRW_wlock()`
-- 推荐用法：`RAII(AAutoKey) key = AMtx_lock(&lock);`
-
-## 9. 示例与测试入口
-
-可以直接参考这些文件理解现有 API：
-
-- `sample/sample_type.c`：类型注册与对象生命周期
+- `sample/sample_type.c`：自定义类型与对象生命周期
 - `sample/sample_aclass.c`：类系统与虚函数覆盖
-- `sample/sample_aline.c`：动态数组与泛型容器
-- `sample/sample_asignal.c`：信号派发与异常收集
-- `sample/sample_alock.c`：锁与 `AAutoKey`
+- `sample/sample_aline.c`：容器生成、遍历与值语义
+- `sample/sample_alock.c`：`AAutoKey` 与锁的 RAII 使用
+- `sample/sample_asignal.c`：信号连接、派发与异常收集
 
-回归测试覆盖的重点包括：
+回归测试：
 
-- `test/test_sequence_api.c`：序列容器统一 API
-- `test/test_map_api.c`：映射容器统一 API
-- `test/test_asignal.c`：信号连接、重入发送、异常收集
-- `test/test_aptr.c`：独占/共享指针包装语义
+- `test/test_sequence_api.c`：序列容器共性 API
+- `test/test_map_api.c`：映射容器共性 API
+- `test/test_asignal.c`：信号系统、重入发送、异常收集
+- `test/test_aptr.c`：`APtr` / `AShPtr` 语义
+- 其余 `test/test_*.c`：各模块单独行为测试
 
-建议在修改容器或对象语义后至少执行：
+推荐最少验证命令：
 
 ```bash
 make
 make -C test
 ```
 
-如果需要同时看使用方式，再补：
+如果修改了示例相关接口，再补：
 
 ```bash
 make -C sample
 ```
 
-## 10. 总结
+## 7. 常见误区速记
 
-ALib 的特色不在于“覆盖 GLib 的全部能力”，而在于把下面几件事捏成了同一套风格：
+- `AString_new()` 只是借用，不是复制。
+- `APtr(T)` 复制后不会转移所有权，只会得到弱别名。
+- `AHash(K,V)` 的比较结果不等价于“无序集合相等”。
+- 顺序容器的 `at(index)` 普遍是“空容器报错，非空越界截断到尾元素”。
+- `take` / `pop` 把元素写到 `tar` 后，后续由调用方负责析构该元素。
+- 迭代时一旦改容器结构，就应重新获取迭代器。
+- `a_signal_transmit(signal, ...)` 只允许 0 或 1 个附加参数。
+- `AClass_Inherit(T, ...)` 和 `A_CALL(obj, ...)` 都是宏变参，但附加参数上限都只有 1 个。
 
-- 编译期绑定类型的泛型容器
-- 统一的 init/copy/dest/cmpd/hash 协议
-- RAII 风格的对象与锁管理
-- 轻量类系统
-- 进程内信号机制
-
-因此它最适合作为：
-
-- 纯 C 项目里的内部基础库
-- 希望获得更强类型化容器接口的工具层
-- 研究 C 里“值语义 + 宏泛型 + 轻量对象模型”这条路线的代码库
-
-如果你的需求已经超出这个边界，尤其是需要主循环、文本工具、成熟对象反射或广泛生态，那么 GLib 仍然是更稳妥、更成熟的选择。
