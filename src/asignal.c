@@ -536,7 +536,6 @@ static inline void ASignalSystem_rm_link(ASignalSystem* self, ALink* link){
     }
 
     if(__a_unlikely(link == nullptr)){
-        aExcSet(AEXC_outdomain);
         return;
     }
 
