@@ -261,7 +261,7 @@ int tss_set(tss_t key, void* val){
 void tss_delete(tss_t key){
     pthread_key_delete(key);
 }
-    #elif defined(_WIN32)
+    #elif defined(__C_WINDOWS__)
 
         #include <process.h>
 
@@ -685,5 +685,5 @@ void tss_delete(tss_t key){
     FlsFree(key.slot);
 }
 
-    #endif /* __C_POSIX__ || _WIN32 */
+    #endif /* __C_POSIX__ || __C_WINDOWS__ */
 #endif /* !A_THRD_USE_SYSTEM_THREADS */

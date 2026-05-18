@@ -56,7 +56,7 @@ extern "C" {
 
     #define TSS_DTOR_ITERATIONS 4
 
-    #if defined(_WIN32)
+    #if defined(__C_WINDOWS__)
         #if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0600)
             #undef _WIN32_WINNT
             #define _WIN32_WINNT 0x0600
@@ -105,8 +105,8 @@ extern "C" {
         typedef pthread_cond_t cnd_t;
         typedef pthread_key_t tss_t;
     #else
-        #error "The target platform cannot support multithreading; define __C_POSIX__ on POSIX or use _WIN32."
-    #endif /* _WIN32 */
+        #error "The target platform cannot support multithreading; define __C_POSIX__ on POSIX or __C_WINDOWS__ on Windows."
+    #endif /* __C_WINDOWS__ */
 
     int thrd_create(thrd_t* thr, thrd_start_t func, void* arg);
     int thrd_equal(thrd_t lhs, thrd_t rhs);

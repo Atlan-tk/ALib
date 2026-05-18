@@ -15,11 +15,11 @@
         #define __A_HAVE_ICONV 0
     #endif
 #else
-    #if defined(_WIN32)
-        #define __A_HAVE_ICONV 0
-    #else
+    #if defined(__C_POSIX__)
         #include <iconv.h>
         #define __A_HAVE_ICONV 1
+    #else
+        #define __A_HAVE_ICONV 0
     #endif
 #endif
 

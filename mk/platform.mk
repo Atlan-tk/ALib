@@ -30,4 +30,6 @@ endif
 ifeq ($(strip $(THREAD_LIBS)),)
 THREAD_LIBS := -pthread
 endif
+else ifeq ($(ALIB_PLATFORM),windows)
+ALIB_PLATFORM_CFLAGS += -D__C_WINDOWS__
 endif
