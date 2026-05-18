@@ -11,8 +11,8 @@ extern "C" {
 #endif /* __cplusplus */
 
 #include "alib.h"
+#include "athrd.h"
 #include "aclass.h"
-#include <threads.h>
 
 
 

@@ -1,6 +1,8 @@
 CC ?= gcc
 AR ?= ar
 
+include mk/platform.mk
+
 DESTDIR ?=
 PREFIX ?= /usr/local
 LIBDIR ?= $(PREFIX)/lib
@@ -15,7 +17,7 @@ INC_DIR := inc
 TEST_DIR := test
 SAMPLE_DIR := sample
 
-CFLAGS := -I$(INC_DIR) -Wall -Wextra -Werror -O2 -fPIC -MMD -MP
+CFLAGS := $(THREAD_CFLAGS) -I$(INC_DIR) -Wall -Wextra -Werror -O2 -fPIC -MMD -MP
 ARFLAGS ?= rcs
 
 LIB_NAME := libatlan.a

@@ -16,7 +16,7 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，核心目标不是复�
 - 统一的对象初始化 / 拷贝 / 析构 / 比较 / 哈希协议
 - 近似 RAII 的资源释放方式
 - 轻量单继承类系统与虚函数表
-- 进程内信号派发和锁封装
+- 进程内信号派发、线程兼容层和锁封装
 
 一句话概括：ALib 更像“把 STL 式值语义和轻量对象模型带进 C 的实验性基础库”。
 
@@ -56,7 +56,7 @@ ALib 依赖：
 
 - C11
 - GNU 扩展（`__auto_type`、`typeof`、`cleanup`、`weakref` 等）
-- `<threads.h>`
+- C11 线程 / 时间接口；优先复用系统 `<threads.h>`，缺失时由 `athrd.h` 在 POSIX / Win32 上补齐
 
 因此推荐直接使用仓库内的 `Makefile`，或者在外部工程中保持等价编译条件。
 
@@ -185,6 +185,7 @@ A_TYPE_REGISTER(ATree(KeyType, ValueType));
 | `ahash.h` | 哈希映射 |
 | `astring.h` | 字符串对象 |
 | `aptr.h` | 独占 / 共享指针包装 |
+| `athrd.h` | C11 线程兼容层；线程、互斥锁、条件变量、TSS、`call_once` |
 | `alock.h` | 互斥锁、递归锁、读写锁、自动解锁 token |
 | `asignal.h` | 信号系统、接收者基类、异常收集器 |
 
@@ -788,16 +789,93 @@ A_TYPE_REGISTER(AShPtr(T));
 - 被共享对象 `*p` 自身并不会自动加锁；
 - 多线程同时修改 `*sp.p` 时仍需外部同步。
 
-### 5.14 `alock.h` — 锁与自动解锁
+### 5.14 `athrd.h` — C11 线程兼容层
 
-`alock.h` 建立在 C11 `<threads.h>` 上，提供：
+`athrd.h` 的目标不是重新设计一套线程 API，而是给 ALib 及其使用者提供一个稳定的 C11 线程入口：
+
+- 如果系统有 `<threads.h>`，则直接透传系统实现；
+- 如果 `__STDC_NO_THREADS__` 生效，或标准库缺少 `<threads.h>`，则在 POSIX 上回退到 `pthread`，在 Windows 上回退到 Win32 线程原语；
+- 上层代码始终使用 `thrd_t` / `mtx_t` / `cnd_t` / `tss_t` 这些 C11 风格名字，不需要为平台分支改业务接口。
+
+#### 5.14.1 主要类型与常量
+
+| API | 类别 | 说明 |
+| --- | --- | --- |
+| `thrd_start_t` | 函数指针类型 | `int (*)(void*)`；线程入口函数 |
+| `tss_dtor_t` | 函数指针类型 | `void (*)(void*)`；线程退出时用于清理 TSS 值 |
+| `thrd_t` | 线程句柄 | 线程标识 / 句柄；底层表示随平台变化 |
+| `once_flag` / `ONCE_FLAG_INIT` | 一次初始化原语 | 与 `call_once` 配套，确保初始化逻辑只执行一次 |
+| `mtx_t` | 互斥锁类型 | 支持普通锁、递归锁，以及定时加锁接口 |
+| `cnd_t` | 条件变量类型 | 与 `mtx_t` 配套使用 |
+| `tss_t` | 线程特定存储 key | 与 `tss_*` API 配套 |
+| `thrd_success` / `thrd_busy` / `thrd_error` / `thrd_nomem` / `thrd_timedout` | 状态码 | 与 C11 `<threads.h>` 风格一致的返回值 |
+| `mtx_plain` / `mtx_recursive` / `mtx_timed` | 锁类型标志 | 传给 `mtx_init` 的 bit flag |
+| `TSS_DTOR_ITERATIONS` | 宏常量 | fallback 实现固定为 `4`；若直接走系统 `<threads.h>`，则以系统定义为准 |
+
+#### 5.14.2 兼容策略与时间语义
+
+- 需要线程原语时，优先包含 `<alib/athrd.h>`，而不是直接依赖系统 `<threads.h>`；这样能保持与 ALib 内部相同的兼容路径。
+- `thrd_sleep` 接收的是“相对时长” `duration`。
+- `mtx_timedlock` 和 `cnd_timedwait` 接收的是“绝对 UTC 时间点” `time_point`；最常见写法是先用 `timespec_get(&ts, TIME_UTC)` 取得当前时间，再手工累加超时窗口。
+- 如果你准备调用定时锁接口，仍建议在 `mtx_init` 时显式带上 `mtx_timed`，这样与系统 `<threads.h>` 路径的源代码兼容性最好。
+- 若目标平台既没有系统 `<threads.h>`，又不属于当前 fallback 支持的 POSIX / Win32 范围，则会在编译期直接报错。
+
+#### 5.14.3 线程 API
+
+| API | 参数 | 返回值 | 说明 |
+| --- | --- | --- | --- |
+| `thrd_create(thrd_t* thr, thrd_start_t func, void* arg)` | 输出线程句柄、入口函数、用户参数 | `thrd_*` 状态码 | 成功后启动新线程执行 `func(arg)` |
+| `thrd_equal(thrd_t lhs, thrd_t rhs)` | 两个线程句柄 | `int` | 非零表示两者标识同一线程 |
+| `thrd_current(void)` | 无 | `thrd_t` | 返回当前线程句柄 |
+| `thrd_sleep(const struct timespec* duration, struct timespec* remaining)` | 相对睡眠时长、可选剩余时长输出 | `0` / `-1` / `-2` | `0` 表示睡满，`-1` 表示被中断，`-2` 表示参数非法或系统错误 |
+| `thrd_exit(int res)` | 线程退出码 | 不返回 | 立刻结束当前线程；`res` 可由 `thrd_join` 取回 |
+| `thrd_detach(thrd_t thr)` | 线程句柄 | `thrd_*` 状态码 | 把线程转为 detached；之后不再 `join` |
+| `thrd_join(thrd_t thr, int* res)` | 线程句柄、可选结果输出 | `thrd_*` 状态码 | 阻塞到目标线程结束；若 `res != nullptr`，写回线程返回值 |
+| `thrd_yield(void)` | 无 | 无 | 主动让出当前时间片 |
+
+#### 5.14.4 互斥锁、条件变量与一次初始化
+
+| API | 参数 | 返回值 | 说明 |
+| --- | --- | --- | --- |
+| `mtx_init(mtx_t* mutex, int type)` | 锁对象、类型标志 | `thrd_*` 状态码 | 初始化互斥锁；`type` 可组合 `mtx_plain` / `mtx_recursive` / `mtx_timed` |
+| `mtx_lock(mtx_t* mutex)` | 锁对象 | `thrd_*` 状态码 | 阻塞直到获取锁 |
+| `mtx_timedlock(mtx_t* mutex, const struct timespec* time_point)` | 锁对象、绝对 UTC 截止时间 | `thrd_*` 状态码 | 超时返回 `thrd_timedout` |
+| `mtx_trylock(mtx_t* mutex)` | 锁对象 | `thrd_*` 状态码 | 无阻塞尝试加锁；占用中返回 `thrd_busy` |
+| `mtx_unlock(mtx_t* mutex)` | 锁对象 | `thrd_*` 状态码 | 释放当前线程持有的锁 |
+| `mtx_destroy(mtx_t* mutex)` | 锁对象 | 无 | 销毁已初始化锁 |
+| `call_once(once_flag* flag, void (*func)(void))` | 一次初始化标志、初始化函数 | 无 | 无论多少线程并发调用，`func` 最多执行一次 |
+| `cnd_init(cnd_t* cond)` | 条件变量对象 | `thrd_*` 状态码 | 初始化条件变量 |
+| `cnd_signal(cnd_t* cond)` | 条件变量对象 | `thrd_*` 状态码 | 唤醒一个等待者 |
+| `cnd_broadcast(cnd_t* cond)` | 条件变量对象 | `thrd_*` 状态码 | 唤醒全部等待者 |
+| `cnd_wait(cnd_t* cond, mtx_t* mutex)` | 条件变量对象、已持有的锁 | `thrd_*` 状态码 | 原子地“释放锁并等待”；唤醒后重新持锁返回 |
+| `cnd_timedwait(cnd_t* cond, mtx_t* mutex, const struct timespec* time_point)` | 条件变量对象、已持有的锁、绝对 UTC 截止时间 | `thrd_*` 状态码 | 超时返回 `thrd_timedout` |
+| `cnd_destroy(cnd_t* cond)` | 条件变量对象 | 无 | 销毁条件变量 |
+
+#### 5.14.5 线程特定存储（TSS）
+
+| API | 参数 | 返回值 | 说明 |
+| --- | --- | --- | --- |
+| `tss_create(tss_t* key, tss_dtor_t destructor)` | 输出 key、可选析构函数 | `thrd_*` 状态码 | 创建一个线程局部存储槽；线程退出时会对非空值调用析构器 |
+| `tss_get(tss_t key)` | key | `void*` | 读取当前线程在该 key 上保存的值 |
+| `tss_set(tss_t key, void* val)` | key、待保存值 | `thrd_*` 状态码 | 为当前线程写入局部值；传 `NULL` 等价于清空当前线程槽位 |
+| `tss_delete(tss_t key)` | key | 无 | 删除整个 TSS key；不同线程的关联值后续不应再访问 |
+
+#### 5.14.6 与 `alock.h` 的关系
+
+- `athrd.h` 提供的是“原始线程原语”：线程创建、等待、条件变量、TLS、一次初始化。
+- `alock.h` 则建立在 `athrd.h` 的 `mtx_t` / `cnd_t` 之上，把常见加锁模式封装成 ALib 风格对象和 `RAII(AAutoKey)`。
+- 如果你需要创建线程、等待条件或直接操作 `tss_t`，用 `athrd.h`；如果你只需要在业务代码里保护临界区，通常直接用 `AMtx` / `ARecursion` / `AMtxRW` 更省心。
+
+### 5.15 `alock.h` — 锁与自动解锁
+
+`alock.h` 建立在 `athrd.h` 暴露的 `mtx_t` / `cnd_t` 之上，提供：
 
 - `AMtx`：普通互斥锁
 - `ARecursion`：递归互斥锁
 - `AMtxRW`：读写锁
 - `AAutoKey`：自动解锁 token
 
-#### 5.14.1 类型总览
+#### 5.15.1 类型总览
 
 | API | 类别 | 说明 |
 | --- | --- | --- |
@@ -807,7 +885,7 @@ A_TYPE_REGISTER(AShPtr(T));
 | `ARecursion` | 类 | 递归互斥锁 |
 | `AMtxRW` | 类 | 基于 `mtx_t + cnd_t` 实现的读写锁，带写者优先倾向 |
 
-#### 5.14.2 `AAutoKey`
+#### 5.15.2 `AAutoKey`
 
 `AAutoKey` 常见用法：
 
@@ -823,7 +901,7 @@ if (aExcOccur()) {
 - `AAutoKey` 析构时，如果内部 `lock` 和 `unlock` 都非空，就自动解锁。
 - `A_COPY(AAutoKey, key)` 会得到一个“空 token”，不会复制解锁责任；因此它天然近似不可复制。
 
-#### 5.14.3 公共函数
+#### 5.15.3 公共函数
 
 | API | 参数 | 返回值 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -834,19 +912,19 @@ if (aExcOccur()) {
 | `AMtxRW_rlock(AMtxRW* self)` | 读写锁指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 获取读锁；存在等待写者时新读者也会阻塞 |
 | `AMtxRW_wlock(AMtxRW* self)` | 读写锁指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 获取写锁；需要等待现有读者和写者全部离开 |
 
-#### 5.14.4 初始化 / 拷贝 / 析构语义
+#### 5.15.4 初始化 / 拷贝 / 析构语义
 
 - `A_INIT(AMtx)` / `A_INIT(ARecursion)` / `A_INIT(AMtxRW)` 会创建一个新的未持有锁实例。
 - `A_COPY(AMtx)` / `A_COPY(ARecursion)` / `A_COPY(AMtxRW)` **不会复制锁状态**，而是创建一把新的、未加锁的同类锁。
 - 锁对象析构时会销毁底层系统锁 / 条件变量。
 
-#### 5.14.5 使用建议
+#### 5.15.5 使用建议
 
 - 优先使用 `RAII(AAutoKey)` 管理解锁，不要手工模拟“多 return 点解锁”。
 - 不要复制 `AAutoKey` 并试图让多个 token 共同管理一次加锁；复制后的 token 是空对象。
 - `AMtxRW` 对写者更友好：只要有写者等待，新读者就会阻塞，避免写者饥饿。
 
-### 5.15 `asignal.h` — 信号系统与接收者基类
+### 5.16 `asignal.h` — 信号系统与接收者基类
 
 `asignal.h` 提供进程内同步派发信号系统。它支持：
 
@@ -856,7 +934,7 @@ if (aExcOccur()) {
 - 收集回调执行时抛出的异常
 - 让接收者在析构时自动断连
 
-#### 5.15.1 主要类型
+#### 5.16.1 主要类型
 
 | API | 类别 | 说明 |
 | --- | --- | --- |
@@ -871,7 +949,7 @@ if (aExcOccur()) {
 - `addressee`：发生异常的接收者地址（`const void*`）
 - `exc_value`：该回调设置的异常码
 
-#### 5.15.2 `ASignal`
+#### 5.16.2 `ASignal`
 
 `ASignal` 是所有自定义信号的基类。字段：
 
@@ -893,7 +971,7 @@ AClass_Generate(MySignal);
 A_CLASS_REGISTER(MySignal);
 ```
 
-#### 5.15.3 `AExcCollector`
+#### 5.16.3 `AExcCollector`
 
 `AExcCollector` 用于把回调执行过程中的异常收集起来，而不是只留下最终的 `AEXC_response_exc`。
 
@@ -911,7 +989,7 @@ A_CLASS_REGISTER(MySignal);
 - `id`：本次 `a_signal_transmit` 正在派发的信号 id
 - `exc`：收集器自身的异常标志；如果收集过程中连异常列表都无法追加（例如分配失败），该标志会被置位，派发过程也会中止继续收集
 
-#### 5.15.4 信号系统公共 API
+#### 5.16.4 信号系统公共 API
 
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -924,7 +1002,7 @@ A_CLASS_REGISTER(MySignal);
 | `a_signal_disconnect_all(Aint id)` | 信号 id | 删除该信号 id 的全部连接 | `AEXC_outdomain` | 若该 id 当前没有连接，通常静默返回 |
 | `a_target_disconnect_all(const void* addressee)` | 接收者地址 | 删除该接收者的全部连接 | `AEXC_outdomain` | 在回调执行期间调用同样会延迟到本轮派发结束后执行 |
 
-#### 5.15.5 `a_signal_transmit` 宏的变参规则
+#### 5.16.5 `a_signal_transmit` 宏的变参规则
 
 宏定义等价于：
 
@@ -940,7 +1018,7 @@ a_signal_transmit(signal, &collector);
 - `signal` 必须是指向 `ASignal` 或其子类对象的指针；
 - 这些约束由宏内的静态断言和类型断言在编译期检查。
 
-#### 5.15.6 运行时语义
+#### 5.16.6 运行时语义
 
 - 发送信号是同步行为：所有当前连接的回调都在调用线程内执行。
 - 派发开始前，系统会拷贝当前信号 id 对应的连接快照；因此“回调里新增的连接”不会参与当前这一轮派发，只会影响后续派发。
@@ -952,7 +1030,7 @@ a_signal_transmit(signal, &collector);
 - 向一个”已分配但当前无人连接”的合法 `id` 发送信号，会报 `AEXC_outdomain`。
 - 向一个”从未分配过或超出当前范围”的 `id` 发送信号，同样会报 `AEXC_outdomain`。
 
-#### 5.15.7 `AReceEnd`
+#### 5.16.7 `AReceEnd`
 
 `AReceEnd` 是接收者辅助基类，适合“对象析构时自动断开全部连接”的场景。
 
@@ -969,7 +1047,7 @@ a_signal_transmit(signal, &collector);
 - `AReceEnd` 的析构函数会调用 `a_target_disconnect_all(self)`；
 - 因此只要你的接收者对象继承 `AReceEnd`，一般不需要手工在所有正常析构路径里逐条断连。
 
-#### 5.15.8 使用约束（非常重要）
+#### 5.16.8 使用约束（非常重要）
 
 当前实现要求：
 
@@ -993,6 +1071,7 @@ a_signal_transmit(signal, &collector);
 
 - `test/test_sequence_api.c`：序列容器共性 API
 - `test/test_map_api.c`：映射容器共性 API
+- `test/test_athrd.c`：线程兼容层、定时锁、条件变量、TSS 与 `call_once`
 - `test/test_asignal.c`：信号系统、重入发送、异常收集
 - `test/test_aptr.c`：`APtr` / `AShPtr` 语义
 - 其余 `test/test_*.c`：各模块单独行为测试

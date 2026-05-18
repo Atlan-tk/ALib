@@ -57,6 +57,18 @@ extern "C" {
     #define __cleanup(func) __attribute__((cleanup(func)))
 #endif /* __cleanup */
 
+#ifndef __noreturn
+    #if defined(__cplusplus)
+        #define __noreturn [[noreturn]]
+    #elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
+        #define __noreturn [[noreturn]]
+    #elif defined(__GNUC__)
+        #define __noreturn __attribute__((noreturn))
+    #else
+        #define __noreturn _Noreturn
+    #endif /* __cplusplus */
+#endif /* __noreturn */
+
 #include <string.h>
 #include <stdint.h>
 #include <assert.h>
