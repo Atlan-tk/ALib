@@ -15,8 +15,12 @@
         #define __A_HAVE_ICONV 0
     #endif
 #else
-    #include <iconv.h>
-    #define __A_HAVE_ICONV 1
+    #if defined(_WIN32)
+        #define __A_HAVE_ICONV 0
+    #else
+        #include <iconv.h>
+        #define __A_HAVE_ICONV 1
+    #endif
 #endif
 
 static inline uint32_t AText_calCap(uint32_t cap) {
