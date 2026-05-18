@@ -10,6 +10,18 @@
 extern "C" {
 #endif /* __cplusplus */
 
+#ifndef __noreturn
+    #if defined(__cplusplus)
+        #define __noreturn [[noreturn]]
+    #elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
+        #define __noreturn [[noreturn]]
+    #elif defined(__GNUC__)
+        #define __noreturn __attribute__((noreturn))
+    #else
+        #define __noreturn _Noreturn
+    #endif /* __cplusplus */
+#endif /* __noreturn */
+
 #if !defined(__STDC_NO_THREADS__)
     #if defined(__has_include)
         #if __has_include(<threads.h>)

@@ -184,6 +184,7 @@ A_TYPE_REGISTER(ATree(KeyType, ValueType));
 | `atree.h` | 红黑树映射 |
 | `ahash.h` | 哈希映射 |
 | `astring.h` | 字符串对象 |
+| `atext.h` | UTF-8 文本对象与编码转换 |
 | `aptr.h` | 独占 / 共享指针包装 |
 | `athrd.h` | C11 线程兼容层；线程、互斥锁、条件变量、TSS、`call_once` |
 | `alock.h` | 互斥锁、递归锁、读写锁、自动解锁 token |
@@ -711,14 +712,107 @@ owned.f->addBack(&owned, AString_new(buf));
 
 这样 `owned` 会变成真正拥有内容的字符串；如果只是把 `AString_new(buf)` 本身长时间保存，`buf` 一旦失效就会悬空。
 
-### 5.13 `aptr.h` — `APtr(T)` 与 `AShPtr(T)`
+### 5.13 `atext.h` — `AText` 与 `Achar`
+
+`AText` 是面向 UTF-8 的文本对象。和 `AString` 的“按字节处理”不同，`AText` 的插入、删除、截断、拼接和计数都以 UTF-8 码点为单位，同时保留 ALib 一贯的借用 / 拥有双状态语义。
+
+适合把它理解为：
+
+- `AString`：低层字节串
+- `AText`：低层 UTF-8 文本串
+
+#### 5.13.1 长度辅助函数与 `Achar`
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `astrlen_u8(char* s)` | UTF-8 字符串，可为 `nullptr` | `uint32_t` | 无 | 统计 UTF-8 码点数；`nullptr` 返回 `0`；遇到非法起始字节时按“单字节占位”继续扫描 |
+| `astrlen_u16(char* s)` | UTF-16 字符串（以 16 位 `0` 结束） | `uint32_t` | 无 | 统计 UTF-16 字符数；合法代理对按一个字符计数 |
+| `astrlen_u32(char* s)` | UTF-32 字符串（以 32 位 `0` 结束） | `uint32_t` | 无 | 每个非零 32 位码点算一个字符 |
+| `astrlen_gbk(char* s)` | GBK 字符串，可为 `nullptr` | `uint32_t` | 无 | ASCII 按单字节计数，合法双字节前导 + 尾字节按一个字符计数 |
+| `Achar` | 值类型 | 4 字节 UTF-8 字符包装 | 无 | `c[0..3]` 存一个 UTF-8 字符，未使用字节补 `0` |
+| `Achar_used(Achar ch)` | 单个 `Achar` | `uint32_t` | 无 | 返回当前字符实际占用的 UTF-8 字节数 |
+| `Achar_new(const char* s)` | UTF-8 字符串首地址 | 返回首字符对应的 `Achar` | 无 | 只取首个 UTF-8 字符；若输入不是合法 UTF-8 前缀，则退化为单字节字符 |
+
+`Achar` 是 `AText_ins` / `pushBack` / `pushFront` / `popBack` / `popFront` 使用的单字符载体。
+
+#### 5.13.2 `AText` 结构字段与创建 API
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `f` | `const A_FUNC(AText)*` | 函数表 |
+| `noLiteral` | `bool` | `false` 表示当前只借用外部 UTF-8 字符串；`true` 表示缓冲区由对象拥有 |
+| `char_num` | `uint32_t` | 当前 UTF-8 字符数，不含终止符 |
+| `byte_num` | `uint32_t` | 当前 UTF-8 字节数，不含终止符 |
+| `capacity` | `uint32_t` | 当前缓冲容量，单位为字节；借用状态下一般为 `0` |
+| `s` | `char*` | UTF-8 缓冲区地址，可为 `nullptr` |
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `A_INIT(AText)` | 无 | 返回空 `AText` 对象 | 类型初始化异常 | 初始无缓冲区；首次写入时按需分配 |
+| `AText_new(char* s)` | UTF-8 字符串指针，可为 `nullptr` | 返回 `AText` 值对象 | 无 | 只做包装，不复制内容；`char_num` 与 `byte_num` 会立即按当前内容计算 |
+| `AText_getNumber(const AText* self)` | 指针 | `uint32_t` | 无 | 返回缓存的 UTF-8 字符数 |
+| `AText_getCapacity(const AText* self)` | 指针 | `uint32_t` | 无 | 返回当前容量 |
+| `AText_empty(const AText* self)` | 指针 | `bool` | 无 | 是否为空文本 |
+
+#### 5.13.3 编辑 API
+
+所有编辑型接口都按 UTF-8 码点操作，而不是按字节偏移操作。
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AText_rm(AText* self, uint32_t index)` | 字符索引 | 删除一个 UTF-8 字符 | 分配失败时 `AEXC_alloc_failed` | `index >= char_num` 时静默返回；借用状态下会先转为拥有型缓冲区 |
+| `AText_ins(AText* self, uint32_t index, Achar c)` | 字符索引、字符 | 插入一个 UTF-8 字符 | `index > char_num` 时 `AEXC_overstep`；分配失败时 `AEXC_alloc_failed` | 可在头部 / 中间 / 尾部插入 |
+| `AText_pushBack(AText* self, Achar c)` | 字符 | 尾部追加字符 | 见 `AText_ins` | 等价于在 `index == char_num` 处插入 |
+| `AText_pushFront(AText* self, Achar c)` | 字符 | 头部插入字符 | 见 `AText_ins` | |
+| `AText_popBack(AText* self)` | 无 | 返回尾字符，空文本时返回全零 `Achar` | 分配失败时 `AEXC_alloc_failed` | 空文本时不报异常 |
+| `AText_popFront(AText* self)` | 无 | 返回首字符，空文本时返回全零 `Achar` | 分配失败时 `AEXC_alloc_failed` | 空文本时不报异常 |
+| `AText_addBack(AText* self, AText that)` | 目标文本、源文本（按值传入） | 尾部拼接 | 分配失败时 `AEXC_alloc_failed` | 支持自拼接；若 `self` 与 `that` 共享同一底层缓冲区，会先复制临时副本 |
+| `AText_addFront(AText* self, AText that)` | 同上 | 头部拼接 | 分配失败时 `AEXC_alloc_failed` | 同样支持自拼接 |
+| `AText_truncate(AText* self, uint32_t index)` | 截断后的字符数 | 仅保留前 `index` 个 UTF-8 字符 | 分配失败时 `AEXC_alloc_failed` | `index >= char_num` 时静默返回 |
+
+#### 5.13.4 编码转换 API
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AText_forU32(char* s)` | UTF-32 字符串（以 32 位 `0` 结束） | 返回 UTF-8 `AText` | `AEXC_outdomain`、`AEXC_alloc_failed` | 遇到非法码点（如代理项或超出 Unicode 范围）时报错 |
+| `AText_forU16(char* s)` | UTF-16 字符串（以 16 位 `0` 结束） | 返回 UTF-8 `AText` | `AEXC_outdomain`、`AEXC_alloc_failed` | 非法代理对会报错 |
+| `AText_forGBK(char* s)` | GBK 字符串（以 `\0` 结束） | 返回 UTF-8 `AText` | `AEXC_outdomain`、`AEXC_alloc_failed`、`AEXC_system_error`、`AEXC_invalid_function` | 优先使用 `iconv`；若构建环境没有可用 `iconv` 后端，则 fallback 只保证 ASCII 输入可用 |
+| `AText_toU32(const AText* self, char* buf, uint32_t buf_size)` | 源文本、输出缓冲区、缓冲区大小 | 以 UTF-32 写出并补 32 位 `0` 终止符 | `AEXC_nullptr`、`AEXC_overstep`、`AEXC_outdomain` | 需要至少 `4 * (char_num + 1)` 字节；会严格校验 UTF-8 合法性 |
+| `AText_toU16(const AText* self, char* buf, uint32_t buf_size)` | 同上 | 以 UTF-16 写出并补 16 位 `0` 终止符 | `AEXC_nullptr`、`AEXC_overstep`、`AEXC_outdomain` | 最坏情况需要 `4 * char_num + 2` 字节；超出 BMP 的码点会写成代理对 |
+| `AText_toGBK(const AText* self, char* buf, uint32_t buf_size)` | 同上 | 以 GBK 写出并补 `\0` | `AEXC_nullptr`、`AEXC_overstep`、`AEXC_outdomain`、`AEXC_system_error`、`AEXC_invalid_function` | 需要足够输出空间；字符无法映射到 GBK 时会失败 |
+
+使用建议：
+
+- 做 UTF-32 输出时，按 `4 * (text.char_num + 1)` 预留缓冲区最直接。
+- 做 UTF-16 输出时，如果懒得精确估算，按 `4 * text.char_num + 2` 预留就够。
+- 做 GBK 输出时，如果内容以中文为主，按 `2 * text.char_num + 1` 作为保守上界更稳妥。
+
+#### 5.13.5 拥有权与语义补充
+
+- `AText_new("literal")` 和 `AString_new("literal")` 一样，只是借用现有缓冲区；第一次写入时才会拷贝到对象自己拥有的内存。
+- `A_COPY(AText, t)` 的行为与 `AString` 同风格：拥有型文本会深拷贝，借用型文本只复制指针并保持借用。
+- `char_num` 统计的是 UTF-8 码点数，不是“用户眼里看到的字形数”；组合附加符、旗帜 emoji、ZWJ 序列等都可能包含多个码点。
+- 编辑型 API 在做字符边界扫描时，会把非法 UTF-8 起始字节当作“单字节字符”处理，以便尽量保留原始字节串；但 `AText_toU16` / `AText_toU32` / `AText_toGBK` 会严格校验 UTF-8，非法序列会触发 `AEXC_outdomain`。
+- 如果要把栈缓冲区或临时内存转成长期持有的文本对象，请像 `AString` 一样立刻拼接到一个拥有型 `AText` 上，而不要长期保存 `AText_new(buf)` 的直接返回值。
+
+安全模式：
+
+```c
+char buf[32] = "hello";
+RAII(AText) owned = A_INIT(AText);
+owned.f->addBack(&owned, AText_new(buf));
+```
+
+这样 `owned` 会在首次写入时获得自己的堆缓冲区；如果只保存 `AText_new(buf)` 本身，`buf` 失效后就会悬空。
+
+### 5.14 `aptr.h` — `APtr(T)` 与 `AShPtr(T)`
 
 `aptr.h` 提供两类指针包装：
 
 - `APtr(T)`：强拥有者 + 弱别名模型
 - `AShPtr(T)`：原子引用计数共享指针
 
-#### 5.13.1 `APtr(T)`
+#### 5.14.1 `APtr(T)`
 
 ##### 生成方式
 
@@ -756,7 +850,7 @@ A_TYPE_REGISTER(APtr(T));
 
 如果要转移所有权，请用 `A_MOVE` 或手工重置原对象，不要直接复制。
 
-#### 5.13.2 `AShPtr(T)`
+#### 5.14.2 `AShPtr(T)`
 
 ##### 生成方式
 
@@ -789,7 +883,7 @@ A_TYPE_REGISTER(AShPtr(T));
 - 被共享对象 `*p` 自身并不会自动加锁；
 - 多线程同时修改 `*sp.p` 时仍需外部同步。
 
-### 5.14 `athrd.h` — C11 线程兼容层
+### 5.15 `athrd.h` — C11 线程兼容层
 
 `athrd.h` 的目标不是重新设计一套线程 API，而是给 ALib 及其使用者提供一个稳定的 C11 线程入口：
 
@@ -797,7 +891,7 @@ A_TYPE_REGISTER(AShPtr(T));
 - 如果 `__STDC_NO_THREADS__` 生效，或标准库缺少 `<threads.h>`，则在 POSIX 上回退到 `pthread`，在 Windows 上回退到 Win32 线程原语；
 - 上层代码始终使用 `thrd_t` / `mtx_t` / `cnd_t` / `tss_t` 这些 C11 风格名字，不需要为平台分支改业务接口。
 
-#### 5.14.1 主要类型与常量
+#### 5.15.1 主要类型与常量
 
 | API | 类别 | 说明 |
 | --- | --- | --- |
@@ -812,7 +906,7 @@ A_TYPE_REGISTER(AShPtr(T));
 | `mtx_plain` / `mtx_recursive` / `mtx_timed` | 锁类型标志 | 传给 `mtx_init` 的 bit flag |
 | `TSS_DTOR_ITERATIONS` | 宏常量 | fallback 实现固定为 `4`；若直接走系统 `<threads.h>`，则以系统定义为准 |
 
-#### 5.14.2 兼容策略与时间语义
+#### 5.15.2 兼容策略与时间语义
 
 - 需要线程原语时，优先包含 `<alib/athrd.h>`，而不是直接依赖系统 `<threads.h>`；这样能保持与 ALib 内部相同的兼容路径。
 - `thrd_sleep` 接收的是“相对时长” `duration`。
@@ -820,7 +914,7 @@ A_TYPE_REGISTER(AShPtr(T));
 - 如果你准备调用定时锁接口，仍建议在 `mtx_init` 时显式带上 `mtx_timed`，这样与系统 `<threads.h>` 路径的源代码兼容性最好。
 - 若目标平台既没有系统 `<threads.h>`，又不属于当前 fallback 支持的 POSIX / Win32 范围，则会在编译期直接报错。
 
-#### 5.14.3 线程 API
+#### 5.15.3 线程 API
 
 | API | 参数 | 返回值 | 说明 |
 | --- | --- | --- | --- |
@@ -833,7 +927,7 @@ A_TYPE_REGISTER(AShPtr(T));
 | `thrd_join(thrd_t thr, int* res)` | 线程句柄、可选结果输出 | `thrd_*` 状态码 | 阻塞到目标线程结束；若 `res != nullptr`，写回线程返回值 |
 | `thrd_yield(void)` | 无 | 无 | 主动让出当前时间片 |
 
-#### 5.14.4 互斥锁、条件变量与一次初始化
+#### 5.15.4 互斥锁、条件变量与一次初始化
 
 | API | 参数 | 返回值 | 说明 |
 | --- | --- | --- | --- |
@@ -851,7 +945,7 @@ A_TYPE_REGISTER(AShPtr(T));
 | `cnd_timedwait(cnd_t* cond, mtx_t* mutex, const struct timespec* time_point)` | 条件变量对象、已持有的锁、绝对 UTC 截止时间 | `thrd_*` 状态码 | 超时返回 `thrd_timedout` |
 | `cnd_destroy(cnd_t* cond)` | 条件变量对象 | 无 | 销毁条件变量 |
 
-#### 5.14.5 线程特定存储（TSS）
+#### 5.15.5 线程特定存储（TSS）
 
 | API | 参数 | 返回值 | 说明 |
 | --- | --- | --- | --- |
@@ -860,13 +954,13 @@ A_TYPE_REGISTER(AShPtr(T));
 | `tss_set(tss_t key, void* val)` | key、待保存值 | `thrd_*` 状态码 | 为当前线程写入局部值；传 `NULL` 等价于清空当前线程槽位 |
 | `tss_delete(tss_t key)` | key | 无 | 删除整个 TSS key；不同线程的关联值后续不应再访问 |
 
-#### 5.14.6 与 `alock.h` 的关系
+#### 5.15.6 与 `alock.h` 的关系
 
 - `athrd.h` 提供的是“原始线程原语”：线程创建、等待、条件变量、TLS、一次初始化。
 - `alock.h` 则建立在 `athrd.h` 的 `mtx_t` / `cnd_t` 之上，把常见加锁模式封装成 ALib 风格对象和 `RAII(AAutoKey)`。
 - 如果你需要创建线程、等待条件或直接操作 `tss_t`，用 `athrd.h`；如果你只需要在业务代码里保护临界区，通常直接用 `AMtx` / `ARecursion` / `AMtxRW` 更省心。
 
-### 5.15 `alock.h` — 锁与自动解锁
+### 5.16 `alock.h` — 锁与自动解锁
 
 `alock.h` 建立在 `athrd.h` 暴露的 `mtx_t` / `cnd_t` 之上，提供：
 
@@ -875,7 +969,7 @@ A_TYPE_REGISTER(AShPtr(T));
 - `AMtxRW`：读写锁
 - `AAutoKey`：自动解锁 token
 
-#### 5.15.1 类型总览
+#### 5.16.1 类型总览
 
 | API | 类别 | 说明 |
 | --- | --- | --- |
@@ -885,7 +979,7 @@ A_TYPE_REGISTER(AShPtr(T));
 | `ARecursion` | 类 | 递归互斥锁 |
 | `AMtxRW` | 类 | 基于 `mtx_t + cnd_t` 实现的读写锁，带写者优先倾向 |
 
-#### 5.15.2 `AAutoKey`
+#### 5.16.2 `AAutoKey`
 
 `AAutoKey` 常见用法：
 
@@ -901,7 +995,7 @@ if (aExcOccur()) {
 - `AAutoKey` 析构时，如果内部 `lock` 和 `unlock` 都非空，就自动解锁。
 - `A_COPY(AAutoKey, key)` 会得到一个“空 token”，不会复制解锁责任；因此它天然近似不可复制。
 
-#### 5.15.3 公共函数
+#### 5.16.3 公共函数
 
 | API | 参数 | 返回值 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -912,19 +1006,19 @@ if (aExcOccur()) {
 | `AMtxRW_rlock(AMtxRW* self)` | 读写锁指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 获取读锁；存在等待写者时新读者也会阻塞 |
 | `AMtxRW_wlock(AMtxRW* self)` | 读写锁指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 获取写锁；需要等待现有读者和写者全部离开 |
 
-#### 5.15.4 初始化 / 拷贝 / 析构语义
+#### 5.16.4 初始化 / 拷贝 / 析构语义
 
 - `A_INIT(AMtx)` / `A_INIT(ARecursion)` / `A_INIT(AMtxRW)` 会创建一个新的未持有锁实例。
 - `A_COPY(AMtx)` / `A_COPY(ARecursion)` / `A_COPY(AMtxRW)` **不会复制锁状态**，而是创建一把新的、未加锁的同类锁。
 - 锁对象析构时会销毁底层系统锁 / 条件变量。
 
-#### 5.15.5 使用建议
+#### 5.16.5 使用建议
 
 - 优先使用 `RAII(AAutoKey)` 管理解锁，不要手工模拟“多 return 点解锁”。
 - 不要复制 `AAutoKey` 并试图让多个 token 共同管理一次加锁；复制后的 token 是空对象。
 - `AMtxRW` 对写者更友好：只要有写者等待，新读者就会阻塞，避免写者饥饿。
 
-### 5.16 `asignal.h` — 信号系统与接收者基类
+### 5.17 `asignal.h` — 信号系统与接收者基类
 
 `asignal.h` 提供进程内同步派发信号系统。它支持：
 
@@ -934,7 +1028,7 @@ if (aExcOccur()) {
 - 收集回调执行时抛出的异常
 - 让接收者在析构时自动断连
 
-#### 5.16.1 主要类型
+#### 5.17.1 主要类型
 
 | API | 类别 | 说明 |
 | --- | --- | --- |
@@ -949,7 +1043,7 @@ if (aExcOccur()) {
 - `addressee`：发生异常的接收者地址（`const void*`）
 - `exc_value`：该回调设置的异常码
 
-#### 5.16.2 `ASignal`
+#### 5.17.2 `ASignal`
 
 `ASignal` 是所有自定义信号的基类。字段：
 
@@ -971,7 +1065,7 @@ AClass_Generate(MySignal);
 A_CLASS_REGISTER(MySignal);
 ```
 
-#### 5.16.3 `AExcCollector`
+#### 5.17.3 `AExcCollector`
 
 `AExcCollector` 用于把回调执行过程中的异常收集起来，而不是只留下最终的 `AEXC_response_exc`。
 
@@ -989,7 +1083,7 @@ A_CLASS_REGISTER(MySignal);
 - `id`：本次 `a_signal_transmit` 正在派发的信号 id
 - `exc`：收集器自身的异常标志；如果收集过程中连异常列表都无法追加（例如分配失败），该标志会被置位，派发过程也会中止继续收集
 
-#### 5.16.4 信号系统公共 API
+#### 5.17.4 信号系统公共 API
 
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -1002,7 +1096,7 @@ A_CLASS_REGISTER(MySignal);
 | `a_signal_disconnect_all(Aint id)` | 信号 id | 删除该信号 id 的全部连接 | `AEXC_outdomain` | 若该 id 当前没有连接，通常静默返回 |
 | `a_target_disconnect_all(const void* addressee)` | 接收者地址 | 删除该接收者的全部连接 | `AEXC_outdomain` | 在回调执行期间调用同样会延迟到本轮派发结束后执行 |
 
-#### 5.16.5 `a_signal_transmit` 宏的变参规则
+#### 5.17.5 `a_signal_transmit` 宏的变参规则
 
 宏定义等价于：
 
@@ -1018,7 +1112,7 @@ a_signal_transmit(signal, &collector);
 - `signal` 必须是指向 `ASignal` 或其子类对象的指针；
 - 这些约束由宏内的静态断言和类型断言在编译期检查。
 
-#### 5.16.6 运行时语义
+#### 5.17.6 运行时语义
 
 - 发送信号是同步行为：所有当前连接的回调都在调用线程内执行。
 - 派发开始前，系统会拷贝当前信号 id 对应的连接快照；因此“回调里新增的连接”不会参与当前这一轮派发，只会影响后续派发。
@@ -1030,7 +1124,7 @@ a_signal_transmit(signal, &collector);
 - 向一个”已分配但当前无人连接”的合法 `id` 发送信号，会报 `AEXC_outdomain`。
 - 向一个”从未分配过或超出当前范围”的 `id` 发送信号，同样会报 `AEXC_outdomain`。
 
-#### 5.16.7 `AReceEnd`
+#### 5.17.7 `AReceEnd`
 
 `AReceEnd` 是接收者辅助基类，适合“对象析构时自动断开全部连接”的场景。
 
@@ -1047,7 +1141,7 @@ a_signal_transmit(signal, &collector);
 - `AReceEnd` 的析构函数会调用 `a_target_disconnect_all(self)`；
 - 因此只要你的接收者对象继承 `AReceEnd`，一般不需要手工在所有正常析构路径里逐条断连。
 
-#### 5.16.8 使用约束（非常重要）
+#### 5.17.8 使用约束（非常重要）
 
 当前实现要求：
 

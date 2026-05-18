@@ -25,13 +25,13 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib�
 | 容器语义 | 容器元素默认按值拷贝、按值析构 | 更常见的是指针/句柄语义，由调用方维护元素对象 |
 | 类型信息来源 | `A_TYPE_REGISTER` / `A_CLASS_REGISTER` 约定 init/copy/dest/cmpd/hash | 由 API 约定、回调、`GType`/`GObject` 等运行时机制承担 |
 | 对象系统 | 轻量单继承 + 虚函数表，无属性系统、无反射 | GObject 提供更完整的类型系统、信号、属性和 introspection |
-| 字符串能力 | `AString` 是低层字节串封装，偏轻量 | GLib 提供 `GString`、UTF-8/Unicode、路径和文本工具 |
+| 字符串能力 | `AString` 处理字节串，`AText` 处理 UTF-8 文本与基础编码转换 | GLib 提供 `GString`、更完整的 UTF-8/Unicode、路径和文本工具 |
 | 并发能力 | `athrd.h` 提供兼容 C11 `<threads.h>` 的线程原语，`alock.h` 再封装锁对象 | GLib 线程、主循环、异步设施更成熟 |
 | 功能边界 | 容器、指针、类、信号、线程兼容层、锁 | 还覆盖主循环、IO、文件路径、模块装载、字符集等 |
 
 这意味着：
 
-- 如果你需要 `GMainLoop`、UTF-8/Unicode 工具、文件系统抽象、成熟的对象反射体系，优先考虑 GLib。
+- 如果你需要 `GMainLoop`、更完整的 UTF-8/Unicode 工具、文件系统抽象、成熟的对象反射体系，优先考虑 GLib。
 - 如果你明确只写 C，又希望容器和对象生命周期尽量统一、尽量类型化，ALib 更贴近它的目标场景。
 - ALib 不是 GLib API 兼容层，也不试图替代整个 GLib 生态。
 
@@ -49,6 +49,7 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib�
 - `atree.h`：红黑树映射
 - `ahash.h`：哈希映射
 - `astring.h`：字符串对象
+- `atext.h`：UTF-8 文本对象与 UTF-16/UTF-32/GBK 转换
 - `aptr.h`：独占指针包装和共享指针包装
 - `asignal.h`：进程内信号连接/派发系统
 - `athrd.h`：兼容 C11 `<threads.h>` 的线程原语入口；优先复用系统实现，缺失时回退到 POSIX/Win32
@@ -182,7 +183,7 @@ A_TYPE_REGISTER(ATree(int, AString));
 
 ## 需要特别注意的语义
 
-- `AString_new()` 只是“包装已有 `char*`”，不会立刻拷贝；传入栈缓冲区或临时内存时，必须在其失效前复制到一个真正拥有内存的 `AString`。
+- `AString_new()` 和 `AText_new()` 都只是“包装已有 `char*`”，不会立刻拷贝；传入栈缓冲区或临时内存时，必须在其失效前复制到一个真正拥有内存的对象。
 - 顺序容器的 `at(index)` 在“容器非空但 index 越界”时，通常会截断到尾元素；只有空容器访问才会设置 `AEXC_overstep`。
 - `AHash(K,V)` 和 `ATree(K,V)` 的 `ins()` 是 upsert 语义：同键再次插入会替换已有值。
 - `a_signal_connection(id, addressee, call)` 对同一个 `(id, addressee)` 重复连接时，会覆盖原有回调，而不是忽略此次连接。
