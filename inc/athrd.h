@@ -22,6 +22,8 @@ extern "C" {
     #endif /* __cplusplus */
 #endif /* __noreturn */
 
+
+
 #if !defined(__STDC_NO_THREADS__)
     #if defined(__has_include)
         #if __has_include(<threads.h>)
@@ -33,6 +35,8 @@ extern "C" {
         #define A_THRD_USE_SYSTEM_THREADS 1
     #endif /* __has_include */
 #endif /* !__STDC_NO_THREADS__ */
+
+
 
 #if !defined(A_THRD_USE_SYSTEM_THREADS)
     #include <time.h>
@@ -55,6 +59,8 @@ extern "C" {
     };
 
     #define TSS_DTOR_ITERATIONS 4
+
+
 
     #if defined(__C_WINDOWS__)
         #if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0600)
@@ -106,7 +112,9 @@ extern "C" {
         typedef pthread_key_t tss_t;
     #else
         #error "The target platform cannot support multithreading; define __C_POSIX__ on POSIX or __C_WINDOWS__ on Windows."
-    #endif /* __C_WINDOWS__ */
+    #endif /* __C_POSIX__ || __C_WINDOWS__ */
+
+
 
     int thrd_create(thrd_t* thr, thrd_start_t func, void* arg);
     int thrd_equal(thrd_t lhs, thrd_t rhs);
@@ -137,7 +145,10 @@ extern "C" {
     void* tss_get(tss_t key);
     int tss_set(tss_t key, void* val);
     void tss_delete(tss_t key);
+
 #endif /* !A_THRD_USE_SYSTEM_THREADS */
+
+
 
 #ifdef __cplusplus
 }

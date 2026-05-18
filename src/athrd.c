@@ -7,11 +7,11 @@
 
 #if !defined(A_THRD_USE_SYSTEM_THREADS)
 
-    #include <errno.h>
-    #include <limits.h>
-    #include <stdint.h>
-    #include <stdlib.h>
-    #include <string.h>
+#include <errno.h>
+#include <limits.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 static inline int __athrd_timespec_valid(const struct timespec* ts){
     return ts != NULL && ts->tv_sec >= 0 && ts->tv_nsec >= 0 && ts->tv_nsec < 1000000000L;
@@ -44,9 +44,9 @@ static inline struct timespec __athrd_timespec_sub(const struct timespec* end,
     return diff;
 }
 
-    #if defined(__C_POSIX__)
+#if defined(__C_POSIX__)
 
-        #include <sched.h>
+#include <sched.h>
 
 typedef struct{
     thrd_start_t func;
@@ -73,11 +73,11 @@ static void* __athrd_posix_start(void* arg){
 }
 
 static int __athrd_posix_now_utc(struct timespec* now){
-    #if defined(CLOCK_REALTIME)
+#if defined(CLOCK_REALTIME)
         return clock_gettime(CLOCK_REALTIME, now);
-    #else
+#else
         return timespec_get(now, TIME_UTC) == TIME_UTC ? 0 : -1;
-    #endif /* CLOCK_REALTIME */
+#endif /* CLOCK_REALTIME */
 }
 
 int thrd_create(thrd_t* thr, thrd_start_t func, void* arg){
@@ -261,9 +261,9 @@ int tss_set(tss_t key, void* val){
 void tss_delete(tss_t key){
     pthread_key_delete(key);
 }
-    #elif defined(__C_WINDOWS__)
+#elif defined(__C_WINDOWS__)
 
-        #include <process.h>
+#include <process.h>
 
 typedef struct{
     thrd_start_t func;
@@ -685,5 +685,5 @@ void tss_delete(tss_t key){
     FlsFree(key.slot);
 }
 
-    #endif /* __C_POSIX__ || __C_WINDOWS__ */
+#endif /* __C_POSIX__ || __C_WINDOWS__ */
 #endif /* !A_THRD_USE_SYSTEM_THREADS */
