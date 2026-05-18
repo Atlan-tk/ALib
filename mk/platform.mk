@@ -20,8 +20,10 @@ endif
 
 THREAD_CFLAGS ?=
 THREAD_LIBS ?=
+ALIB_PLATFORM_CFLAGS ?=
 
 ifeq ($(ALIB_PLATFORM),posix)
+ALIB_PLATFORM_CFLAGS += -D__C_POSIX__
 ifeq ($(strip $(THREAD_CFLAGS)),)
 THREAD_CFLAGS := -pthread
 endif

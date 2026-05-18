@@ -9,7 +9,7 @@ LIB_TARGET := $(ROOT_DIR)/libatlan.a
 LOCAL_INCLUDE_DIR := $(ROOT_DIR)/.local/include
 LOCAL_INCLUDE_LINK := $(LOCAL_INCLUDE_DIR)/alib
 
-CFLAGS := $(THREAD_CFLAGS) -I$(LOCAL_INCLUDE_DIR) -Wall -Wextra -Werror -g -O0
+CFLAGS := $(ALIB_PLATFORM_CFLAGS) $(THREAD_CFLAGS) -I$(LOCAL_INCLUDE_DIR) -Wall -Wextra -Werror -g -O0
 
 SRC := $(sort $(wildcard *.c))
 

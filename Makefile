@@ -17,7 +17,7 @@ INC_DIR := inc
 TEST_DIR := test
 SAMPLE_DIR := sample
 
-CFLAGS := $(THREAD_CFLAGS) -I$(INC_DIR) -Wall -Wextra -Werror -O2 -fPIC -MMD -MP
+CFLAGS := $(ALIB_PLATFORM_CFLAGS) $(THREAD_CFLAGS) -I$(INC_DIR) -Wall -Wextra -Werror -O2 -fPIC -MMD -MP
 ARFLAGS ?= rcs
 
 LIB_NAME := libatlan.a

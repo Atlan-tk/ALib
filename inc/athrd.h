@@ -93,8 +93,7 @@ extern "C" {
             DWORD slot;
             tss_dtor_t destructor;
         }tss_t;
-    #elif defined(__C_POSIX__) || defined(_POSIX_THREADS) || defined(__unix__) \
-            || defined(__APPLE__) || defined(__MACH__) || defined(__linux__)
+    #elif defined(__C_POSIX__)
         #include <pthread.h>
 
         #define A_THRD_USE_POSIX 1
@@ -106,7 +105,7 @@ extern "C" {
         typedef pthread_cond_t cnd_t;
         typedef pthread_key_t tss_t;
     #else
-        #error "The target platform cannot support multithreading"
+        #error "The target platform cannot support multithreading; define __C_POSIX__ on POSIX or use _WIN32."
     #endif /* _WIN32 */
 
     int thrd_create(thrd_t* thr, thrd_start_t func, void* arg);

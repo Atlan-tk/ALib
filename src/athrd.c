@@ -44,7 +44,7 @@ static inline struct timespec __athrd_timespec_sub(const struct timespec* end,
     return diff;
 }
 
-    #if defined(A_THRD_USE_POSIX)
+    #if defined(__C_POSIX__)
 
         #include <sched.h>
 
@@ -261,7 +261,7 @@ int tss_set(tss_t key, void* val){
 void tss_delete(tss_t key){
     pthread_key_delete(key);
 }
-    #elif defined(A_THRD_USE_WIN32)
+    #elif defined(_WIN32)
 
         #include <process.h>
 
@@ -685,5 +685,5 @@ void tss_delete(tss_t key){
     FlsFree(key.slot);
 }
 
-    #endif /* A_THRD_USE_POSIX || A_THRD_USE_WIN32 */
+    #endif /* __C_POSIX__ || _WIN32 */
 #endif /* !A_THRD_USE_SYSTEM_THREADS */
