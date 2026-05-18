@@ -123,6 +123,7 @@ int __a_signal_transmit(const ASignal* signal, AExcCollector* collector);
 
 
 /* 连接信号与靶 */
+/* 同一个(id, addressee)重复连接时会覆盖原有回调 */
 void a_signal_connection(Aint id, const void* addressee, void(*call)(const ASignal*, void*));
 
 /* 断开连接 */
@@ -188,5 +189,4 @@ A_CLASS_REGISTER(AReceEnd);
 #endif /* __cplusplus */
 
 #endif /*__asignal_h__*/
-
 

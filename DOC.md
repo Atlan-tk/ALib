@@ -918,7 +918,7 @@ A_CLASS_REGISTER(MySignal);
 | `a_signal_alloc()` | 无 | 新的正整数信号 id；失败时通常为 `-1` | `AEXC_system_error` | 申请一个新的信号类型 id |
 | `__a_signal_transmit(const ASignal* signal, AExcCollector* collector)` | 信号指针、可选收集器 | 发送信号 | `AEXC_system_error`、`AEXC_nullptr`、`AEXC_outdomain`、`AEXC_response_exc` | 低层实现函数；业务代码通常调用 `a_signal_transmit` 宏 |
 | `a_signal_transmit(signal, ...)` | 变参宏：必传 `signal`，可选 1 个 `AExcCollector*` | 发送信号 | 同 `__a_signal_transmit` | 宏变参上限 1；会做编译期类型断言 |
-| `a_signal_connection(Aint id, const void* addressee, void(*call)(const ASignal*, void*))` | 信号 id、接收者地址、回调函数 | 建立连接 | `AEXC_outdomain`、底层分配异常 | 同一个 `(id, addressee)` 若已存在连接，则静默忽略（不会覆盖） |
+| `a_signal_connection(Aint id, const void* addressee, void(*call)(const ASignal*, void*))` | 信号 id、接收者地址、回调函数 | 建立连接 | `AEXC_outdomain`、底层分配异常 | 同一个 `(id, addressee)` 若已存在连接，则会覆盖原有回调 |
 | `a_signal_disconnect(Aint id, const void* addressee)` | 信号 id、接收者地址 | 删除一条连接 | `AEXC_outdomain` | 在回调执行期间调用会延迟到本轮派发结束后执行；“连接不存在但参数合法”通常静默返回 |
 | `a_target_disconnect(const void* addressee, Aint id)` | 接收者地址、信号 id | 删除一条连接 | 同 `a_signal_disconnect` | 只是参数顺序相反的内联包装 |
 | `a_signal_disconnect_all(Aint id)` | 信号 id | 删除该信号 id 的全部连接 | `AEXC_outdomain` | 若该 id 当前没有连接，通常静默返回 |
@@ -975,8 +975,9 @@ a_signal_transmit(signal, &collector);
 
 1. 已连接的接收者对象在析构前必须断开连接，或者直接继承 `AReceEnd`。  
 2. 回调执行期间可以断连（`disconnect` / `disconnect_all`），但实际操作会延迟到本轮派发结束后执行。  
-3. 回调里不要析构任何仍处于连接表中的接收者对象，否则会制造悬空指针。  
-4. 回调里不要等待其他线程执行信号连接 / 断开操作，否则可能形成锁等待。  
+3. 同一个 `(id, addressee)` 重复调用 `a_signal_connection` / `AReceEnd_connection` 时，会更新为新的回调函数，而不是保留旧回调。  
+4. 回调里不要析构任何仍处于连接表中的接收者对象，否则会制造悬空指针。  
+5. 回调里不要等待其他线程执行信号连接 / 断开操作，否则可能形成锁等待。  
 
 ## 6. 示例与测试入口
 
@@ -1019,4 +1020,3 @@ make -C sample
 - 迭代时一旦改容器结构，就应重新获取迭代器。
 - `a_signal_transmit(signal, ...)` 只允许 0 或 1 个附加参数。
 - `AClass_Inherit(T, ...)` 和 `A_CALL(obj, ...)` 都是宏变参，但附加参数上限都只有 1 个。
-

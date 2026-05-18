@@ -101,7 +101,7 @@ static void test_signal_transmit_basic(void) {
     assert(receiver1.hits == 2);
 }
 
-static void test_signal_duplicate_addressee_ignored(void) {
+static void test_signal_duplicate_addressee_replaced(void) {
     Aint id = a_signal_alloc();
     assert(!aExcOccur());
     assert(id >= 0);
@@ -123,8 +123,8 @@ static void test_signal_duplicate_addressee_ignored(void) {
 
     a_signal_transmit(&sig);
     assert(!aExcOccur());
-    assert(receiver.hits == 1);
-    assert(g_duplicate_target_hits == 0);
+    assert(receiver.hits == 0);
+    assert(g_duplicate_target_hits == 1);
 
     a_signal_disconnect_all(id);
     assert(!aExcOccur());
@@ -132,8 +132,8 @@ static void test_signal_duplicate_addressee_ignored(void) {
     a_signal_transmit(&sig);
     assert(aExcGet() == AEXC_outdomain);
     aExcClean();
-    assert(receiver.hits == 1);
-    assert(g_duplicate_target_hits == 0);
+    assert(receiver.hits == 0);
+    assert(g_duplicate_target_hits == 1);
 }
 
 static void test_disconnect_all_helpers(void) {
@@ -364,7 +364,7 @@ static void test_signal_collect_exceptions(void) {
 int main(void) {
     test_signal_type_helpers();
     test_signal_transmit_basic();
-    test_signal_duplicate_addressee_ignored();
+    test_signal_duplicate_addressee_replaced();
     test_disconnect_all_helpers();
     test_invalid_id_rejected();
     test_signal_transmit_reentrant();
