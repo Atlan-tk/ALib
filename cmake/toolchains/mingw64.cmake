@@ -1,0 +1,27 @@
+# Linux-to-Windows cross-compilation toolchain for MinGW-w64.
+
+set(CMAKE_SYSTEM_NAME Windows)
+set(CMAKE_SYSTEM_PROCESSOR x86_64)
+
+set(ALIB_MINGW_TRIPLET "x86_64-w64-mingw32" CACHE STRING
+    "MinGW-w64 target triplet used for Linux-to-Windows cross compilation"
+)
+
+set(CMAKE_C_COMPILER "${ALIB_MINGW_TRIPLET}-gcc")
+set(CMAKE_RC_COMPILER "${ALIB_MINGW_TRIPLET}-windres")
+set(CMAKE_AR "${ALIB_MINGW_TRIPLET}-ar")
+set(CMAKE_RANLIB "${ALIB_MINGW_TRIPLET}-ranlib")
+set(CMAKE_NM "${ALIB_MINGW_TRIPLET}-nm")
+set(CMAKE_STRIP "${ALIB_MINGW_TRIPLET}-strip")
+
+set(ALIB_MINGW_ROOT "/usr/${ALIB_MINGW_TRIPLET}" CACHE PATH
+    "Optional MinGW-w64 sysroot path"
+)
+if(EXISTS "${ALIB_MINGW_ROOT}")
+    list(APPEND CMAKE_FIND_ROOT_PATH "${ALIB_MINGW_ROOT}")
+endif()
+
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)

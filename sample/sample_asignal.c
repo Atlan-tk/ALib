@@ -36,7 +36,7 @@ AClass_Struct(PingReceiver,
 );
 AClass_Function(PingReceiver);
 AClass_Generate(PingReceiver);
-static void A_OBJ_INIT(PingReceiver)(PingReceiver* self) {
+__unused static void A_OBJ_INIT(PingReceiver)(PingReceiver* self) {
     self->name = "receiver";
     self->total = 0;
     self->reject_negative = false;

@@ -53,7 +53,7 @@ make
 默认产物：
 
 - Linux 静态库：`libatlan.a`
-- Windows 静态库：`atlan.lib`
+- Windows 静态库：`atlan.lib`（统一不带 `lib` 前缀）
 - 中间文件目录：`build/obj`
 - 临时头文件映射：`build/inc -> inc`，并额外生成 `build/alib -> inc` 以兼容 `<alib/...>` 引用
 - 库输出目录：`build/lib`
@@ -63,6 +63,33 @@ make
 - 安装库目录：`PREFIX/lib`
 
 默认会同时构建库本身、`sample/` 下的示例程序和 `test/` 下的测试程序。
+
+`cmake/toolchains/` 当前提供：
+
+- `linux-gcc.cmake`：Linux 本机构建，显式使用 `gcc`
+- `linux-clang.cmake`：Linux 本机构建，显式使用 `clang`
+- `windows-clang-cl.cmake`：Windows 本机构建，显式使用 `clang-cl`
+- `mingw64.cmake`：Linux 主机交叉编译 Windows，使用 `mingw-w64`
+
+Linux 本机如需显式切换编译器，可在配置阶段指定对应工具链文件，例如：
+
+```bash
+mkdir -p build
+cd build
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/linux-clang.cmake
+make
+```
+
+如果需要在 Linux 主机上交叉编译 Windows 目标，仓库内提供了现成工具链文件 `cmake/toolchains/mingw64.cmake`，可直接使用：
+
+```bash
+mkdir -p build
+cd build
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mingw64.cmake
+make
+```
+
+默认会生成 `build/lib/atlan.lib` 以及 `build/sample/*.exe`、`build/test/*.exe`。
 
 ## 3. 先读这些通用约定
 

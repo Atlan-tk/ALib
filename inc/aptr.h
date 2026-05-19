@@ -44,8 +44,8 @@ extern "C" {
 #define APtrNew(T) A_INIT(APtr(T))                                                      \
 
 #define APtrCPNew(T, obj) ({                                                            \
-    auto __a_obj = (obj); __a_type_assert(T, __a_obj);                                  \
-    (APtr(T)){ A_CPNEW(T, __a_obj), true };                                             \
+    auto __a_aptr_obj = (obj); __a_type_assert(T, __a_aptr_obj);                        \
+    (APtr(T)){ A_CPNEW(T, __a_aptr_obj), true };                                        \
 })                                                                                      \
 
 
@@ -137,8 +137,8 @@ static inline bool __a_ref_count_sub(atomic_int* ref_count){
 #define AShPtrNew(T) A_INIT(AShPtr(T))                                                  \
 
 #define AShPtrCPNew(T, obj) ({                                                          \
-    auto __a_obj = (obj); __a_type_assert(T, __a_obj);                                  \
-    __Asp_tar(T) __a_tar = { 0, __a_obj };                                              \
+    auto __a_ashptr_obj = (obj); __a_type_assert(T, __a_ashptr_obj);                    \
+    __Asp_tar(T) __a_tar = { 0, __a_ashptr_obj };                                       \
     __Asp_tar(T)*__a_p = alib_cpnew(sizeof(__Asp_tar(T)),                               \
             &__a_tar, (void*)__Aspf(T,data_copy));                                      \
     (AShPtr(T)){ __a_p != nullptr ? & (__a_p->data) : nullptr };                        \
@@ -151,4 +151,3 @@ static inline bool __a_ref_count_sub(atomic_int* ref_count){
 #endif /* __cplusplus */
 
 #endif /*__aptr_h__*/
-

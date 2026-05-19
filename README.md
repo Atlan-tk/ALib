@@ -3,7 +3,7 @@
 ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib，但设计路线并不相同：
 它把“泛型容器、对象生命周期、轻量类系统、进程内信号、线程兼容层、锁封装”组合进一套偏编译期驱动的接口里，目标是在纯 C 中获得比传统 `void*` 工具库更强的类型约束和更统一的值语义体验。
 
-当前仓库产物为静态库：Linux 下默认生成 `libatlan.a`，Windows 下使用 `clang-cl` 时默认生成 `atlan.lib`。公共头文件位于 `inc/`，安装后按 `<alib/...>` 方式引用。
+当前仓库产物为静态库：Linux 下默认生成 `libatlan.a`，Windows 目标统一生成 `atlan.lib`。公共头文件位于 `inc/`，安装后按 `<alib/...>` 方式引用。
 
 ## 项目定位
 
@@ -78,7 +78,7 @@ make
 默认生成：
 
 - Linux 静态库目标：`libatlan.a`
-- Windows 静态库目标：`atlan.lib`
+- Windows 静态库目标：`atlan.lib`（统一不带 `lib` 前缀）
 - 中间文件目录：`build/obj`
 - 临时头文件映射：`build/inc -> inc`，并额外生成 `build/alib -> inc` 以兼容 `<alib/...>` 引用
 - 目标文件目录：库在 `build/lib`，示例在 `build/sample`，测试在 `build/test`
@@ -91,6 +91,68 @@ Windows 下按本文 `cmake ..` + `make` 流程操作时，建议先确认这些
 - 当前 CMake 生成器确实产出 Makefile；如果 CMake 默认选成了 Visual Studio 生成器，需要改成 `Unix Makefiles`，例如 `cmake -G "Unix Makefiles" ..`
 - 已进入 Visual Studio / Build Tools 提供的开发者命令行环境，使 `clang-cl`、`link.exe`、`lib.exe` 以及 Windows SDK 头文件和库都可用
 - `make install` 默认会写入 `C:\Program Files (x86)\alib`，通常需要管理员权限；如果不想提权，请在配置阶段改用自定义 `CMAKE_INSTALL_PREFIX`
+
+### toolchains 目录
+
+仓库内当前提供这些工具链文件：
+
+- `cmake/toolchains/linux-gcc.cmake`：Linux 本机构建，显式使用 `gcc`
+- `cmake/toolchains/linux-clang.cmake`：Linux 本机构建，显式使用 `clang`
+- `cmake/toolchains/windows-clang-cl.cmake`：Windows 本机构建，显式使用 `clang-cl`
+- `cmake/toolchains/mingw64.cmake`：Linux 主机交叉编译 Windows，使用 `mingw-w64`
+
+Linux 下如果要显式切换编译器，可直接这样用：
+
+```bash
+mkdir -p build
+cd build
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/linux-gcc.cmake
+make
+```
+
+或：
+
+```bash
+mkdir -p build
+cd build
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/linux-clang.cmake
+make
+```
+
+### Linux 下交叉编译 Windows
+
+仓库内已提供现成工具链文件：`cmake/toolchains/mingw64.cmake`。
+
+前提：
+
+- 已安装 `mingw-w64`
+- 命令行里能直接执行 `x86_64-w64-mingw32-gcc --version`
+
+构建命令：
+
+```bash
+mkdir -p build
+cd build
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mingw64.cmake
+make
+```
+
+默认产物：
+
+- 静态库：`build/lib/atlan.lib`
+- 示例程序：`build/sample/*.exe`
+- 测试程序：`build/test/*.exe`
+
+如果本机安装了 `wine`，可进一步在 Linux 下执行这些 `.exe` 做基础验证。
+
+Windows 本机如果要显式指定 `clang-cl`，可使用：
+
+```bash
+mkdir build
+cd build
+cmake -G "Unix Makefiles" .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/windows-clang-cl.cmake
+make
+```
 
 ### 编译示例
 

@@ -15,7 +15,7 @@ extern "C" {
         #error "The minimum supported C standard is C11"
     #endif /* __STDC_VERSION__ > c11 */
 
-    #if !defined(__GNUC__)
+    #if !defined(__GNUC__) && !defined(__clang__)
         #error "Please use a compiler that supports GNU extensions: gcc, clang, icc, armcc"
     #endif /* gcc or clang */
 

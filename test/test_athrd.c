@@ -1,6 +1,14 @@
 #include <alib/athrd.h>
 #include <assert.h>
 #include <stdio.h>
+#include <time.h>
+
+#if defined(_WIN32)
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN 1
+    #endif
+    #include <windows.h>
+#endif
 
 typedef struct {
     mtx_t mutex;
@@ -32,10 +40,30 @@ static once_flag g_once = ONCE_FLAG_INIT;
 static int g_once_hits = 0;
 static tss_t g_tls_key;
 
+static int realtime_now(struct timespec *now) {
+#if defined(_WIN32)
+    FILETIME file_time = {0};
+    ULARGE_INTEGER ticks = {0};
+    const unsigned long long windows_epoch_offset = 116444736000000000ULL;
+    unsigned long long unix_ticks = 0;
+
+    GetSystemTimeAsFileTime(&file_time);
+    ticks.LowPart = file_time.dwLowDateTime;
+    ticks.HighPart = file_time.dwHighDateTime;
+    unix_ticks = ticks.QuadPart - windows_epoch_offset;
+    now->tv_sec = (time_t)(unix_ticks / 10000000ULL);
+    now->tv_nsec = (long)((unix_ticks % 10000000ULL) * 100ULL);
+    return 0;
+#elif defined(CLOCK_REALTIME)
+    return clock_gettime(CLOCK_REALTIME, now);
+#else
+    return timespec_get(now, TIME_UTC) == TIME_UTC ? 0 : -1;
+#endif
+}
+
 static struct timespec deadline_after_ms(long ms) {
     struct timespec now = {0};
-    int rc = timespec_get(&now, TIME_UTC);
-    assert(rc == TIME_UTC);
+    assert(realtime_now(&now) == 0);
 
     now.tv_sec += ms / 1000;
     now.tv_nsec += (ms % 1000) * 1000000L;
