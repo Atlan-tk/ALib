@@ -38,35 +38,52 @@ extern "C" {
         #ifndef typeof
             #define typeof __typeof__
         #endif /* typeof */
+
+        #ifndef noreturn
+            #define noreturn _Noreturn
+            #define __noreturn noreturn
+        #endif
     #endif /* __STDC_VERSION__ < c23 */
 #endif /* no __cplusplus */
 
 #ifndef __weak
-    #define __weak __attribute__((weak))
+    #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
+        #define __weak [[weak]]
+    #else
+        #define __weak __attribute__((weak))
+    #endif
 #endif /* __weak */
 
 #ifndef __weakref
-    #define __weakref(symbol) __attribute__((weakref(__A_Str(symbol))))
+    #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
+        #define __weakref(symbol) [[weakref(__A_Str(symbol))]]
+    #else
+        #define __weakref(symbol) __attribute__((weakref(__A_Str(symbol))))
+    #endif
 #endif /* __weakref */
 
 #ifndef __unused
-    #define __unused __attribute__((unused))
+    #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
+        #define __unused [[unused]]
+    #else
+        #define __unused __attribute__((unused))
+    #endif
 #endif /* __unused */
 
 #ifndef __cleanup
-    #define __cleanup(func) __attribute__((cleanup(func)))
+    #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
+        #define __cleanup(func) [[cleanup(func)]]
+    #else
+        #define __cleanup(func) __attribute__((cleanup(func)))
+    #endif
 #endif /* __cleanup */
 
 #ifndef __noreturn
-    #if defined(__cplusplus)
+    #if (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)) || defined(__cplusplus)
         #define __noreturn [[noreturn]]
-    #elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
-        #define __noreturn [[noreturn]]
-    #elif defined(__GNUC__)
-        #define __noreturn __attribute__((noreturn))
     #else
-        #define __noreturn _Noreturn
-    #endif /* __cplusplus */
+        #define __noreturn __attribute__((noreturn))
+    #endif
 #endif /* __noreturn */
 
 #include <string.h>
@@ -108,7 +125,15 @@ extern "C" {
 
 
 /* alloc and free */
-#if defined(__C_WINDOWS__) || defined(_WIN32)
+#if defined(__C_POSIX__)
+    __unused void  alib_free(void* p);
+    __unused void* alib_alloc(uint32_t size);
+    __unused void* alib_realloc(void* p, uint32_t size);
+
+    __unused void* alib_new(uint32_t size, void(*init_func)(void*));
+    __unused void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
+    __unused void  alib_delete(void* p, void(*dest_func)(void*));
+#elif defined(__C_WINDOWS__) || defined(_WIN32)
     typedef void  (*alib_free_func_t)(void* p);
     typedef void* (*alib_alloc_func_t)(uint32_t size);
     typedef void* (*alib_realloc_func_t)(void* p, uint32_t size);

@@ -30,7 +30,22 @@ static void *tracked_alib_realloc(void *p, uint32_t size) {
     return realloc(p, size);
 }
 
-#if defined(__C_WINDOWS__) || defined(_WIN32)
+#if defined(__C_POSIX__)
+void alib_free(void *p) {
+    tracked_alib_free(p);
+}
+
+void *alib_alloc(uint32_t size) {
+    return tracked_alib_alloc(size);
+}
+
+void *alib_realloc(void *p, uint32_t size) {
+    return tracked_alib_realloc(p, size);
+}
+
+static void install_tracked_allocators(void) {
+}
+#elif defined(__C_WINDOWS__) || defined(_WIN32)
 static void install_tracked_allocators(void) {
     alib_free = tracked_alib_free;
     alib_alloc = tracked_alib_alloc;

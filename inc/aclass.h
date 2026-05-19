@@ -18,7 +18,7 @@ extern "C" {
     static_assert(__aNarg_n(0, ##__VA_ARGS__) <= 1, "Error: Only single inheritance is allowed");           \
     typedef struct T T;                                                                                     \
     typedef struct A_FUNC(T) A_FUNC(T);                                                                     \
-    extern A_FUNC(T) A_FUNC_TAB(T);                                                                         \
+    static A_FUNC(T) A_FUNC_TAB(T);                                                                         \
     __AClass_Inherit(T, ##__VA_ARGS__, Atlan);                                                              \
                                                                                                             \
 
@@ -41,7 +41,7 @@ extern "C" {
     };                                                                                                      \
 
 #define AClass_Generate(T, ...)                                                                             \
-    __weak A_FUNC(T) A_FUNC_TAB(T) = { { false }, __VA_ARGS__ };                                            \
+    static A_FUNC(T) A_FUNC_TAB(T) = { { false }, __VA_ARGS__ };                                            \
 
 #define A_CLASS_REGISTER(T)                                                                                 \
     enum{ __A_IS_CLASS(T) = 1 };                                                                            \

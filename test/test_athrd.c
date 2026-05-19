@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <time.h>
 
-#if defined(_WIN32)
+#if defined(__C_POSIX__)
+    /* POSIX builds rely on athrd.h for the required system headers. */
+#elif defined(_WIN32)
     #ifndef WIN32_LEAN_AND_MEAN
         #define WIN32_LEAN_AND_MEAN 1
     #endif
@@ -41,7 +43,13 @@ static int g_once_hits = 0;
 static tss_t g_tls_key;
 
 static int realtime_now(struct timespec *now) {
-#if defined(_WIN32)
+#if defined(__C_POSIX__)
+#if defined(CLOCK_REALTIME)
+    return clock_gettime(CLOCK_REALTIME, now);
+#else
+    return timespec_get(now, TIME_UTC) == TIME_UTC ? 0 : -1;
+#endif
+#elif defined(_WIN32)
     FILETIME file_time = {0};
     ULARGE_INTEGER ticks = {0};
     const unsigned long long windows_epoch_offset = 116444736000000000ULL;

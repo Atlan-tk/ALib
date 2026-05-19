@@ -70,15 +70,6 @@ if(ALIB_TOP_LEVEL_PROJECT AND DEFINED ALIB_DEFAULT_COMPILER_HINT)
     message(STATUS "ALib default C compiler/toolset: ${ALIB_DEFAULT_COMPILER_HINT}")
 endif()
 
-if(ALIB_TOP_LEVEL_PROJECT AND WIN32)
-    message(NOTICE
-        "Windows install prefix defaults to ${CMAKE_INSTALL_PREFIX}. "
-        "After installation, add this directory to CMAKE_PREFIX_PATH; "
-        "if you compile with clang-cl directly, also add ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR} "
-        "to INCLUDE and ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} to LIB."
-    )
-endif()
-
 set(ALIB_REQUIRED_C_STANDARD_FLAG "")
 if(ALIB_MSVC_LIKE)
     set(ALIB_REQUIRED_C_STANDARD_FLAG "/std:c11")

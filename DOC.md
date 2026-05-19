@@ -2,6 +2,8 @@
 
 本文以 `inc/` 中的公共头文件为准，系统说明 ALib 当前提供的模块、类型、宏和函数，以及它们的参数、返回值、异常语义与使用约定。
 
+注意：当前版本暂不支持 Windows 环境。这里的“不支持”包括 Windows 本机构建、Cygwin 环境，以及从 Linux/Unix 主机交叉编译 Windows 目标；当前构建系统仍保留这些入口以兼容既有流程，但会在实际编译阶段直接报错终止。
+
 文档范围约定：
 
 - 以 `__` 开头的符号视为内部实现细节，不建议业务代码直接调用，本文不逐一展开。
@@ -46,14 +48,14 @@ make
 默认约定：
 
 - Linux：默认优先使用 `gcc`
-- Windows：默认优先使用 `clang-cl`（MSVC 风格命令参数）
-- 非 Linux/Unix/Windows 目标平台：配置阶段直接提示无法编译
+- 其他 Unix 目标：使用 CMake 选定的本地 C 编译器，或按需显式指定工具链
+- Windows / Cygwin：构建入口仍保留，但当前暂不支持，实际编译阶段会直接提示无法编译
+- 其他非 Linux/Unix/Windows 目标平台：配置阶段直接提示无法编译
 - 不支持 C11 或 GNU 扩展（如 `__auto_type`、`typeof`、`cleanup`、`weakref`）的编译器：配置阶段直接提示无法编译
 
 默认产物：
 
-- Linux 静态库：`libatlan.a`
-- Windows 静态库：`atlan.lib`（统一不带 `lib` 前缀）
+- 静态库：`libatlan.a`
 - 中间文件目录：`build/obj`
 - 临时头文件映射：`build/inc -> inc`，并额外生成 `build/alib -> inc` 以兼容 `<alib/...>` 引用
 - 库输出目录：`build/lib`
@@ -68,8 +70,8 @@ make
 
 - `linux-gcc.cmake`：Linux 本机构建，显式使用 `gcc`
 - `linux-clang.cmake`：Linux 本机构建，显式使用 `clang`
-- `windows-clang-cl.cmake`：Windows 本机构建，显式使用 `clang-cl`
-- `mingw64.cmake`：Linux 主机交叉编译 Windows，使用 `mingw-w64`
+- `windows-clang-cl.cmake`：Windows 本机构建入口，显式使用 `clang-cl`
+- `mingw64.cmake`：Linux 主机交叉编译 Windows 的入口，使用 `mingw-w64`
 
 Linux 本机如需显式切换编译器，可在配置阶段指定对应工具链文件，例如：
 
@@ -80,16 +82,7 @@ cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/linux-clang.cmake
 make
 ```
 
-如果需要在 Linux 主机上交叉编译 Windows 目标，仓库内提供了现成工具链文件 `cmake/toolchains/mingw64.cmake`，可直接使用：
-
-```bash
-mkdir -p build
-cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mingw64.cmake
-make
-```
-
-默认会生成 `build/lib/atlan.lib` 以及 `build/sample/*.exe`、`build/test/*.exe`。
+当前版本如果通过 Windows 相关入口完成配置，库目标会在编译阶段直接报错，明确提示该环境暂不受支持。
 
 ## 3. 先读这些通用约定
 
@@ -101,7 +94,7 @@ ALib 依赖：
 - GNU 扩展（`__auto_type`、`typeof`、`cleanup`、`weakref` 等）
 - C11 线程 / 时间接口；优先复用系统 `<threads.h>`，缺失时由 `athrd.h` 在 POSIX / Win32 上补齐
 
-因此推荐直接使用仓库内的 CMake 构建，并在仓库根目录下手动创建 `build/` 后进入该目录执行 `cmake ..` 和 `make`。Linux 下默认安装到 `/usr/local`；Windows 下默认安装到 `C:\Program Files (x86)\alib`。如果目标平台不是 Linux/Unix/Windows，或者编译器缺少 C11 / GNU 扩展支持，CMake 会在配置阶段直接终止并提示无法编译。如果在 Windows 上安装后要做外部集成，建议把安装前缀加入 `CMAKE_PREFIX_PATH`，并在直接调用 `clang-cl` 时补充 `INCLUDE` / `LIB` 环境变量。
+因此推荐直接使用仓库内的 CMake 构建，并在仓库根目录下手动创建 `build/` 后进入该目录执行 `cmake ..` 和 `make`。默认安装前缀为 `/usr/local`。当前版本暂不支持 Windows / Cygwin 环境，也不支持从 Linux/Unix 主机交叉编译 Windows 目标；这些入口仍可完成配置，但会在编译阶段直接报错终止。如果目标平台不是 Linux/Unix/Windows，或者编译器缺少 C11 / GNU 扩展支持，CMake 会在配置阶段直接终止并提示无法编译。
 
 ### 3.2 类型协议：所有容器都依赖 `A_TYPE_REGISTER`
 

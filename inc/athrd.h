@@ -62,7 +62,18 @@ extern "C" {
 
 
 
-    #if defined(__C_WINDOWS__)
+    #if defined(__C_POSIX__)
+        #include <pthread.h>
+
+        #define A_THRD_USE_POSIX 1
+
+        typedef pthread_t thrd_t;
+        typedef pthread_once_t once_flag;
+        #define ONCE_FLAG_INIT PTHREAD_ONCE_INIT
+        typedef pthread_mutex_t mtx_t;
+        typedef pthread_cond_t cnd_t;
+        typedef pthread_key_t tss_t;
+    #elif defined(__C_WINDOWS__)
         #if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0600)
             #undef _WIN32_WINNT
             #define _WIN32_WINNT 0x0600
@@ -99,17 +110,6 @@ extern "C" {
             DWORD slot;
             tss_dtor_t destructor;
         }tss_t;
-    #elif defined(__C_POSIX__)
-        #include <pthread.h>
-
-        #define A_THRD_USE_POSIX 1
-
-        typedef pthread_t thrd_t;
-        typedef pthread_once_t once_flag;
-        #define ONCE_FLAG_INIT PTHREAD_ONCE_INIT
-        typedef pthread_mutex_t mtx_t;
-        typedef pthread_cond_t cnd_t;
-        typedef pthread_key_t tss_t;
     #else
         #error "The target platform cannot support multithreading; define __C_POSIX__ on POSIX or __C_WINDOWS__ on Windows."
     #endif /* __C_POSIX__ || __C_WINDOWS__ */
