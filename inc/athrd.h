@@ -59,63 +59,64 @@ extern "C" {
     };
 
     #define TSS_DTOR_ITERATIONS 4
+#endif /* A_THRD_USE_SYSTEM_THREADS */
 
 
 
-    #if defined(__C_POSIX__)
-        #include <pthread.h>
+#if !defined(A_THRD_USE_SYSTEM_THREADS) && defined(__C_POSIX__)
+    #include <pthread.h>
 
-        #define A_THRD_USE_POSIX 1
+    #define A_THRD_USE_POSIX 1
 
-        typedef pthread_t thrd_t;
-        typedef pthread_once_t once_flag;
-        #define ONCE_FLAG_INIT PTHREAD_ONCE_INIT
-        typedef pthread_mutex_t mtx_t;
-        typedef pthread_cond_t cnd_t;
-        typedef pthread_key_t tss_t;
-    #elif defined(__C_WINDOWS__)
-        #if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0600)
-            #undef _WIN32_WINNT
-            #define _WIN32_WINNT 0x0600
-        #endif /* _WIN32_WINNT < 0x0600 */
+    typedef pthread_t thrd_t;
+    typedef pthread_once_t once_flag;
+    #define ONCE_FLAG_INIT PTHREAD_ONCE_INIT
+    typedef pthread_mutex_t mtx_t;
+    typedef pthread_cond_t cnd_t;
+    typedef pthread_key_t tss_t;
+#endif /* A_THRD_USE_SYSTEM_THREADS && __C_POSIX__ */
 
-        #ifndef WIN32_LEAN_AND_MEAN
-            #define WIN32_LEAN_AND_MEAN 1
-        #endif /* WIN32_LEAN_AND_MEAN */
+#if !defined(A_THRD_USE_SYSTEM_THREADS) && defined(__C_WINDOWS__)
 
-        #include <windows.h>
+    #if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0600)
+        #undef _WIN32_WINNT
+        #define _WIN32_WINNT 0x0600
+    #endif /* _WIN32_WINNT < 0x0600 */
 
-        #define A_THRD_USE_WIN32 1
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN 1
+    #endif /* WIN32_LEAN_AND_MEAN */
 
-        typedef struct{
-            HANDLE handle;
-            DWORD id;
-            int owned;
-        }thrd_t;
+    #include <windows.h>
 
-        typedef INIT_ONCE once_flag;
-        #define ONCE_FLAG_INIT INIT_ONCE_STATIC_INIT
+    typedef struct{
+        HANDLE handle;
+        DWORD id;
+        int owned;
+    }thrd_t;
 
-        typedef struct{
-            int type;
-            union{
-                CRITICAL_SECTION critical_section;
-                SRWLOCK srwlock;
-            }native;
-        }mtx_t;
+    typedef INIT_ONCE once_flag;
+    #define ONCE_FLAG_INIT INIT_ONCE_STATIC_INIT
 
-        typedef CONDITION_VARIABLE cnd_t;
+    typedef struct{
+        int type;
+        union{
+            CRITICAL_SECTION critical_section;
+            SRWLOCK srwlock;
+        }native;
+    }mtx_t;
 
-        typedef struct{
-            DWORD slot;
-            tss_dtor_t destructor;
-        }tss_t;
-    #else
-        #error "The target platform cannot support multithreading; define __C_POSIX__ on POSIX or __C_WINDOWS__ on Windows."
-    #endif /* __C_POSIX__ || __C_WINDOWS__ */
+    typedef CONDITION_VARIABLE cnd_t;
 
+    typedef struct{
+        DWORD slot;
+        tss_dtor_t destructor;
+    }tss_t;
+#endif /* A_THRD_USE_SYSTEM_THREADS && __C_WINDOWS__ */
 
 
+
+#if !defined(A_THRD_USE_SYSTEM_THREADS)
     int thrd_create(thrd_t* thr, thrd_start_t func, void* arg);
     int thrd_equal(thrd_t lhs, thrd_t rhs);
     thrd_t thrd_current(void);
