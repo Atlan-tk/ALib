@@ -26,7 +26,7 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，核心目标不是复�
 
 ```text
 ALib/
-├── cmake/     # CMake package 配置模板
+├── cmake/     # CMake 构建脚本
 ├── CMakeLists.txt
 ├── inc/       # 公共头文件
 ├── src/       # 非模板实现

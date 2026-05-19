@@ -40,7 +40,6 @@ if(ALIB_TOP_LEVEL_PROJECT AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 
 include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
 include(CMakePushCheckState)
 include(CheckCSourceCompiles)
 
@@ -208,34 +207,10 @@ if(ALIB_BUILD_TESTS)
     add_subdirectory(cmake/test "${ALIB_OBJECT_ROOT}/test")
 endif()
 
-install(TARGETS atlan EXPORT ALibTargets
+install(TARGETS atlan
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/inc/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/alib"
     FILES_MATCHING PATTERN "*.h"
-)
-
-set(ALIB_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/ALib")
-set(ALIB_PACKAGE_CONFIG_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
-if(WIN32 AND NOT CMAKE_HOST_WIN32 AND NOT IS_ABSOLUTE "${ALIB_PACKAGE_CONFIG_INSTALL_PREFIX}")
-    # Cross-compiling to Windows from a Unix host keeps the Windows-style
-    # install prefix for installation, but CMake package generation needs a
-    # host-absolute path to compute PACKAGE_PREFIX_DIR.
-    set(ALIB_PACKAGE_CONFIG_INSTALL_PREFIX "${PROJECT_BINARY_DIR}/_package_prefix")
-endif()
-configure_package_config_file(
-    "${PROJECT_SOURCE_DIR}/cmake/ALibConfig.cmake.in"
-    "${PROJECT_BINARY_DIR}/ALibConfig.cmake"
-    INSTALL_DESTINATION "${ALIB_INSTALL_CMAKEDIR}"
-    INSTALL_PREFIX "${ALIB_PACKAGE_CONFIG_INSTALL_PREFIX}"
-)
-
-install(FILES "${PROJECT_BINARY_DIR}/ALibConfig.cmake"
-    DESTINATION "${ALIB_INSTALL_CMAKEDIR}"
-)
-install(EXPORT ALibTargets
-    FILE ALibTargets.cmake
-    NAMESPACE ALib::
-    DESTINATION "${ALIB_INSTALL_CMAKEDIR}"
 )
