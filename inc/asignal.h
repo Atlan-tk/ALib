@@ -25,11 +25,13 @@ A_TYPE_REGISTER(Aint);
 
 /* 信号基类 */
 /* 用户需要继承这个类实现自己的信号 */
+/* 基类不提供信号校验，如有需要需在子类中自行实现 */
 AClass_Inherit(ASignal);
 AClass_Struct(ASignal,
     Aint                id;         //信号id,由信号系统分配
     Aint                value;      //信号值
     const void*         sender;     //发送者
+    const char*         signal_name;//信号名
 );
 AClass_Function(ASignal);
 AClass_Generate(ASignal);
@@ -57,8 +59,10 @@ A_TYPE_REGISTER(ALine(AExcEnd));
 AClass_Inherit(AExcCollector);
 AClass_Struct(AExcCollector,
     Aint            id;
-    AEXC_t          exc;     //收集器异常标志
-    ALine(AExcEnd)  list;
+    AEXC_t          exc;            //收集器异常标志
+    const void*     sender;         //发送者
+    const char*     signal_name;    //信号名
+    ALine(AExcEnd)  list;           //异常列表
 );
 AClass_Function(AExcCollector,
     AExcEnd (*const pop)(AExcCollector* collector);

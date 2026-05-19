@@ -191,19 +191,20 @@ __unused static inline void a_class_dest(void* _self);
 /* exception handling */
 /********************************************************************/
 typedef enum{
-    AEXC_NORMAL = 0,
+    AEXC_NORMAL = 0,                //正常
 
-    AEXC_nullptr = -1,
-    AEXC_overstep = -2,
-    AEXC_outdomain = -3,
-    AEXC_init_failed = -4,
-    AEXC_file_noexist = -5,
-    AEXC_alloc_failed = -6,
-    AEXC_no_permissions = -7,
-    AEXC_invalid_function = -8,
-    AEXC_repeat_write = -9,
-    AEXC_system_error = -10,
-    AEXC_response_exc = -11,    //信号响应异常
+    AEXC_nullptr = -1,              //self指针为空
+    AEXC_overstep = -2,             //越界访问
+    AEXC_outdomain = -3,            //函数参数超出预定范围
+    AEXC_init_failed = -4,          //初始化失败
+    AEXC_file_noexist = -5,         //文件不存在
+    AEXC_alloc_failed = -6,         //内存分配失败
+    AEXC_no_permissions = -7,       //无操作权限，常用于文件系统或设备
+    AEXC_invalid_function = -8,     //已废弃的函数
+    AEXC_repeat_write = -9,         //重复写入
+    AEXC_system_error = -10,        //系统错误
+    AEXC_response_exc = -11,        //信号响应异常
+    AEXC_matching_failed = -12,     //常用于信号匹配失败
 }AEXC_t;
 extern thread_local int __A_EXC_VALUE__;
 static inline void aExcClean() { __A_EXC_VALUE__ = 0; }

@@ -30,9 +30,11 @@ void AExcCollector_collect(AExcCollector* self, const void* addressee, AEXC_t ev
     if(__a_unlikely(self == nullptr)){
         return;
     }
-    auto list = &self->list; aExcClean();
-    list->f->pushBack(list, (AExcEnd){ addressee, ev});
-    self->exc = aExcGet(); aExcClean();
+    if(ev != AEXC_NORMAL && ev != AEXC_matching_failed){
+        auto list = &self->list; aExcClean();
+        list->f->pushBack(list, (AExcEnd){ addressee, ev});
+        self->exc = aExcGet(); aExcClean();
+    }
 }
 /* 异常列表是否为空 */
 bool AExcCollector_empty(const AExcCollector* self){
@@ -744,6 +746,8 @@ int __a_signal_transmit(const ASignal* signal, AExcCollector* collector){
     auto id = signal->id;
     if(collector != nullptr){
         collector->id = id;
+        collector->sender = signal->sender;
+        collector->signal_name = signal->signal_name;
     }
 
     aExcClean();
