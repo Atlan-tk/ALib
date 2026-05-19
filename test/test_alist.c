@@ -15,20 +15,43 @@ A_TYPE_REGISTER(AList(AString));
 
 static uint32_t g_alib_free_calls = 0;
 
-void alib_free(void *p) {
+static void tracked_alib_free(void *p) {
     if (p != NULL) {
         g_alib_free_calls++;
     }
     free(p);
 }
 
-void *alib_alloc(uint32_t size) {
+static void *tracked_alib_alloc(uint32_t size) {
     return malloc(size);
 }
 
-void *alib_realloc(void *p, uint32_t size) {
+static void *tracked_alib_realloc(void *p, uint32_t size) {
     return realloc(p, size);
 }
+
+#if defined(__C_WINDOWS__) || defined(_WIN32)
+static void install_tracked_allocators(void) {
+    alib_free = tracked_alib_free;
+    alib_alloc = tracked_alib_alloc;
+    alib_realloc = tracked_alib_realloc;
+}
+#else
+void alib_free(void *p) {
+    tracked_alib_free(p);
+}
+
+void *alib_alloc(uint32_t size) {
+    return tracked_alib_alloc(size);
+}
+
+void *alib_realloc(void *p, uint32_t size) {
+    return tracked_alib_realloc(p, size);
+}
+
+static void install_tracked_allocators(void) {
+}
+#endif
 
 static void assert_int_list_eq(const AList(int) *list, const int *expected, uint32_t n) {
     assert(list->f->getNumber(list) == n);
@@ -464,6 +487,7 @@ static void test_alist_astring_take_p(void) {
 }
 
 int main(void) {
+    install_tracked_allocators();
     test_alist_int();
     test_alist_rm_p();
     test_alist_take_p();

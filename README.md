@@ -3,7 +3,7 @@
 ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib，但设计路线并不相同：
 它把“泛型容器、对象生命周期、轻量类系统、进程内信号、线程兼容层、锁封装”组合进一套偏编译期驱动的接口里，目标是在纯 C 中获得比传统 `void*` 工具库更强的类型约束和更统一的值语义体验。
 
-当前仓库产物为静态库 `libatlan.a`，公共头文件位于 `inc/`，安装后按 `<alib/...>` 方式引用。
+当前仓库产物为静态库：Linux 下默认生成 `libatlan.a`，Windows 下使用 `clang-cl` 时默认生成 `atlan.lib`。公共头文件位于 `inc/`，安装后按 `<alib/...>` 方式引用。
 
 ## 项目定位
 
@@ -61,38 +61,92 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib�
 
 ### 构建静态库
 
+默认编译器约定：
+
+- Linux：默认优先使用 `gcc`
+- Windows：默认优先使用 `clang-cl`（MSVC 风格命令参数）
+- 非 Linux/Unix/Windows 目标平台：配置阶段直接提示无法编译
+- 不支持 C11 或 GNU 扩展（如 `__auto_type`、`typeof`、`cleanup`、`weakref`）的编译器：配置阶段直接提示无法编译
+
 ```bash
+mkdir -p build
+cd build
+cmake ..
 make
 ```
 
 默认生成：
 
-- `libatlan.a`
+- Linux 静态库目标：`libatlan.a`
+- Windows 静态库目标：`atlan.lib`
+- 中间文件目录：`build/obj`
+- 临时头文件映射：`build/inc -> inc`，并额外生成 `build/alib -> inc` 以兼容 `<alib/...>` 引用
+- 目标文件目录：库在 `build/lib`，示例在 `build/sample`，测试在 `build/test`
+
+默认会同时构建库本身、`sample/` 下的示例程序和 `test/` 下的测试程序。
+
+Windows 下按本文 `cmake ..` + `make` 流程操作时，建议先确认这些前提：
+
+- 已安装 GNU Make，并且命令行里执行 `make --version` 能成功
+- 当前 CMake 生成器确实产出 Makefile；如果 CMake 默认选成了 Visual Studio 生成器，需要改成 `Unix Makefiles`，例如 `cmake -G "Unix Makefiles" ..`
+- 已进入 Visual Studio / Build Tools 提供的开发者命令行环境，使 `clang-cl`、`link.exe`、`lib.exe` 以及 Windows SDK 头文件和库都可用
+- `make install` 默认会写入 `C:\Program Files (x86)\alib`，通常需要管理员权限；如果不想提权，请在配置阶段改用自定义 `CMAKE_INSTALL_PREFIX`
 
 ### 编译示例
 
 ```bash
-make -C sample
+mkdir -p build
+cd build
+cmake ..
+make samples
 ```
 
 ### 编译测试
 
 ```bash
-make -C test
+mkdir -p build
+cd build
+cmake ..
+make tests
 ```
 
-仓库里的 `sample/Makefile` 和 `test/Makefile` 会自动创建 `.local/include/alib -> inc/` 的本地头文件映射，因此不需要先安装到系统目录。
+### 运行测试
+
+```bash
+cd build
+ctest --output-on-failure
+```
 
 ### 安装
 
 ```bash
-make install PREFIX=/usr/local
+cd build
+make install
 ```
 
-安装结果：
+默认安装结果：
 
-- 头文件：`/usr/local/include/alib/*.h`
-- 静态库：`/usr/local/lib/libatlan.a`
+- Linux：
+  - 头文件：`/usr/local/include/alib/*.h`
+  - 静态库：`/usr/local/lib/libatlan.a`
+- Windows：
+  - 头文件：`C:\Program Files (x86)\alib\include\alib\*.h`
+  - 静态库：`C:\Program Files (x86)\alib\lib\atlan.lib`
+
+如需覆盖默认安装前缀：
+
+```bash
+mkdir -p build
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=<your-prefix> ..
+make
+make install
+```
+
+Windows 下安装后建议补充环境变量：
+
+- CMake 项目：把 `C:\Program Files (x86)\alib` 加到 `CMAKE_PREFIX_PATH`
+- 直接调用 `clang-cl`：把 `C:\Program Files (x86)\alib\include` 加到 `INCLUDE`，把 `C:\Program Files (x86)\alib\lib` 加到 `LIB`
 
 ## 快速开始
 
@@ -128,18 +182,21 @@ int main(void) {
 }
 ```
 
-安装后可直接编译：
+安装后可直接编译（Linux / GCC）：
 
 ```bash
-gcc -std=c11 -Wall -Wextra -O2 example.c -latlan -o example
+gcc -std=gnu11 -Wall -Wextra -O2 example.c -latlan -pthread -o example
 ```
 
-如果只是想在仓库目录里临时编译：
+如果只是想在仓库目录里临时编译（Linux / GCC）：
 
 ```bash
-mkdir -p .local/include
-ln -snf "$(pwd)/inc" .local/include/alib
-gcc -std=c11 -Wall -Wextra -O2 -I.local/include example.c -L. -latlan -o example
+mkdir -p build
+cd build
+cmake ..
+make
+cd ..
+gcc -std=gnu11 -Wall -Wextra -O2 -Ibuild example.c build/lib/libatlan.a -pthread -o example
 ```
 
 ## 使用模式

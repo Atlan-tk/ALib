@@ -24,11 +24,12 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，核心目标不是复�
 
 ```text
 ALib/
+├── cmake/     # CMake package 配置模板
+├── CMakeLists.txt
 ├── inc/       # 公共头文件
 ├── src/       # 非模板实现
 ├── sample/    # 示例程序
 ├── test/      # 回归测试
-├── Makefile
 ├── README.md
 └── DOC.md
 ```
@@ -36,17 +37,32 @@ ALib/
 常用命令：
 
 ```bash
+mkdir -p build
+cd build
+cmake ..
 make
-make -C sample
-make -C test
-make install PREFIX=/usr/local
 ```
+
+默认约定：
+
+- Linux：默认优先使用 `gcc`
+- Windows：默认优先使用 `clang-cl`（MSVC 风格命令参数）
+- 非 Linux/Unix/Windows 目标平台：配置阶段直接提示无法编译
+- 不支持 C11 或 GNU 扩展（如 `__auto_type`、`typeof`、`cleanup`、`weakref`）的编译器：配置阶段直接提示无法编译
 
 默认产物：
 
-- 静态库：`libatlan.a`
+- Linux 静态库：`libatlan.a`
+- Windows 静态库：`atlan.lib`
+- 中间文件目录：`build/obj`
+- 临时头文件映射：`build/inc -> inc`，并额外生成 `build/alib -> inc` 以兼容 `<alib/...>` 引用
+- 库输出目录：`build/lib`
+- 示例输出目录：`build/sample`
+- 测试输出目录：`build/test`
 - 安装头文件目录：`PREFIX/include/alib`
 - 安装库目录：`PREFIX/lib`
+
+默认会同时构建库本身、`sample/` 下的示例程序和 `test/` 下的测试程序。
 
 ## 3. 先读这些通用约定
 
@@ -58,7 +74,7 @@ ALib 依赖：
 - GNU 扩展（`__auto_type`、`typeof`、`cleanup`、`weakref` 等）
 - C11 线程 / 时间接口；优先复用系统 `<threads.h>`，缺失时由 `athrd.h` 在 POSIX / Win32 上补齐
 
-因此推荐直接使用仓库内的 `Makefile`，或者在外部工程中保持等价编译条件。
+因此推荐直接使用仓库内的 CMake 构建，并在仓库根目录下手动创建 `build/` 后进入该目录执行 `cmake ..` 和 `make`。Linux 下默认安装到 `/usr/local`；Windows 下默认安装到 `C:\Program Files (x86)\alib`。如果目标平台不是 Linux/Unix/Windows，或者编译器缺少 C11 / GNU 扩展支持，CMake 会在配置阶段直接终止并提示无法编译。如果在 Windows 上安装后要做外部集成，建议把安装前缀加入 `CMAKE_PREFIX_PATH`，并在直接调用 `clang-cl` 时补充 `INCLUDE` / `LIB` 环境变量。
 
 ### 3.2 类型协议：所有容器都依赖 `A_TYPE_REGISTER`
 
@@ -226,14 +242,44 @@ A_TYPE_REGISTER(ATree(KeyType, ValueType));
 
 | API | 参数 | 返回值 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
-| `alib_alloc(uint32_t size)` | 分配字节数 | `void*` 或 `nullptr` | 默认不主动写异常 | 默认弱符号，内部转到 `malloc` |
-| `alib_realloc(void* p, uint32_t size)` | 原地址、目标大小 | 新地址或 `nullptr` | 默认不主动写异常 | 默认弱符号，内部转到 `realloc` |
-| `alib_free(void* p)` | 待释放地址，可为 `nullptr` | 无 | 无 | 默认弱符号，内部转到 `free` |
+| `alib_alloc(uint32_t size)` | 分配字节数 | `void*` 或 `nullptr` | 默认不主动写异常 | 默认转到 `malloc` |
+| `alib_realloc(void* p, uint32_t size)` | 原地址、目标大小 | 新地址或 `nullptr` | 默认不主动写异常 | 默认转到 `realloc` |
+| `alib_free(void* p)` | 待释放地址，可为 `nullptr` | 无 | 无 | 默认转到 `free` |
 | `alib_new(uint32_t size, void(*init_func)(void*))` | 大小、初始化函数 | 已初始化对象地址或 `nullptr` | `AEXC_alloc_failed`；或 `init_func` 自己设置的异常 | 先分配，再调用初始化；初始化失败会自动释放并返回 `nullptr` |
 | `alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*))` | 大小、源对象、拷贝函数 | 新对象地址或 `nullptr` | `AEXC_alloc_failed`；或 `copy_func` 自己设置的异常 | 先分配，再复制；复制失败会自动释放 |
 | `alib_delete(void* p, void(*dest_func)(void*))` | 对象地址、析构函数 | 无 | 由 `dest_func` 决定 | `p == nullptr` 时直接返回；若 `dest_func != nullptr` 先析构再释放 |
 
-如果你要把 ALib 接到自定义分配器、对象池或调试分配层，通常就是重写这些弱符号。
+平台差异：
+
+- 非 Windows 平台：这些符号默认实现为弱符号；如果你在自己的目标文件里提供同名实现，链接后就会覆盖默认分配器。
+- Windows 平台：由于不能依赖弱符号，`alib_alloc` / `alib_realloc` / `alib_free` / `alib_new` / `alib_cpnew` / `alib_delete` 在头文件里声明为函数指针变量；默认分别指向 `malloc` / `realloc` / `free` 及其上层包装逻辑。
+- Windows 上如果只想替换底层内存来源，通常只改写 `alib_alloc`、`alib_realloc`、`alib_free` 三个函数指针即可；默认的 `alib_new`、`alib_cpnew`、`alib_delete` 会继续通过这些公开钩子完成分配与释放。
+
+典型接入方式：
+
+```c
+/* 非 Windows：直接提供同名实现覆盖默认弱符号 */
+void* alib_alloc(uint32_t size) {
+    return my_pool_alloc(size);
+}
+
+void alib_free(void* p) {
+    my_pool_free(p);
+}
+```
+
+```c
+/* Windows：在程序启动阶段改写函数指针 */
+static void* my_alloc(uint32_t size) { return my_pool_alloc(size); }
+static void* my_realloc(void* p, uint32_t size) { return my_pool_realloc(p, size); }
+static void  my_free(void* p) { my_pool_free(p); }
+
+static void install_alib_allocator(void) {
+    alib_alloc = my_alloc;
+    alib_realloc = my_realloc;
+    alib_free = my_free;
+}
+```
 
 #### 5.1.4 哈希辅助函数
 
@@ -1173,14 +1219,18 @@ a_signal_transmit(signal, &collector);
 推荐最少验证命令：
 
 ```bash
+mkdir -p build
+cd build
+cmake ..
 make
-make -C test
+ctest --output-on-failure
 ```
 
 如果修改了示例相关接口，再补：
 
 ```bash
-make -C sample
+cd build
+make samples
 ```
 
 ## 7. 常见误区速记

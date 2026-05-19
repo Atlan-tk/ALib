@@ -54,6 +54,15 @@
 *.codex
 AGENTS.md
 
+# CMake
+build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+
 .tmp_versions/
 modules.order
 Module.symvers

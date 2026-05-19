@@ -108,13 +108,29 @@ extern "C" {
 
 
 /* alloc and free */
-__unused void  alib_free(void* p);
-__unused void* alib_alloc(uint32_t size);
-__unused void* alib_realloc(void* p, uint32_t size);
+#if defined(__C_WINDOWS__) || defined(_WIN32)
+    typedef void  (*alib_free_func_t)(void* p);
+    typedef void* (*alib_alloc_func_t)(uint32_t size);
+    typedef void* (*alib_realloc_func_t)(void* p, uint32_t size);
+    typedef void* (*alib_new_func_t)(uint32_t size, void(*init_func)(void*));
+    typedef void* (*alib_cpnew_func_t)(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
+    typedef void  (*alib_delete_func_t)(void* p, void(*dest_func)(void*));
 
-__unused void* alib_new(uint32_t size, void(*init_func)(void*));
-__unused void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
-__unused void  alib_delete(void* p, void(*dest_func)(void*));
+    extern alib_free_func_t alib_free;
+    extern alib_alloc_func_t alib_alloc;
+    extern alib_realloc_func_t alib_realloc;
+    extern alib_new_func_t alib_new;
+    extern alib_cpnew_func_t alib_cpnew;
+    extern alib_delete_func_t alib_delete;
+#else
+    __unused void  alib_free(void* p);
+    __unused void* alib_alloc(uint32_t size);
+    __unused void* alib_realloc(void* p, uint32_t size);
+
+    __unused void* alib_new(uint32_t size, void(*init_func)(void*));
+    __unused void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
+    __unused void  alib_delete(void* p, void(*dest_func)(void*));
+#endif
 
 typedef void*               cptr_t;
 typedef char*               cstr_t;
