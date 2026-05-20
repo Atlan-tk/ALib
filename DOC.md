@@ -1033,6 +1033,8 @@ A_TYPE_REGISTER(AShPtr(T));
 - `AMtx`：普通互斥锁
 - `ARecursion`：递归互斥锁
 - `AMtxRW`：读写锁
+- `AMtxCnd`：互斥锁 + 条件变量组合
+- `ASemaphore`：基于 `AMtxCnd` 的计数信号量
 - `AAutoKey`：自动解锁 token
 
 #### 5.16.1 类型总览
@@ -1044,6 +1046,8 @@ A_TYPE_REGISTER(AShPtr(T));
 | `AMtx` | 类 | 普通互斥锁 |
 | `ARecursion` | 类 | 递归互斥锁 |
 | `AMtxRW` | 类 | 基于 `mtx_t + cnd_t` 实现的读写锁，带写者优先倾向 |
+| `AMtxCnd` | 类 | 在 `AMtx` 上追加一个 `cnd_t`，适合“谓词 + 等待队列”场景 |
+| `ASemaphore` | 类 | 基于 `AMtxCnd` 的容量限制器；`count` 为当前占用数，`max` 为上限 |
 
 #### 5.16.2 `AAutoKey`
 
@@ -1071,17 +1075,91 @@ if (aExcOccur()) {
 | `ARecursion_lock(ARecursion* self)` | 递归锁指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 同一线程可重入 |
 | `AMtxRW_rlock(AMtxRW* self)` | 读写锁指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 获取读锁；存在等待写者时新读者也会阻塞 |
 | `AMtxRW_wlock(AMtxRW* self)` | 读写锁指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 获取写锁；需要等待现有读者和写者全部离开 |
+| `AMtxCnd_lock(AMtxCnd* self)` | 条件锁指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 获取与条件变量配套的互斥锁 |
+| `AMtxCnd_awake(AMtxCnd* self)` | 条件锁指针 | 无 | `AEXC_nullptr`、`AEXC_system_error` | 唤醒一个等待在该条件变量上的线程 |
+| `AMtxCnd_awake_all(AMtxCnd* self)` | 条件锁指针 | 无 | `AEXC_nullptr`、`AEXC_system_error` | 广播唤醒全部等待线程 |
+| `AMtxCnd_wait(AMtxCnd* self)` | 条件锁指针 | 无 | `AEXC_nullptr`、`AEXC_system_error` | 原子地释放互斥锁并等待；返回前重新持有该锁 |
+| `ASemaphore_lock(ASemaphore* self)` | 信号量指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 当 `count < max` 时占用一个名额；token 析构时归还名额 |
+| `ASemaphore_setMax(ASemaphore* self, uint32_t max)` | 信号量指针、上限 | 无 | `AEXC_nullptr`、`AEXC_system_error` | 线程安全地更新并发上限；调大后如出现空位会唤醒等待者 |
 
-#### 5.16.4 初始化 / 拷贝 / 析构语义
+#### 5.16.4 `AMtxCnd`
 
-- `A_INIT(AMtx)` / `A_INIT(ARecursion)` / `A_INIT(AMtxRW)` 会创建一个新的未持有锁实例。
-- `A_COPY(AMtx)` / `A_COPY(ARecursion)` / `A_COPY(AMtxRW)` **不会复制锁状态**，而是创建一把新的、未加锁的同类锁。
-- 锁对象析构时会销毁底层系统锁 / 条件变量。
+`AMtxCnd` 把一把普通互斥锁和一个条件变量打包成一个类对象，适合把“共享状态 + 谓词等待”放进统一的 ALib 生命周期里。
 
-#### 5.16.5 使用建议
+典型模式：
+
+```c
+typedef struct {
+    AMtxCnd lock;
+    bool ready;
+} SharedState;
+
+RAII(AAutoKey) key = AMtxCnd_lock(&state.lock);
+if (aExcOccur()) {
+    return;
+}
+
+while (!state.ready) {
+    AMtxCnd_wait(&state.lock);
+    if (aExcOccur()) {
+        return;
+    }
+}
+```
+
+使用要点：
+
+- `AMtxCnd_wait()` 的前提是调用线程已经通过 `AMtxCnd_lock()` 持有同一把锁；等待时会暂时释放这把锁，返回前再重新持有它。
+- 条件变量可能出现“伪唤醒”，或者被其他线程先一步消费掉条件，因此应始终用 `while (predicate_not_ready)` 而不是 `if`。
+- `AMtxCnd_awake()` / `AMtxCnd_awake_all()` 只负责唤醒等待者，不会自动修改共享谓词；通常应先在持锁状态下更新谓词，再发出唤醒。
+- `AMtxCnd_awake()`、`AMtxCnd_awake_all()`、`AMtxCnd_wait()` 都对 `nullptr` 做显式保护，失败时写入 `AEXC_nullptr`。
+
+#### 5.16.5 `ASemaphore`
+
+`ASemaphore` 建立在 `AMtxCnd` 之上，可以把它看成“用 `AAutoKey` 归还名额”的计数信号量：
+
+- `max`：允许同时占用的最大名额数
+- `count`：当前已经被占用的名额数
+
+最小用法：
+
+```c
+RAII(ASemaphore) sem = A_INIT(ASemaphore);
+if (aExcOccur()) {
+    return;
+}
+
+ASemaphore_setMax(&sem, 4);
+if (aExcOccur()) {
+    return;
+}
+
+RAII(AAutoKey) permit = ASemaphore_lock(&sem);
+if (aExcOccur()) {
+    return;
+}
+```
+
+语义细节：
+
+- `ASemaphore_lock()` 会在 `count >= max` 时阻塞等待；一旦成功进入临界区，`count` 递增 1，返回的 `AAutoKey` 析构时自动递减并尝试唤醒一个等待者。
+- 新建或复制得到的 `ASemaphore` 默认 `count == 0` 且 `max == 0`；也就是说，它一开始等价于“关闭状态”，第一次使用前需要显式调用 `ASemaphore_setMax()`。
+- `ASemaphore_setMax()` 可以在其他线程正在持有或等待该信号量时调用；如果把上限调大，并且更新后满足 `count < max`，当前实现会广播唤醒全部等待线程，让它们重新竞争名额。
+- 如果把上限调小到小于当前 `count`，已拿到名额的线程不会被强制驱逐；后续新调用 `ASemaphore_lock()` 的线程会继续等待，直到已有持有者释放到 `count < max` 为止。
+
+#### 5.16.6 初始化 / 拷贝 / 析构语义
+
+- `A_INIT(AMtx)` / `A_INIT(ARecursion)` / `A_INIT(AMtxRW)` / `A_INIT(AMtxCnd)` / `A_INIT(ASemaphore)` 会创建一个新的未持有锁实例。
+- `A_COPY(AMtx)` / `A_COPY(ARecursion)` / `A_COPY(AMtxRW)` / `A_COPY(AMtxCnd)` **不会复制锁状态**，而是创建一把新的、未加锁的同类锁。
+- `A_COPY(ASemaphore)` 同样不会复制等待队列或占用状态；新对象的 `count`、`max` 都会重置为 `0`，需要重新调用 `ASemaphore_setMax()`。
+- 锁对象析构时会销毁底层系统锁 / 条件变量；`AMtxCnd` 与 `AMtxRW` 还会在内部记录条件变量是否初始化成功，以保证初始化中途失败后析构仍然安全。
+
+#### 5.16.7 使用建议
 
 - 优先使用 `RAII(AAutoKey)` 管理解锁，不要手工模拟“多 return 点解锁”。
 - 不要复制 `AAutoKey` 并试图让多个 token 共同管理一次加锁；复制后的 token 是空对象。
+- `AMtxCnd_wait()` 始终放在谓词循环里使用；仅仅“被唤醒”并不等于条件已经满足。
+- `ASemaphore` 的 `max == 0` 更接近“关闭闸门”而不是“无限并发”；忘记先设上限会让后续 `ASemaphore_lock()` 一直等待。
 - `AMtxRW` 对写者更友好：只要有写者等待，新读者就会阻塞，避免写者饥饿。
 
 ### 5.17 `asignal.h` — 信号系统与接收者基类
@@ -1224,13 +1302,14 @@ a_signal_transmit(signal, &collector);
 - `sample/sample_type.c`：自定义类型与对象生命周期
 - `sample/sample_aclass.c`：类系统与虚函数覆盖
 - `sample/sample_aline.c`：容器生成、遍历与值语义
-- `sample/sample_alock.c`：`AAutoKey` 与锁的 RAII 使用
+- `sample/sample_alock.c`：`AAutoKey`、`AMtxCnd`、`ASemaphore` 与锁的 RAII 使用
 - `sample/sample_asignal.c`：信号连接、派发与异常收集
 
 回归测试：
 
 - `test/test_sequence_api.c`：序列容器共性 API
 - `test/test_map_api.c`：映射容器共性 API
+- `test/test_alock.c`：`AMtxCnd` 唤醒、`ASemaphore` 并发上限与动态扩容
 - `test/test_athrd.c`：线程兼容层、定时锁、条件变量、TSS 与 `call_once`
 - `test/test_asignal.c`：信号系统、重入发送、异常收集
 - `test/test_aptr.c`：`APtr` / `AShPtr` 语义

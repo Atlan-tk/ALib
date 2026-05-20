@@ -150,10 +150,87 @@ A_CLASS_REGISTER(AMtxRW);
 
 
 
+AClass_Inherit(AMtxCnd, AMtx);
+AClass_Struct(AMtxCnd,
+    cnd_t cnd;
+    bool cnd_ready;
+);
+AClass_Function(AMtxCnd);
+AClass_Generate(AMtxCnd);
+__unused static inline void __AMtxCnd_reset(AMtxCnd* self){
+    self->cnd_ready = false;
+}
+__unused static inline void A_OBJ_INIT(AMtxCnd)(AMtxCnd* self){
+    __AMtxCnd_reset(self);
+    if(cnd_init(&self->cnd) != thrd_success){
+        aExcSet(AEXC_system_error);
+        return;
+    }
+    self->cnd_ready = true;
+}
+__unused static inline void A_OBJ_DEST(AMtxCnd)(AMtxCnd* self){
+    if(self->cnd_ready){
+        cnd_destroy(&self->cnd);
+    }
+    __AMtxCnd_reset(self);
+}
+__unused static inline void A_OBJ_COPY(AMtxCnd)(AMtxCnd* self, __unused const AMtxCnd* that){
+    A_OBJ_INIT(AMtxCnd)(self);
+}
+A_CLASS_REGISTER(AMtxCnd);
+
+static inline void AMtxCnd_awake(AMtxCnd* self){
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    if(cnd_signal(&self->cnd) != thrd_success){
+        aExcSet(AEXC_system_error);
+    }
+}
+static inline void AMtxCnd_awake_all(AMtxCnd* self){
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    if(cnd_broadcast(&self->cnd) != thrd_success){
+        aExcSet(AEXC_system_error);
+    }
+}
+static inline void AMtxCnd_wait(AMtxCnd* self){
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    if(cnd_wait(&self->cnd, &((ALock*)self)->mtx) != thrd_success){
+        aExcSet(AEXC_system_error);
+    }
+}
+
+
+
+/* 基于mtx/cnd信号量 */
+AClass_Inherit(ASemaphore, AMtxCnd);
+AClass_Struct(ASemaphore,
+    uint32_t    max;
+    uint32_t    count;
+);
+AClass_Function(ASemaphore);
+AClass_Generate(ASemaphore);
+__unused static inline void A_OBJ_COPY(ASemaphore)(ASemaphore* self, __unused const ASemaphore* that){
+    self->count = self->max = 0;
+}
+A_CLASS_REGISTER(ASemaphore);
+void ASemaphore_setMax(ASemaphore* self, uint32_t max);
+
+
+
 AAutoKey AMtx_lock(AMtx* self);
 AAutoKey ARecursion_lock(ARecursion* self);
 AAutoKey AMtxRW_rlock(AMtxRW* self);
 AAutoKey AMtxRW_wlock(AMtxRW* self);
+AAutoKey AMtxCnd_lock(AMtxCnd* self);
+AAutoKey ASemaphore_lock(ASemaphore* self);
 
 
 

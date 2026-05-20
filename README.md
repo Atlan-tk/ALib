@@ -55,9 +55,9 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib�
 - `aptr.h`：独占指针包装和共享指针包装
 - `asignal.h`：进程内信号连接/派发系统
 - `athrd.h`：兼容 C11 `<threads.h>` 的线程原语入口；优先复用系统实现，缺失时回退到 POSIX/Win32
-- `alock.h`：基于 `athrd.h` 的互斥锁、递归锁、读写锁及自动解锁辅助对象
+- `alock.h`：基于 `athrd.h` 的互斥锁、递归锁、读写锁、条件变量锁、信号量及自动解锁辅助对象
 
-其中 `athrd.h` 适合直接做线程创建、条件变量等待和线程局部存储；如果只是想在 ALib 风格代码里管理临界区，通常直接使用 `alock.h` 的 `AAutoKey`/`AMtx` 更顺手。
+其中 `athrd.h` 适合直接做线程创建、条件变量等待和线程局部存储；如果只是想在 ALib 风格代码里管理临界区、等待条件或限制并发配额，通常直接使用 `alock.h` 的 `AAutoKey`、`AMtxCnd`、`ASemaphore` 更顺手。
 
 ## 构建、测试与安装
 
@@ -253,6 +253,12 @@ A_TYPE_REGISTER(ATree(int, AString));
 - 堆上对象：`A_NEW(T)` / `A_CPNEW(T, obj)` / `A_DELETE(T, p)`
 - 自动析构：`RAII(T)`
 
+### 4. 在并发场景里优先用锁对象
+
+- `AMtx` / `ARecursion` / `AMtxRW` 适合普通临界区、递归调用和读多写少的共享状态。
+- `AMtxCnd` 把互斥锁和条件变量绑在一起：先 `AMtxCnd_lock()`，在谓词不满足时循环 `AMtxCnd_wait()`，状态更新后再 `AMtxCnd_awake()` 或 `AMtxCnd_awake_all()`。
+- `ASemaphore` 把“占用一个名额 / 归还一个名额”封装进 `ASemaphore_lock()` 返回的 `AAutoKey`；首次使用前需要先 `ASemaphore_setMax()` 设置上限，之后可以按需动态调整容量。
+
 ## 需要特别注意的语义
 
 - `AString_new()` 和 `AText_new()` 都只是“包装已有 `char*`”，不会立刻拷贝；传入栈缓冲区或临时内存时，必须在其失效前复制到一个真正拥有内存的对象。
@@ -263,6 +269,8 @@ A_TYPE_REGISTER(ATree(int, AString));
 - 迭代器更适合只读遍历或就地修改元素值，不适合边遍历边插入/删除；只要容器结构发生变化，就应丢弃旧迭代器并重新获取。
 - `APtr(T)` 不是 `unique_ptr` 的等价物：复制后新对象是弱别名，不会接管释放责任；如果需要转移所有权，请显式使用 `A_MOVE` 或避免复制。
 - `AReceEnd` 可以在析构时自动断开信号连接；信号回调内部也可以断连，但实际操作会延迟到本轮派发结束后执行。
+- `AMtxCnd_wait()` 必须在已经持有同一把 `AMtxCnd_lock()` 的前提下使用，并且要放在 `while (...)` 循环里反复检查共享谓词。
+- `ASemaphore` 初始化后默认 `max == 0`；第一次 `ASemaphore_lock()` 前要先 `ASemaphore_setMax()`，而且把上限调大且当前存在空位时，会唤醒等待中的线程重新竞争名额。
 
 ## 适合什么场景
 
