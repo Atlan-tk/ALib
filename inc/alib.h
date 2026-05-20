@@ -10,6 +10,16 @@
 extern "C" {
 #endif /* __cplusplus */
 
+#if !defined(__C_WINDOWS__) && !defined(__C_POSIX__)
+    #if defined(_WIN32) || defined(__WIN32__) || defined(WIN32)
+        #define __C_WINDOWS__ 1
+    #elif defined(__unix__) || defined(__unix) || defined(__linux__) || defined(__APPLE__) || defined(__CYGWIN__)
+        #define __C_POSIX__ 1
+    #else
+        #error "Unsupported platform: define __C_POSIX__ or __C_WINDOWS__ before including alib.h"
+    #endif
+#endif
+
 #ifndef __cplusplus
     #if !(defined(__STDC_VERSION__)) || (__STDC_VERSION__ < 201112L)
         #error "The minimum supported C standard is C11"

@@ -10,19 +10,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#ifndef __noreturn
-    #if defined(__cplusplus)
-        #define __noreturn [[noreturn]]
-    #elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
-        #define __noreturn [[noreturn]]
-    #elif defined(__GNUC__)
-        #define __noreturn __attribute__((noreturn))
-    #else
-        #define __noreturn _Noreturn
-    #endif /* __cplusplus */
-#endif /* __noreturn */
-
-
+#include "alib.h"
 
 #if !defined(__STDC_NO_THREADS__)
     #if defined(__has_include)
@@ -35,8 +23,6 @@ extern "C" {
         #define A_THRD_USE_SYSTEM_THREADS 1
     #endif /* __has_include */
 #endif /* !__STDC_NO_THREADS__ */
-
-
 
 #if !defined(A_THRD_USE_SYSTEM_THREADS)
     #include <time.h>

@@ -16,6 +16,7 @@ endforeach()
 
 add_executable(test_athrd_fallback
     "${PROJECT_SOURCE_DIR}/test/test_athrd.c"
+    "${PROJECT_SOURCE_DIR}/src/alib.c"
     "${PROJECT_SOURCE_DIR}/src/athrd.c"
 )
 set_target_properties(test_athrd_fallback PROPERTIES
