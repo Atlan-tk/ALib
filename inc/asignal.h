@@ -14,7 +14,7 @@ extern "C" {
 #include "aline.h"
 #include "aclass.h"
 
-typedef int32_t Aint;
+typedef int64_t Aint;
 __unused static inline void A_OBJ_INIT(Aint)(Aint* self){ *self = 0; }
 __unused static inline void A_OBJ_DEST(Aint)(Aint* self){ *self = 0; }
 __unused static inline void A_OBJ_COPY(Aint)(Aint* self, const Aint* that){ *self = *that; }

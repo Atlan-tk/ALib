@@ -10,6 +10,7 @@
 #include <alib/alib.h>
 #include <alib/asignal.h>
 #include <stdbool.h>
+#include <inttypes.h>
 #include <stdio.h>
 
 typedef struct PingSignal PingSignal;
@@ -114,8 +115,8 @@ static int emit_ping(PingSource* source, int payload, bool collect_exc) {
 
         int ret = a_signal_transmit(base, &collector);
         if (ret == AEXC_response_exc) {
-            printf("emit_ping(payload=%d) collected callback errors for id=%d:\n",
-                    payload, collector.id);
+            printf("emit_ping(payload=%d) collected callback errors for id=%" PRId64 ":\n",
+                    payload, (int64_t)collector.id);
             drain_signal_exceptions(&collector);
             return 0;
         }
@@ -149,7 +150,7 @@ int main(void) {
 
     Aint id = ping_id(&source);
 
-    printf("Ping signal id = %d\n", id);
+    printf("Ping signal id = %" PRId64 "\n", (int64_t)id);
 
     A_CALL(fast, AReceEnd).connection((const AReceEnd*)&fast, id, ping_target);
     if (print_exc("connect fast") != 0) {
