@@ -119,7 +119,7 @@ static inline bool __a_ref_count_sub(atomic_ullong* ref_count){
             aExcSet(AEXC_alloc_failed); return;                                         \
         }                                                                               \
         self->p = A_NEW(T); if(__a_unlikely(self->p == nullptr)){                       \
-            alib_free(self->ref_count); aExcSet(AEXC_alloc_failed);                     \
+            alib_free(self->ref_count);                                                 \
             memset(self, 0, sizeof(AShPtr(T))); return;                                 \
         }                                                                               \
         atomic_store_explicit(self->ref_count, 1, memory_order_relaxed);                \
@@ -148,7 +148,7 @@ static inline bool __a_ref_count_sub(atomic_ullong* ref_count){
             aExcSet(AEXC_alloc_failed); return sh;                                      \
         }                                                                               \
         sh.p = A_CPNEW(T, *obj); if(__a_unlikely(sh.p == nullptr)){                     \
-            alib_free(sh.ref_count); aExcSet(AEXC_alloc_failed);                        \
+            alib_free(sh.ref_count);                                                    \
             memset(&sh, 0, sizeof(AShPtr(T))); return sh;                               \
         }                                                                               \
         atomic_store_explicit(sh.ref_count, 1, memory_order_relaxed);                   \
