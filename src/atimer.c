@@ -21,7 +21,7 @@ typedef struct{
 }AWork;
 __weak int A_OBJ_CMPD(AWork)(const AWork* self, const AWork* that){
     int ret = A_CMPD(uint32_t, self->wait, that->wait);
-    if(ret == 0) ret = memcmp(self, that, sizeof(AWork));
+    if(ret == 0) ret = A_CMPD(int64_t, self->id, that->id);
     return ret;
 }
 A_TYPE_REGISTER(AWork);
@@ -300,6 +300,7 @@ static inline void ATimer_main(ATimer* self){
         A_DEST(AAutoKey, key);
         AWorkQue_call(&self->call_queue);
         aExcClean(); key = AMtxCnd_lock(&self->lock);if(aExcOccur()){
+            A_DEST(AWorkQue, self->call_queue);
             return;
         }
         /* call end   */
@@ -355,7 +356,8 @@ static inline void ATimer_add(ATimer* self, AWork work){
     }
 
     AClock start = self->clock;
-    AClock awaken_clk = AClock_usAdd(start, work.wait * 1000);
+    AClock now = A_INIT(AClock);
+    AClock awaken_clk = AClock_usAdd(now, work.wait * 1000);
     work.wait = (uint32_t)(AClock_usDiff(awaken_clk, start) / 1000);
 
     AWorkQue_push(&self->queue, work);
@@ -378,10 +380,12 @@ static inline void ATimer_rm(ATimer* self, int64_t id){
         return;
     }
 
-    forEach(it, self->call_queue.que){
-        if(it.p != nullptr && it.p->id == id){
-            AWork_set_rm(it.p);
-            return;
+    if(self->call_queue.que.f != nullptr){
+        forEach(it, self->call_queue.que){
+            if(it.p != nullptr && it.p->id == id){
+                AWork_set_rm(it.p);
+                return;
+            }
         }
     }
     AWorkQue_rm(&self->queue, id);
@@ -401,6 +405,10 @@ static inline void ATimer_start(ATimer* self){
         return;
     }
 
+    if(self->stat){
+        return;
+    }
+
     self->stat = true;
     if (thrd_create(&self->tid, ATimer_thread, self) != thrd_success) {
         aExcSet(AEXC_system_error);
@@ -413,6 +421,10 @@ static inline void ATimer_poweroff(ATimer* self){
         return;
     }
     aExcClean();auto key = AMtxCnd_lock(&self->lock);if(aExcOccur()){
+        return;
+    }
+
+    if(!self->stat){
         return;
     }
 
@@ -460,6 +472,5 @@ int64_t a_timer_addwork(uint32_t cycle, uint32_t num, void(*call)(void*), void* 
     }
     return work.id;
 }
-
 
 

@@ -47,7 +47,9 @@ static inline int64_t AClock_sDiff(AClock self, AClock that){
     return AClock_msDiff(self, that) / 1000;
 }
 static inline void AClock_refresh(AClock* self){
-    timespec_get(&self->clock, TIME_UTC);
+   if(TIME_UTC != timespec_get(&self->clock, TIME_UTC)){
+        aExcSet(AEXC_system_error);
+   }
 }
 
 static inline AClock AClock_nsAdd(AClock self, int64_t t){

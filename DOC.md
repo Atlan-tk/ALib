@@ -247,6 +247,7 @@ A_TYPE_REGISTER(ATree(KeyType, ValueType));
 | `astring.h` | 字符串对象 |
 | `atext.h` | UTF-8 文本对象与编码转换 |
 | `aptr.h` | 独占 / 共享指针包装 |
+| `atimer.h` | `AClock` 时间点辅助、全局毫秒级定时任务 |
 | `athrd.h` | C11 线程兼容层；线程、互斥锁、条件变量、TSS、`call_once` |
 | `alock.h` | 互斥锁、递归锁、读写锁、自动解锁 token |
 | `asignal.h` | 信号系统、接收者基类、异常收集器 |
@@ -1000,7 +1001,69 @@ RAII(AShPtr(int)) moved = AShPtrCvs(int, sp);
 - 被共享对象 `*p` 自身并不会自动加锁；
 - 多线程同时修改 `*sp.p` 时仍需外部同步。
 
-### 5.15 `athrd.h` — C11 线程兼容层
+### 5.15 `atimer.h` — `AClock` 与毫秒级定时任务
+
+`atimer.h` 提供两部分能力：
+
+- `AClock`：基于 `struct timespec` 的时间点对象，支持差值、加法和单位转换。
+- 全局毫秒级定时器：通过 `a_timer_addwork*` 注册一次性、有限次数或长期任务，后台线程按周期调用回调。
+
+#### 5.15.1 `AClock`
+
+`AClock` 是值类型，`A_INIT(AClock)` 会读取当前 UTC 时间点。常用辅助函数：
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AClock_nsDiff(a, b)` | 两个 `AClock` | 返回 `a - b` 的纳秒差 | 无 | 正值表示 `a` 晚于 `b` |
+| `AClock_usDiff(a, b)` / `AClock_msDiff(a, b)` / `AClock_sDiff(a, b)` | 两个 `AClock` | 返回微秒 / 毫秒 / 秒差 | 无 | 由纳秒差截断换算 |
+| `AClock_nsAdd(c, t)` | 时间点、纳秒数 | 返回加上 `t` 后的新时间点 | 无 | 不修改原对象 |
+| `AClock_usAdd` / `AClock_msAdd` / `AClock_sAdd` | 时间点、对应单位数 | 返回加法后的时间点 | 无 | 逐级换算到纳秒 |
+| `AClock_nsCvs(t)` / `AClock_msCvs(t)` 等 | 时长数值 | 返回对应 `timespec` 值包装 | 无 | 适合构造时长或绝对时间参数 |
+| `AClock_refresh(&c)` | `AClock*` | 把对象刷新为当前时间 | `AEXC_system_error` | `timespec_get` 失败时设置异常 |
+
+当前实现没有对极大数乘法和负数归一化做完整保护，调用方应避免传入会溢出或生成非法 `timespec` 的参数。
+
+#### 5.15.2 定时任务 API
+
+| API | 参数 | 返回值 / 效果 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `a_timer_addwork(cycle, num, call, data)` | 周期 ms、执行次数、回调、用户数据 | 返回任务 id；失败返回 `-1` | `AEXC_outdomain`、`AEXC_system_error` 等 | `cycle` 和 `num` 必须非 0 |
+| `a_timer_addwork_one(cycle, call, data)` | 周期 ms、回调、用户数据 | 注册一次性任务 | 同上 | 等价于 `num == 1` |
+| `a_timer_addwork_long(cycle, call, data)` | 周期 ms、回调、用户数据 | 注册长期任务 | 同上 | 持续执行直到被删除或进程退出 |
+| `a_timer_rmwork(id)` | 任务 id | 删除等待中或正在回调队列中的任务 | `AEXC_outdomain` 等 | 删除正在执行的任务时，实际重入会被抑制 |
+
+回调签名为：
+
+```c
+void callback(void *data);
+```
+
+定时器是进程内全局单例，通过构造函数自动启动、析构函数自动停止。用户通常只需要调用 `a_timer_addwork*` 和 `a_timer_rmwork`，不需要直接管理定时线程。
+
+#### 5.15.3 调度语义
+
+- 单位为毫秒，实际触发时间受系统调度、锁竞争和回调耗时影响，不适合硬实时场景。
+- 重复任务采用 fixed-delay 风格：每次回调执行后重新等待 `cycle`，回调耗时不会被扣除。
+- 定时器在调用用户回调时不持有内部锁，因此回调里可以继续添加或删除其他定时任务。
+- `a_timer_rmwork(id)` 可以删除等待队列中的任务；如果目标任务正处于本轮回调队列，会标记为删除，避免后续重新入队。
+- 回调中的异常槽会被定时器清理，不会直接传回注册线程；需要业务层自行记录错误状态。
+
+示例：
+
+```c
+static void on_timer(void *data) {
+    int *count = data;
+    ++*count;
+}
+
+int count = 0;
+int64_t id = a_timer_addwork(100, 3, on_timer, &count);
+if (id < 0 || aExcOccur()) {
+    /* 处理注册失败 */
+}
+```
+
+### 5.16 `athrd.h` — C11 线程兼容层
 
 `athrd.h` 的目标不是重新设计一套线程 API，而是给 ALib 及其使用者提供一个稳定的 C11 线程入口：
 
@@ -1008,7 +1071,7 @@ RAII(AShPtr(int)) moved = AShPtrCvs(int, sp);
 - 如果 `__STDC_NO_THREADS__` 生效，或标准库缺少 `<threads.h>`，则在 POSIX 上回退到 `pthread`，在 Windows 上回退到 Win32 线程原语；
 - 上层代码始终使用 `thrd_t` / `mtx_t` / `cnd_t` / `tss_t` 这些 C11 风格名字，不需要为平台分支改业务接口。
 
-#### 5.15.1 主要类型与常量
+#### 5.16.1 主要类型与常量
 
 | API | 类别 | 说明 |
 | --- | --- | --- |
@@ -1023,7 +1086,7 @@ RAII(AShPtr(int)) moved = AShPtrCvs(int, sp);
 | `mtx_plain` / `mtx_recursive` / `mtx_timed` | 锁类型标志 | 传给 `mtx_init` 的 bit flag |
 | `TSS_DTOR_ITERATIONS` | 宏常量 | fallback 实现固定为 `4`；若直接走系统 `<threads.h>`，则以系统定义为准 |
 
-#### 5.15.2 兼容策略与时间语义
+#### 5.16.2 兼容策略与时间语义
 
 - 需要线程原语时，优先包含 `<alib/athrd.h>`，而不是直接依赖系统 `<threads.h>`；这样能保持与 ALib 内部相同的兼容路径。
 - `thrd_sleep` 接收的是“相对时长” `duration`。
@@ -1031,7 +1094,7 @@ RAII(AShPtr(int)) moved = AShPtrCvs(int, sp);
 - 如果你准备调用定时锁接口，仍建议在 `mtx_init` 时显式带上 `mtx_timed`，这样与系统 `<threads.h>` 路径的源代码兼容性最好。
 - 若目标平台既没有系统 `<threads.h>`，又不属于当前 fallback 支持的 POSIX / Win32 范围，则会在编译期直接报错。
 
-#### 5.15.3 线程 API
+#### 5.16.3 线程 API
 
 | API | 参数 | 返回值 | 说明 |
 | --- | --- | --- | --- |
@@ -1044,7 +1107,7 @@ RAII(AShPtr(int)) moved = AShPtrCvs(int, sp);
 | `thrd_join(thrd_t thr, int* res)` | 线程句柄、可选结果输出 | `thrd_*` 状态码 | 阻塞到目标线程结束；若 `res != nullptr`，写回线程返回值 |
 | `thrd_yield(void)` | 无 | 无 | 主动让出当前时间片 |
 
-#### 5.15.4 互斥锁、条件变量与一次初始化
+#### 5.16.4 互斥锁、条件变量与一次初始化
 
 | API | 参数 | 返回值 | 说明 |
 | --- | --- | --- | --- |
@@ -1062,7 +1125,7 @@ RAII(AShPtr(int)) moved = AShPtrCvs(int, sp);
 | `cnd_timedwait(cnd_t* cond, mtx_t* mutex, const struct timespec* time_point)` | 条件变量对象、已持有的锁、绝对 UTC 截止时间 | `thrd_*` 状态码 | 超时返回 `thrd_timedout` |
 | `cnd_destroy(cnd_t* cond)` | 条件变量对象 | 无 | 销毁条件变量 |
 
-#### 5.15.5 线程特定存储（TSS）
+#### 5.16.5 线程特定存储（TSS）
 
 | API | 参数 | 返回值 | 说明 |
 | --- | --- | --- | --- |
@@ -1071,13 +1134,13 @@ RAII(AShPtr(int)) moved = AShPtrCvs(int, sp);
 | `tss_set(tss_t key, void* val)` | key、待保存值 | `thrd_*` 状态码 | 为当前线程写入局部值；传 `NULL` 等价于清空当前线程槽位 |
 | `tss_delete(tss_t key)` | key | 无 | 删除整个 TSS key；不同线程的关联值后续不应再访问 |
 
-#### 5.15.6 与 `alock.h` 的关系
+#### 5.16.6 与 `alock.h` 的关系
 
 - `athrd.h` 提供的是“原始线程原语”：线程创建、等待、条件变量、TLS、一次初始化。
 - `alock.h` 则建立在 `athrd.h` 的 `mtx_t` / `cnd_t` 之上，把常见加锁模式封装成 ALib 风格对象和 `RAII(AAutoKey)`。
 - 如果你需要创建线程、等待条件或直接操作 `tss_t`，用 `athrd.h`；如果你只需要在业务代码里保护临界区，通常直接用 `AMtx` / `ARecursion` / `AMtxRW` 更省心。
 
-### 5.16 `alock.h` — 锁与自动解锁
+### 5.17 `alock.h` — 锁与自动解锁
 
 `alock.h` 建立在 `athrd.h` 暴露的 `mtx_t` / `cnd_t` 之上，提供：
 
@@ -1088,7 +1151,7 @@ RAII(AShPtr(int)) moved = AShPtrCvs(int, sp);
 - `ASemaphore`：基于 `AMtxCnd` 的计数信号量
 - `AAutoKey`：自动解锁 token
 
-#### 5.16.1 类型总览
+#### 5.17.1 类型总览
 
 | API | 类别 | 说明 |
 | --- | --- | --- |
@@ -1100,7 +1163,7 @@ RAII(AShPtr(int)) moved = AShPtrCvs(int, sp);
 | `AMtxCnd` | 类 | 在 `AMtx` 上追加一个 `cnd_t`，适合“谓词 + 等待队列”场景 |
 | `ASemaphore` | 类 | 基于 `AMtxCnd` 的容量限制器；`count` 为当前占用数，`max` 为上限 |
 
-#### 5.16.2 `AAutoKey`
+#### 5.17.2 `AAutoKey`
 
 `AAutoKey` 常见用法：
 
@@ -1116,7 +1179,7 @@ if (aExcOccur()) {
 - `AAutoKey` 析构时，如果内部 `lock` 和 `unlock` 都非空，就自动解锁。
 - `A_COPY(AAutoKey, key)` 会得到一个“空 token”，不会复制解锁责任；因此它天然近似不可复制。
 
-#### 5.16.3 公共函数
+#### 5.17.3 公共函数
 
 | API | 参数 | 返回值 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -1133,7 +1196,7 @@ if (aExcOccur()) {
 | `ASemaphore_lock(ASemaphore* self)` | 信号量指针 | `AAutoKey` | `AEXC_nullptr`、`AEXC_system_error` | 当 `count < max` 时占用一个名额；token 析构时归还名额 |
 | `ASemaphore_setMax(ASemaphore* self, uint32_t max)` | 信号量指针、上限 | 无 | `AEXC_nullptr`、`AEXC_system_error` | 线程安全地更新并发上限；调大后如出现空位会唤醒等待者 |
 
-#### 5.16.4 `AMtxCnd`
+#### 5.17.4 `AMtxCnd`
 
 `AMtxCnd` 把一把普通互斥锁和一个条件变量打包成一个类对象，适合把“共享状态 + 谓词等待”放进统一的 ALib 生命周期里。
 
@@ -1165,7 +1228,7 @@ while (!state.ready) {
 - `AMtxCnd_awake()` / `AMtxCnd_awake_all()` 只负责唤醒等待者，不会自动修改共享谓词；通常应先在持锁状态下更新谓词，再发出唤醒。
 - `AMtxCnd_awake()`、`AMtxCnd_awake_all()`、`AMtxCnd_wait()` 都对 `nullptr` 做显式保护，失败时写入 `AEXC_nullptr`。
 
-#### 5.16.5 `ASemaphore`
+#### 5.17.5 `ASemaphore`
 
 `ASemaphore` 建立在 `AMtxCnd` 之上，可以把它看成“用 `AAutoKey` 归还名额”的计数信号量：
 
@@ -1198,14 +1261,14 @@ if (aExcOccur()) {
 - `ASemaphore_setMax()` 可以在其他线程正在持有或等待该信号量时调用；如果把上限调大，并且更新后满足 `count < max`，当前实现会广播唤醒全部等待线程，让它们重新竞争名额。
 - 如果把上限调小到小于当前 `count`，已拿到名额的线程不会被强制驱逐；后续新调用 `ASemaphore_lock()` 的线程会继续等待，直到已有持有者释放到 `count < max` 为止。
 
-#### 5.16.6 初始化 / 拷贝 / 析构语义
+#### 5.17.6 初始化 / 拷贝 / 析构语义
 
 - `A_INIT(AMtx)` / `A_INIT(ARecursion)` / `A_INIT(AMtxRW)` / `A_INIT(AMtxCnd)` / `A_INIT(ASemaphore)` 会创建一个新的未持有锁实例。
 - `A_COPY(AMtx)` / `A_COPY(ARecursion)` / `A_COPY(AMtxRW)` / `A_COPY(AMtxCnd)` **不会复制锁状态**，而是创建一把新的、未加锁的同类锁。
 - `A_COPY(ASemaphore)` 同样不会复制等待队列或占用状态；新对象的 `count`、`max` 都会重置为 `0`，需要重新调用 `ASemaphore_setMax()`。
 - 锁对象析构时会销毁底层系统锁 / 条件变量；`AMtxCnd` 与 `AMtxRW` 还会在内部记录条件变量是否初始化成功，以保证初始化中途失败后析构仍然安全。
 
-#### 5.16.7 使用建议
+#### 5.17.7 使用建议
 
 - 优先使用 `RAII(AAutoKey)` 管理解锁，不要手工模拟“多 return 点解锁”。
 - 不要复制 `AAutoKey` 并试图让多个 token 共同管理一次加锁；复制后的 token 是空对象。
@@ -1213,7 +1276,7 @@ if (aExcOccur()) {
 - `ASemaphore` 的 `max == 0` 更接近“关闭闸门”而不是“无限并发”；忘记先设上限会让后续 `ASemaphore_lock()` 一直等待。
 - `AMtxRW` 对写者更友好：只要有写者等待，新读者就会阻塞，避免写者饥饿。
 
-### 5.17 `asignal.h` — 信号系统与接收者基类
+### 5.18 `asignal.h` — 信号系统与接收者基类
 
 `asignal.h` 提供进程内同步派发信号系统。它支持：
 
@@ -1223,7 +1286,7 @@ if (aExcOccur()) {
 - 收集回调执行时抛出的异常
 - 让接收者在析构时自动断连
 
-#### 5.17.1 主要类型
+#### 5.18.1 主要类型
 
 | API | 类别 | 说明 |
 | --- | --- | --- |
@@ -1238,7 +1301,7 @@ if (aExcOccur()) {
 - `addressee`：发生异常的接收者地址（`const void*`）
 - `exc_value`：该回调设置的异常码
 
-#### 5.17.2 `ASignal`
+#### 5.18.2 `ASignal`
 
 `ASignal` 是所有自定义信号的基类。字段：
 
@@ -1260,7 +1323,7 @@ AClass_Generate(MySignal);
 A_CLASS_REGISTER(MySignal);
 ```
 
-#### 5.17.3 `AExcCollector`
+#### 5.18.3 `AExcCollector`
 
 `AExcCollector` 用于把回调执行过程中的异常收集起来，而不是只留下最终的 `AEXC_response_exc`。
 
@@ -1278,7 +1341,7 @@ A_CLASS_REGISTER(MySignal);
 - `id`：本次 `a_signal_transmit` 正在派发的信号 id
 - `exc`：收集器自身的异常标志；如果收集过程中连异常列表都无法追加（例如分配失败），该标志会被置位，派发过程也会中止继续收集
 
-#### 5.17.4 信号系统公共 API
+#### 5.18.4 信号系统公共 API
 
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -1291,7 +1354,7 @@ A_CLASS_REGISTER(MySignal);
 | `a_signal_disconnect_all(Aint id)` | 信号 id | 删除该信号 id 的全部连接 | `AEXC_outdomain` | 若该 id 当前没有连接，通常静默返回 |
 | `a_target_disconnect_all(const void* addressee)` | 接收者地址 | 删除该接收者的全部连接 | `AEXC_outdomain` | 在回调执行期间调用同样会延迟到本轮派发结束后执行 |
 
-#### 5.17.5 `a_signal_transmit` 宏的变参规则
+#### 5.18.5 `a_signal_transmit` 宏的变参规则
 
 宏定义等价于：
 
@@ -1307,7 +1370,7 @@ a_signal_transmit(signal, &collector);
 - `signal` 必须是指向 `ASignal` 或其子类对象的指针；
 - 这些约束由宏内的静态断言和类型断言在编译期检查。
 
-#### 5.17.6 运行时语义
+#### 5.18.6 运行时语义
 
 - 发送信号是同步行为：所有当前连接的回调都在调用线程内执行。
 - 派发开始前，系统会拷贝当前信号 id 对应的连接快照；因此“回调里新增的连接”不会参与当前这一轮派发，只会影响后续派发。
@@ -1319,7 +1382,7 @@ a_signal_transmit(signal, &collector);
 - 向一个”已分配但当前无人连接”的合法 `id` 发送信号，会报 `AEXC_outdomain`。
 - 向一个”从未分配过或超出当前范围”的 `id` 发送信号，同样会报 `AEXC_outdomain`。
 
-#### 5.17.7 `AReceEnd`
+#### 5.18.7 `AReceEnd`
 
 `AReceEnd` 是接收者辅助基类，适合“对象析构时自动断开全部连接”的场景。
 
@@ -1336,7 +1399,7 @@ a_signal_transmit(signal, &collector);
 - `AReceEnd` 的析构函数会调用 `a_target_disconnect_all(self)`；
 - 因此只要你的接收者对象继承 `AReceEnd`，一般不需要手工在所有正常析构路径里逐条断连。
 
-#### 5.17.8 使用约束（非常重要）
+#### 5.18.8 使用约束（非常重要）
 
 当前实现要求：
 
@@ -1355,6 +1418,7 @@ a_signal_transmit(signal, &collector);
 - `sample/sample_aline.c`：容器生成、遍历与值语义
 - `sample/sample_alock.c`：`AAutoKey`、`AMtxCnd`、`ASemaphore` 与锁的 RAII 使用
 - `sample/sample_asignal.c`：信号连接、派发与异常收集
+- `sample/sample_atimer.c`：一次性任务、有限次数周期任务与 `AClock` 时间差
 
 回归测试：
 
@@ -1362,6 +1426,7 @@ a_signal_transmit(signal, &collector);
 - `test/test_map_api.c`：映射容器共性 API
 - `test/test_alock.c`：`AMtxCnd` 唤醒、`ASemaphore` 并发上限与动态扩容
 - `test/test_athrd.c`：线程兼容层、定时锁、条件变量、TSS 与 `call_once`
+- `test/test_atimer.c`：一次性任务、重复次数、中途新增任务和删除长期任务
 - `test/test_asignal.c`：信号系统、重入发送、异常收集
 - `test/test_aptr.c`：`APtr` / `AShPtr` 语义
 - 其余 `test/test_*.c`：各模块单独行为测试

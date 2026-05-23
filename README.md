@@ -51,6 +51,7 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib�
 - `astring.h`：字符串对象
 - `atext.h`：UTF-8 文本对象与 UTF-16/UTF-32/GBK 转换
 - `aptr.h`：独占指针包装和共享指针包装
+- `atimer.h`：`AClock` 时间点辅助和全局毫秒级定时任务调度
 - `asignal.h`：进程内信号连接/派发系统
 - `athrd.h`：兼容 C11 `<threads.h>` 的线程原语入口；优先复用系统实现，缺失时回退到 POSIX/Win32
 - `alock.h`：基于 `athrd.h` 的互斥锁、递归锁、读写锁、条件变量锁、信号量及自动解锁辅助对象
