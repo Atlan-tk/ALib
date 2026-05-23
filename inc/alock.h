@@ -13,6 +13,7 @@ extern "C" {
 #include "alib.h"
 #include "athrd.h"
 #include "aclass.h"
+#include "atimer.h"
 
 
 
@@ -204,6 +205,20 @@ static inline void AMtxCnd_wait(AMtxCnd* self){
     }
     if(cnd_wait(&self->cnd, &((ALock*)self)->mtx) != thrd_success){
         aExcSet(AEXC_system_error);
+    }
+}
+static inline void AMtxCnd_timewait(AMtxCnd* self, AClock clock){
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    auto ret = cnd_timedwait(&self->cnd, &((ALock*)self)->mtx, &clock.clock);
+    if(ret == thrd_timedout){
+        aExcSet(AEXC_timedout);
+    }else{
+        if(ret != thrd_success){
+            aExcSet(AEXC_system_error);
+        }
     }
 }
 

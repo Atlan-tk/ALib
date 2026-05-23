@@ -215,6 +215,8 @@ typedef enum{
     AEXC_system_error = -10,        //系统错误
     AEXC_response_exc = -11,        //信号响应异常
     AEXC_matching_failed = -12,     //常用于信号匹配失败
+    AEXC_timedout = -13,            //超时
+    AEXC_thrd_err = -14,            //线程错误返回
 }AEXC_t;
 extern thread_local int __A_EXC_VALUE__;
 static inline void aExcClean() { __A_EXC_VALUE__ = 0; }
