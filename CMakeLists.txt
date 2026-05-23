@@ -31,6 +31,12 @@ endif()
 
 project(ALib LANGUAGES C)
 
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang|IntelLLVM")
+    string(REPLACE "-O3" "-O0" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}" CACHE STRING
+        "Flags used by the C compiler during Release builds." FORCE)
+endif()
+
 if(ALIB_TOP_LEVEL_PROJECT AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     if(WIN32)
         set(CMAKE_INSTALL_PREFIX "C:/Program Files (x86)/alib" CACHE PATH "Install path prefix." FORCE)
@@ -73,7 +79,7 @@ set(ALIB_REQUIRED_C_STANDARD_FLAG "")
 if(ALIB_MSVC_LIKE)
     set(ALIB_REQUIRED_C_STANDARD_FLAG "/std:c11")
 elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang|IntelLLVM")
-    set(ALIB_REQUIRED_C_STANDARD_FLAG "-std=gnu11")
+    set(ALIB_REQUIRED_C_STANDARD_FLAG "-std=c11")
 endif()
 
 cmake_push_check_state(RESET)
@@ -188,6 +194,35 @@ function(alib_apply_platform target)
 endfunction()
 
 find_package(Threads REQUIRED)
+
+set(ALIB_PUBLIC_COMPILE_DEFINITIONS "")
+set(ALIB_PUBLIC_LINK_LIBRARIES Threads::Threads)
+
+if(MINGW)
+    cmake_push_check_state(RESET)
+    set(CMAKE_REQUIRED_DEFINITIONS "-D_UCRT")
+    set(CMAKE_REQUIRED_LIBRARIES ucrtbase)
+    check_c_source_compiles([=[
+        #include <time.h>
+
+        int main(void) {
+            struct timespec now;
+            return timespec_get(&now, TIME_UTC) == TIME_UTC ? 0 : 1;
+        }
+    ]=] ALIB_MINGW_UCRT_HAS_TIMESPEC_GET)
+    cmake_pop_check_state()
+
+    if(NOT ALIB_MINGW_UCRT_HAS_TIMESPEC_GET)
+        message(FATAL_ERROR
+            "ALib MinGW builds require a UCRT-compatible runtime that provides "
+            "timespec_get/TIME_UTC. Install a MinGW-w64 UCRT toolchain or provide "
+            "ucrtbase."
+        )
+    endif()
+
+    list(APPEND ALIB_PUBLIC_COMPILE_DEFINITIONS _UCRT)
+    list(APPEND ALIB_PUBLIC_LINK_LIBRARIES ucrtbase)
+endif()
 
 add_subdirectory(cmake/lib "${ALIB_OBJECT_ROOT}/lib")
 add_library(ALib::atlan ALIAS atlan)

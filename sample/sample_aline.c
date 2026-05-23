@@ -15,22 +15,22 @@ typedef struct{
     char* s;
 }My_struct;
 
-__unused static inline void A_OBJ_INIT(My_struct)(My_struct* self){
+__unused __weak void A_OBJ_INIT(My_struct)(My_struct* self){
     printf("hello, alib\n");
     self->s = "alib sample with type system";
 }
 
-__unused static inline void A_OBJ_COPY(My_struct)(My_struct* self, const My_struct* that){
+__unused __weak void A_OBJ_COPY(My_struct)(My_struct* self, const My_struct* that){
     printf("hello, alib\n");
     self->s = that->s;
 }
 
-__unused static inline void A_OBJ_DEST(My_struct)(My_struct* self){
+__unused __weak void A_OBJ_DEST(My_struct)(My_struct* self){
     self->s = nullptr;
     printf("bay, alib\n");
 }
 
-__unused static inline int A_OBJ_CMPD(My_struct)(const My_struct* self, const My_struct* that){
+__unused __weak int A_OBJ_CMPD(My_struct)(const My_struct* self, const My_struct* that){
     return strcmp(self->s, that->s);
 }
 

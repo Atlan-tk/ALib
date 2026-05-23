@@ -58,7 +58,7 @@ extern "C" {
 
 #ifndef __weak
     #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
-        #define __weak [[weak]]
+        #define __weak [[gnu::weak]]
     #else
         #define __weak __attribute__((weak))
     #endif
@@ -66,7 +66,7 @@ extern "C" {
 
 #ifndef __weakref
     #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
-        #define __weakref(symbol) [[weakref(__A_Str(symbol))]]
+        #define __weakref(symbol) [[gnu::weakref(__A_Str(symbol))]]
     #else
         #define __weakref(symbol) __attribute__((weakref(__A_Str(symbol))))
     #endif
@@ -74,7 +74,7 @@ extern "C" {
 
 #ifndef __unused
     #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
-        #define __unused [[unused]]
+        #define __unused [[gnu::unused]]
     #else
         #define __unused __attribute__((unused))
     #endif
@@ -82,7 +82,7 @@ extern "C" {
 
 #ifndef __cleanup
     #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
-        #define __cleanup(func) [[cleanup(func)]]
+        #define __cleanup(func) [[gnu::cleanup(func)]]
     #else
         #define __cleanup(func) __attribute__((cleanup(func)))
     #endif
@@ -135,37 +135,15 @@ extern "C" {
 
 
 /* alloc and free */
-#if defined(__C_POSIX__)
-    __unused void  alib_free(void* p);
-    __unused void* alib_alloc(uint32_t size);
-    __unused void* alib_realloc(void* p, uint32_t size);
+__unused __weak void  alib_free(void* p);
+__unused __weak void* alib_alloc(uint32_t size);
+__unused __weak void* alib_realloc(void* p, uint32_t size);
 
-    __unused void* alib_new(uint32_t size, void(*init_func)(void*));
-    __unused void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
-    __unused void  alib_delete(void* p, void(*dest_func)(void*));
-#elif defined(__C_WINDOWS__) || defined(_WIN32)
-    typedef void  (*alib_free_func_t)(void* p);
-    typedef void* (*alib_alloc_func_t)(uint32_t size);
-    typedef void* (*alib_realloc_func_t)(void* p, uint32_t size);
-    typedef void* (*alib_new_func_t)(uint32_t size, void(*init_func)(void*));
-    typedef void* (*alib_cpnew_func_t)(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
-    typedef void  (*alib_delete_func_t)(void* p, void(*dest_func)(void*));
+__unused __weak void* alib_new(uint32_t size, void(*init_func)(void*));
+__unused __weak void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
+__unused __weak void  alib_delete(void* p, void(*dest_func)(void*));
 
-    extern alib_free_func_t alib_free;
-    extern alib_alloc_func_t alib_alloc;
-    extern alib_realloc_func_t alib_realloc;
-    extern alib_new_func_t alib_new;
-    extern alib_cpnew_func_t alib_cpnew;
-    extern alib_delete_func_t alib_delete;
-#else
-    __unused void  alib_free(void* p);
-    __unused void* alib_alloc(uint32_t size);
-    __unused void* alib_realloc(void* p, uint32_t size);
 
-    __unused void* alib_new(uint32_t size, void(*init_func)(void*));
-    __unused void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
-    __unused void  alib_delete(void* p, void(*dest_func)(void*));
-#endif
 
 typedef void*               cptr_t;
 typedef char*               cstr_t;
@@ -263,17 +241,11 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
 #define A_TYPE_REGISTER(T)                                                                                  \
     enum{ __A_IS_CLASS(T) = 0 };                                                                            \
                                                                                                             \
-    void A_OBJ_DEST(T)(T* self);                                                                            \
-    void A_OBJ_INIT(T)(T* self);                                                                            \
-    void A_OBJ_COPY(T)(T* self, const T* that);                                                             \
-    int  A_OBJ_CMPD(T)(const T* self, const T* that);                                                       \
-    uint32_t  A_OBJ_HASH(T)(const T* self);                                                                 \
-                                                                                                            \
-    static void __A_OBJ_DEST(T)(T* self) __weakref(A_OBJ_DEST(T));                                          \
-    static void __A_OBJ_INIT(T)(T* self) __weakref(A_OBJ_INIT(T));                                          \
-    static void __A_OBJ_COPY(T)(T* self, const T* that) __weakref(A_OBJ_COPY(T));                           \
-    static int  __A_OBJ_CMPD(T)(const T* self, const T* that) __weakref(A_OBJ_CMPD(T));                     \
-    __unused static uint32_t __A_OBJ_HASH(T)(const T* self) __weakref(A_OBJ_HASH(T));                       \
+    __weak void A_OBJ_DEST(T)(T* self);                                                                     \
+    __weak void A_OBJ_INIT(T)(T* self);                                                                     \
+    __weak void A_OBJ_COPY(T)(T* self, const T* that);                                                      \
+    __weak int  A_OBJ_CMPD(T)(const T* self, const T* that);                                                \
+    __weak uint32_t A_OBJ_HASH(T)(const T*);                                                                \
                                                                                                             \
     __unused static inline void __A_OBJ_DEST_FUNC_SELF(T)(T* self){                                         \
         /* 空对象不析构 */                                                                                  \
@@ -282,21 +254,21 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
         T null_obj; memset(&null_obj, 0, sizeof(T));                                                        \
         if(memcmp(self, &null_obj, sizeof(T)) == 0){ return; }                                              \
                                                                                                             \
-        if(__A_OBJ_DEST(T) != nullptr) __A_OBJ_DEST(T)(self);                                               \
+        if(A_OBJ_DEST(T) != nullptr) A_OBJ_DEST(T)(self);                                                   \
         memset(self, 0, sizeof(T));                                                                         \
     }                                                                                                       \
     __unused static inline void __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                         \
         aExcClean();                                                                                        \
         if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
-        memset(self, 0, sizeof(T)); if(__A_OBJ_INIT(T) != nullptr) __A_OBJ_INIT(T)(self);                   \
+        memset(self, 0, sizeof(T)); if(A_OBJ_INIT(T) != nullptr) A_OBJ_INIT(T)(self);                       \
         if(aExcOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
     }                                                                                                       \
     __unused static inline void __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){                          \
         aExcClean();                                                                                        \
         if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
         if(__a_unlikely(that == nullptr)) { __A_OBJ_INIT_FUNC_SELF(T)(self); return; }                      \
-        memset(self, 0, sizeof(T)); if(__A_OBJ_COPY(T) != nullptr){                                         \
-            __A_OBJ_COPY(T)(self, that);                                                                    \
+        memset(self, 0, sizeof(T)); if(A_OBJ_COPY(T) != nullptr){                                           \
+            A_OBJ_COPY(T)(self, that);                                                                      \
         }else{                                                                                              \
             memcpy(self, that, sizeof(T));                                                                  \
         }                                                                                                   \
@@ -305,7 +277,7 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
     __unused static inline int __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){                     \
         if(self == that || (self == nullptr && that == nullptr)) return 0;                                  \
         if(self == nullptr){ return 1; } if(that == nullptr){ return -1; }                                  \
-        return __A_OBJ_CMPD(T) != nullptr ? __A_OBJ_CMPD(T)(self,that) : __A_OBJ_CMPD_AUTO(T,self,that);    \
+        return A_OBJ_CMPD(T) != nullptr ? A_OBJ_CMPD(T)(self,that) : __A_OBJ_CMPD_AUTO(T,self,that);        \
     }                                                                                                       \
 
 
@@ -322,13 +294,6 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
 #define A_OBJ_CMPD(T) __A_Splice(T, _cmpd)
 #define A_OBJ_HASH(T) __A_Splice(T, _hash)
 #define A_SET_VTAB(T) __A_Splice(T, _vftab)
-
-#define __A_OBJ_INIT(T) __A_Splice(____A_OBJ_INIT_$__, T)
-#define __A_OBJ_DEST(T) __A_Splice(____A_OBJ_DEST_$__, T)
-#define __A_OBJ_COPY(T) __A_Splice(____A_OBJ_COPY_$__, T)
-#define __A_OBJ_CMPD(T) __A_Splice(____A_OBJ_CMPD_$__, T)
-#define __A_OBJ_HASH(T) __A_Splice(____A_OBJ_HASH_$__, T)
-#define __A_SET_VTAB(T) __A_Splice(____A_SET_VTAB_$__, T)
 
 #define __A_OBJ_CMPD_X(T, self, that) ({                                            \
     const T* __a_p0 = (const void*)self;                                            \
@@ -427,7 +392,7 @@ __unused static inline void __A_OBJ_DEST_FUNC_SELF(void)(__unused void* self){}
 __unused static inline void __A_OBJ_INIT_FUNC_SELF(void)(__unused void* self){}
 __unused static inline void __A_OBJ_COPY_FUNC_SELF(void)(__unused void* self, __unused const void* that){}
 __unused static inline int  __A_OBJ_CMPD_FUNC_SELF(void)(__unused const void* self, __unused const void* that){ return 0; }
-__unused static inline uint32_t __A_OBJ_HASH(void)(__unused const void* self){ return 0; };
+__unused static inline uint32_t A_OBJ_HASH(void)(__unused const void* self){ return 0; };
 
 //int
 #define __A_PRIMITIVE_TYPE_REGISTER(T)                                                  \
@@ -448,7 +413,8 @@ __unused static inline uint32_t __A_OBJ_HASH(void)(__unused const void* self){ r
         if(self == nullptr){ return 1; } if(that == nullptr){ return -1; }              \
         return __A_OBJ_CMPD_AUTO(T,self,that);                                          \
     }                                                                                   \
-    __unused static uint32_t (*const __A_OBJ_HASH(T))(const T* self) = nullptr;         \
+    __unused __weak uint32_t A_OBJ_HASH(T)(const T*);                                   \
+
 
 __A_PRIMITIVE_TYPE_REGISTER(int);
 __A_PRIMITIVE_TYPE_REGISTER(bool);
@@ -512,7 +478,7 @@ __unused static inline int  __A_OBJ_CMPD_FUNC_SELF(Atlan)(const Atlan* self, con
     return 0;
 }
 
-__unused static uint32_t (*const __A_OBJ_HASH(Atlan))(const Atlan* self) = nullptr;
+__unused static inline uint32_t A_OBJ_HASH(Atlan)(__unused const Atlan* self){ return 0; }
 
 static const A_FUNC(Atlan) A_FUNC_TAB(Atlan) = { .flag = true, (void*)__A_OBJ_DEST_FUNC_SELF(Atlan) };
 

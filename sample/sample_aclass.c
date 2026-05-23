@@ -41,25 +41,25 @@ AClass_Generate(My_class, My_class_print);
 //为My_class提供基础函数
 //需要提供四个基础函数用于构造、拷贝构造、析构、比较
 //这些函数是可选的，若没有定义，则会使用默认的处理方式
-__unused static inline void A_OBJ_INIT(My_class)(My_class* self){
+__unused __weak void A_OBJ_INIT(My_class)(My_class* self){
     //构造函数中无需检查self是否为null
     printf("hello, alib\n");
     self->s = "alib sample with type system";
 }
 
-__unused static inline void A_OBJ_COPY(My_class)(My_class* self, const My_class* that){
+__unused __weak void A_OBJ_COPY(My_class)(My_class* self, const My_class* that){
     printf("hello, alib\n");
     self->s = that->s;
 }
 
-__unused static inline void A_OBJ_DEST(My_class)(My_class* self){
+__unused __weak void A_OBJ_DEST(My_class)(My_class* self){
     self->s = nullptr;
     printf("bay, alib\n");
 
     //析构函数不允许发生异常
 }
 
-__unused static inline int A_OBJ_CMPD(My_class)(const My_class* self, const My_class* that){
+__unused __weak int A_OBJ_CMPD(My_class)(const My_class* self, const My_class* that){
     return strcmp(self->s, that->s);
 }
 
@@ -90,19 +90,19 @@ static inline void My_class_sub_print(const My_class_sub* _self){
 }
 
 //覆盖父类函数
-__unused static inline void A_SET_VTAB(My_class_sub)(My_class_sub* self){
+__unused __weak void A_SET_VTAB(My_class_sub)(My_class_sub* self){
     A_COVER_FUNC(self, My_class, print, My_class_sub_print);
 }
 
-__unused static inline void A_OBJ_INIT(My_class_sub)(__unused My_class_sub* self){
+__unused __weak void A_OBJ_INIT(My_class_sub)(__unused My_class_sub* self){
     printf("hello, alib, sub class\n");
 }
 
-__unused static inline void A_OBJ_COPY(My_class_sub)(__unused My_class_sub* self, __unused const My_class_sub* that){
+__unused __weak void A_OBJ_COPY(My_class_sub)(__unused My_class_sub* self, __unused const My_class_sub* that){
     printf("hello, alib, sub class\n");
 }
 
-__unused static inline void A_OBJ_DEST(My_class_sub)(__unused My_class_sub* self){
+__unused __weak void A_OBJ_DEST(My_class_sub)(__unused My_class_sub* self){
     printf("bay, alib, sub class\n");
 }
 

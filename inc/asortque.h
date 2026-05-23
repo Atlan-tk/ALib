@@ -200,16 +200,16 @@ extern "C" {
         it->p--, it->i--;                                                               \
     }                                                                                   \
                                                                                         \
-    __unused static void A_OBJ_DEST(ASortque(T))(ASortque(T)* self){                    \
+    __unused __weak void A_OBJ_DEST(ASortque(T))(ASortque(T)* self){                    \
         for(uint32_t i = 0; i < self->arr.num; i++){                                    \
             A_DEST(T, self->p[i]);                                                      \
         }                                                                               \
         __Aarr_dest(&self->arr);                                                        \
     }                                                                                   \
-    __unused static void A_OBJ_INIT(ASortque(T))(ASortque(T)* self){                    \
+    __unused __weak void A_OBJ_INIT(ASortque(T))(ASortque(T)* self){                    \
         self->arr.size = sizeof(T); self->f = &A_FUNC_TAB(ASortque(T));                 \
     }                                                                                   \
-    __unused static void A_OBJ_COPY(ASortque(T))(ASortque(T)* self, const ASortque(T)* that){    \
+    __unused __weak void A_OBJ_COPY(ASortque(T))(ASortque(T)* self, const ASortque(T)* that){    \
         self->f = that->f;                                                              \
         int ret = __Aarr_copy(&self->arr, &that->arr);                                  \
         self->p = __Aarr_get_strat(&self->arr);                                         \
@@ -219,7 +219,7 @@ extern "C" {
             self->arr.num++;                                                            \
         }                                                                               \
     }                                                                                   \
-    __unused static int  A_OBJ_CMPD(ASortque(T))(const ASortque(T)* self,const ASortque(T)*that){\
+    __unused __weak int  A_OBJ_CMPD(ASortque(T))(const ASortque(T)* self,const ASortque(T)*that){\
         int ret = 0;                                                                    \
         uint32_t num = self->arr.num <= that->arr.num ? self->arr.num : that->arr.num;  \
         for(uint32_t i = 0; i < num && ret == 0; i++){                                  \

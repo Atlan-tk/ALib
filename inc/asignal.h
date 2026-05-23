@@ -15,10 +15,10 @@ extern "C" {
 #include "aclass.h"
 
 typedef int64_t Aint;
-__unused static inline void A_OBJ_INIT(Aint)(Aint* self){ *self = 0; }
-__unused static inline void A_OBJ_DEST(Aint)(Aint* self){ *self = 0; }
-__unused static inline void A_OBJ_COPY(Aint)(Aint* self, const Aint* that){ *self = *that; }
-__unused static inline int  A_OBJ_CMPD(Aint)(const Aint* self, const Aint* that){ return *self==*that ? 0:(*self>*that? 1 : -1); }
+__unused __weak void A_OBJ_INIT(Aint)(Aint* self){ *self = 0; }
+__unused __weak void A_OBJ_DEST(Aint)(Aint* self){ *self = 0; }
+__unused __weak void A_OBJ_COPY(Aint)(Aint* self, const Aint* that){ *self = *that; }
+__unused __weak int  A_OBJ_CMPD(Aint)(const Aint* self, const Aint* that){ return *self==*that ? 0:(*self>*that? 1 : -1); }
 A_TYPE_REGISTER(Aint);
 
 
@@ -35,7 +35,7 @@ AClass_Struct(ASignal,
 );
 AClass_Function(ASignal);
 AClass_Generate(ASignal);
-__unused static inline int A_OBJ_CMPD(ASignal)(const ASignal* self, const ASignal* that){
+__unused __weak int A_OBJ_CMPD(ASignal)(const ASignal* self, const ASignal* that){
     int ret = A_CMPD(Aint, self->id, that->id);
     if(ret == 0) ret = A_CMPD(Aint, self->value, that->value);
     if(ret == 0) ret = A_CMPD(cptr_t, (void*)self->sender, (void*)that->sender);
@@ -77,17 +77,17 @@ AClass_Generate(AExcCollector,
     AExcCollector_empty,
     AExcCollector_getNumber,
 );
-__unused static inline void A_OBJ_INIT(AExcCollector)(AExcCollector* self){
+__unused __weak void A_OBJ_INIT(AExcCollector)(AExcCollector* self){
     self->list = A_INIT(ALine(AExcEnd));
 }
-__unused static inline void A_OBJ_DEST(AExcCollector)(AExcCollector* self){
+__unused __weak void A_OBJ_DEST(AExcCollector)(AExcCollector* self){
     A_DEST(ALine(AExcEnd), self->list);
 }
-__unused static inline void A_OBJ_COPY(AExcCollector)(AExcCollector* self, const AExcCollector* that){
+__unused __weak void A_OBJ_COPY(AExcCollector)(AExcCollector* self, const AExcCollector* that){
     *self = *that;
     self->list = A_COPY(ALine(AExcEnd), that->list);
 }
-__unused static inline int  A_OBJ_CMPD(AExcCollector)(const AExcCollector* self, const AExcCollector* that){
+__unused __weak int  A_OBJ_CMPD(AExcCollector)(const AExcCollector* self, const AExcCollector* that){
     int ret = A_CMPD(Aint, self->id, that->id);
     if(ret == 0) ret = A_CMPD(int, (int)self->exc, (int)that->exc);
     if(ret == 0) ret = A_CMPD(ALine(AExcEnd), self->list, that->list);
@@ -181,7 +181,7 @@ __unused static inline void AReceEnd_disconnect(const AReceEnd* self, Aint id){
 }
 AClass_Generate(AReceEnd, AReceEnd_connection, AReceEnd_disconnect);
 
-__unused static inline void A_OBJ_DEST(AReceEnd)(AReceEnd* self){
+__unused __weak void A_OBJ_DEST(AReceEnd)(AReceEnd* self){
     a_target_disconnect_all(self);
 }
 A_CLASS_REGISTER(AReceEnd);

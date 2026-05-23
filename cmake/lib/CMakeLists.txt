@@ -22,21 +22,7 @@ target_include_directories(atlan
         $<BUILD_INTERFACE:${ALIB_BUILD_INCLUDE_ROOT}>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_link_libraries(atlan PUBLIC Threads::Threads)
+target_compile_definitions(atlan PUBLIC ${ALIB_PUBLIC_COMPILE_DEFINITIONS})
+target_link_libraries(atlan PUBLIC ${ALIB_PUBLIC_LINK_LIBRARIES})
 alib_apply_defaults(atlan)
 alib_apply_platform(atlan)
-
-if(WIN32 OR CYGWIN)
-    set(ALIB_WINDOWS_UNSUPPORTED_SCRIPT
-        "${PROJECT_BINARY_DIR}/cmake/alib_windows_unsupported.cmake"
-    )
-    file(GENERATE OUTPUT "${ALIB_WINDOWS_UNSUPPORTED_SCRIPT}" CONTENT
-        "message(FATAL_ERROR \"ALib currently does not support Windows environments; configuration is kept for compatibility, but compilation is intentionally blocked.\")\n"
-    )
-    add_custom_target(alib_windows_unsupported_build
-        COMMAND ${CMAKE_COMMAND} -P "${ALIB_WINDOWS_UNSUPPORTED_SCRIPT}"
-        COMMENT "Stopping unsupported Windows build"
-        VERBATIM
-    )
-    add_dependencies(atlan alib_windows_unsupported_build)
-endif()

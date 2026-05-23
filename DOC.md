@@ -2,7 +2,7 @@
 
 本文以 `inc/` 中的公共头文件为准，系统说明 ALib 当前提供的模块、类型、宏和函数，以及它们的参数、返回值、异常语义与使用约定。
 
-注意：当前版本暂不支持 Windows 环境。这里的“不支持”包括 Windows 本机构建、Cygwin 环境，以及从 Linux/Unix 主机交叉编译 Windows 目标；当前构建系统仍保留这些入口以兼容既有流程，但会在实际编译阶段直接报错终止。
+当前版本支持 Linux / Unix 本机构建，也支持在 Linux / WSL2 主机上通过 MinGW-w64 交叉编译 Windows x86_64 目标。Windows 本机构建入口仍保留，但推荐优先使用 Linux + MinGW-w64 的交叉编译路径。
 
 文档范围约定：
 
@@ -49,7 +49,8 @@ make
 
 - Linux：默认优先使用 `gcc`
 - 其他 Unix 目标：使用 CMake 选定的本地 C 编译器，或按需显式指定工具链
-- Windows / Cygwin：构建入口仍保留，但当前暂不支持，实际编译阶段会直接提示无法编译
+- Linux 主机交叉编译 Windows：使用 `mingw-w64`，推荐通过 `cmake/toolchains/mingw64.cmake` 进入
+- Windows / Cygwin 本机构建：构建入口仍保留，但建议优先使用 Linux + MinGW-w64 交叉编译路径
 - 其他非 Linux/Unix/Windows 目标平台：配置阶段直接提示无法编译
 - 不支持 C11 或 GNU 扩展（如 `__auto_type`、`typeof`、`cleanup`、`weakref`）的编译器：配置阶段直接提示无法编译
 
@@ -82,7 +83,31 @@ cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/linux-clang.cmake
 make
 ```
 
-当前版本如果通过 Windows 相关入口完成配置，库目标会在编译阶段直接报错，明确提示该环境暂不受支持。
+Linux / WSL2 主机交叉编译 Windows x86_64 目标时，推荐使用 `cmake/toolchains/mingw64.cmake`：
+
+```bash
+mkdir -p build-mingw64
+cd build-mingw64
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mingw64.cmake
+make
+```
+
+也可以直接指定交叉编译器和目标系统：
+
+```bash
+mkdir -p build-mingw64
+cd build-mingw64
+CC=x86_64-w64-mingw32-gcc cmake .. -DCMAKE_SYSTEM_NAME=Windows
+make
+```
+
+MinGW-w64 交叉编译的默认产物：
+
+- 静态库：`build-mingw64/lib/atlan.lib`
+- 示例程序：`build-mingw64/sample/*.exe`
+- 测试程序：`build-mingw64/test/*.exe`
+
+MinGW-w64 构建要求目标运行时提供 `timespec_get` / `TIME_UTC`，因此推荐使用 UCRT 兼容的 MinGW-w64 工具链。CMake 会检测该能力，并为 MinGW 目标公开定义 `_UCRT`、链接 `ucrtbase`。在 Linux / WSL2 中只能完成编译和链接验证；如果要直接执行生成的 Windows `.exe` 测试，需要额外安装 Wine，或者复制到 Windows 环境运行。
 
 ## 3. 先读这些通用约定
 
@@ -94,7 +119,7 @@ ALib 依赖：
 - GNU 扩展（`__auto_type`、`typeof`、`cleanup`、`weakref` 等）
 - C11 线程 / 时间接口；优先复用系统 `<threads.h>`，缺失时由 `athrd.h` 在 POSIX / Win32 上补齐
 
-因此推荐直接使用仓库内的 CMake 构建，并在仓库根目录下手动创建 `build/` 后进入该目录执行 `cmake ..` 和 `make`。默认安装前缀为 `/usr/local`。当前版本暂不支持 Windows / Cygwin 环境，也不支持从 Linux/Unix 主机交叉编译 Windows 目标；这些入口仍可完成配置，但会在编译阶段直接报错终止。如果目标平台不是 Linux/Unix/Windows，或者编译器缺少 C11 / GNU 扩展支持，CMake 会在配置阶段直接终止并提示无法编译。
+因此推荐直接使用仓库内的 CMake 构建，并在仓库根目录下手动创建 `build/` 后进入该目录执行 `cmake ..` 和 `make`。默认安装前缀为 `/usr/local`。如果需要 Windows 目标，推荐在 Linux / WSL2 主机上通过 MinGW-w64 交叉编译；如果目标平台不是 Linux/Unix/Windows，或者编译器缺少 C11 / GNU 扩展支持，CMake 会在配置阶段直接终止并提示无法编译。
 
 ### 3.2 类型协议：所有容器都依赖 `A_TYPE_REGISTER`
 
@@ -904,6 +929,7 @@ A_TYPE_REGISTER(APtr(T));
 | `APtrNew(T)` | 类型名 | 返回一个强拥有的 `APtr(T)` | `A_NEW(T)` 的异常 | 相当于为 `T` 执行默认构造并接管所有权 |
 | `APtrCPNew(T, obj)` | `obj: T` | 返回一个强拥有的 `APtr(T)` | `A_CPNEW(T,obj)` 的异常 | 为 `obj` 的堆副本创建拥有者 |
 | `A_COPY(APtr(T), ptr)` | `APtr(T)` 对象 | 返回一个新的 `APtr(T)` | 通常无 | 新对象仅保存同一个 `p`，但 `strong_flag == false` |
+| `APtrCvs(T, ptr)` | `APtr(T)` 左值 | 返回接管原内容的新 `APtr(T)`，并把原对象清零 | 无 | 用于显式转移包装对象本身；不会复制或析构 `*p` |
 | `A_DEST(APtr(T), ptr)` | `APtr(T)` 左值 | 可能析构并释放 `p` | 被释放对象的析构异常可能透出 | 只有 `strong_flag == true` 的那一份会释放对象 |
 
 ##### 使用警告
@@ -914,7 +940,18 @@ A_TYPE_REGISTER(APtr(T));
 - 新对象只是观察者；
 - 如果拥有者先析构，所有弱别名都会悬空。
 
-如果要转移所有权，请用 `A_MOVE` 或手工重置原对象，不要直接复制。
+如果要转移所有权，请使用 `APtrCvs(T, ptr)` 或 `A_MOVE`，不要直接复制。
+
+`APtrCvs(T, ptr)` 是“转换 / 转移”（convert/transfer-style）辅助宏：它按字节取走 `ptr` 当前保存的 `p`、`dest` 和 `strong_flag`，随后把 `ptr` 清零。返回的新对象继承原对象的拥有状态；如果原对象是强拥有者，新对象负责后续释放；如果原对象是弱别名，新对象仍只是弱别名。调用后不要再通过原 `ptr` 访问旧指针。
+
+示例：
+
+```c
+RAII(APtr(int)) owner = APtrCPNew(int, 7);
+RAII(APtr(int)) moved = APtrCvs(int, owner);
+
+/* owner 已被清零，不再拥有对象；moved 继承 strong_flag == true */
+```
 
 #### 5.14.2 `AShPtr(T)`
 
@@ -941,7 +978,21 @@ A_TYPE_REGISTER(AShPtr(T));
 | `AShPtrNew(T)` | 类型名 | 返回引用计数为 1 的共享指针 | 分配 / 初始化异常 | 构造一个默认值对象 |
 | `AShPtrCPNew(T, obj)` | `obj: T` | 返回引用计数为 1 的共享指针 | 分配 / 复制异常 | 构造 `obj` 的堆副本 |
 | `A_COPY(AShPtr(T), sp)` | 共享指针对象 | 返回共享同一底层对象的新共享指针 | 极端情况下可能 `AEXC_init_failed` | 复制时原子增加引用计数 |
+| `AShPtrCvs(T, sp)` | `AShPtr(T)` 左值 | 返回接管原内容的新共享指针包装，并把原对象清零 | 无 | 不增加引用计数；用于移动包装对象本身 |
 | `A_DEST(AShPtr(T), sp)` | 共享指针左值 | 递减引用计数 | 被管理对象析构异常可能透出 | 最后一个持有者析构时释放底层对象 |
+
+##### `AShPtrCvs` 与复制的区别
+
+`A_COPY(AShPtr(T), sp)` 会增加引用计数，得到另一个共同持有者；`AShPtrCvs(T, sp)` 不增加引用计数，而是把 `sp` 当前保存的 `p`、`dest`、`ref_count` 直接转移到新对象，并把 `sp` 清零。它适合把局部共享指针包装对象转交给另一个变量、容器元素或返回值，避免一次额外的引用计数增减。
+
+示例：
+
+```c
+RAII(AShPtr(int)) sp = AShPtrCPNew(int, 7);
+RAII(AShPtr(int)) moved = AShPtrCvs(int, sp);
+
+/* sp 已被清零；moved 仍持有原 ref_count，不发生引用计数 +1 */
+```
 
 ##### 并发注意事项
 

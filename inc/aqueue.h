@@ -125,17 +125,17 @@ extern "C" {
         it->i--; it->p = __Aquf(T,at)(it->con, it->i);                              \
     }                                                                               \
                                                                                     \
-    __unused static void A_OBJ_DEST(AQueue(T))(AQueue(T)* self){                    \
+    __unused __weak void A_OBJ_DEST(AQueue(T))(AQueue(T)* self){                    \
         for(uint32_t i = 0; i < self->deq.num; i++){                                \
             A_DEST(T, *(T*)__Aquf(T,at)(self, i));                                  \
         }                                                                           \
         __Adeq_dest(&self->deq);                                                    \
     }                                                                               \
-    __unused static void A_OBJ_INIT(AQueue(T))(AQueue(T)* self){                    \
+    __unused __weak void A_OBJ_INIT(AQueue(T))(AQueue(T)* self){                    \
         __Adeq_init(&self->deq, sizeof(T));                                         \
         self->f = &A_FUNC_TAB(AQueue(T));                                           \
     }                                                                               \
-    __unused static void A_OBJ_COPY(AQueue(T))(AQueue(T)* self, const AQueue(T)* that){     \
+    __unused __weak void A_OBJ_COPY(AQueue(T))(AQueue(T)* self, const AQueue(T)* that){     \
         self->f = that->f;                                                          \
         __Adeq_init(&self->deq, sizeof(T));                                         \
         for(uint32_t i = 0; i < that->deq.num; i++){                                \
@@ -144,7 +144,7 @@ extern "C" {
             if(aExcOccur()) return;                                                 \
         }                                                                           \
     }                                                                               \
-    __unused static int A_OBJ_CMPD(AQueue(T))(const AQueue(T)*self,const AQueue(T)*that){   \
+    __unused __weak int A_OBJ_CMPD(AQueue(T))(const AQueue(T)*self,const AQueue(T)*that){   \
         int ret = 0;                                                                \
         uint32_t num = self->deq.num <= that->deq.num ? self->deq.num:that->deq.num;\
         for(uint32_t i = 0; ret == 0 && i < num; i++){                              \

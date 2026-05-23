@@ -3,9 +3,7 @@
 ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib，但设计路线并不相同：
 它把“泛型容器、对象生命周期、轻量类系统、进程内信号、线程兼容层、锁封装”组合进一套偏编译期驱动的接口里，目标是在纯 C 中获得比传统 `void*` 工具库更强的类型约束和更统一的值语义体验。
 
-当前仓库产物为静态库：Linux/Unix 下默认生成 `libatlan.a`。公共头文件位于 `inc/`，安装后按 `<alib/...>` 方式引用。
-
-注意：当前版本暂不支持 Windows 环境。这里的“不支持”包括 Windows 本机构建、Cygwin 环境，以及从 Linux/Unix 主机交叉编译 Windows 目标；当前构建系统仍保留这些入口以兼容既有流程，但会在实际编译阶段直接报错终止。
+当前仓库产物为静态库：Linux/Unix 下默认生成 `libatlan.a`，MinGW-w64 交叉编译 Windows 目标时生成 `atlan.lib`。公共头文件位于 `inc/`，安装后按 `<alib/...>` 方式引用。
 
 ## 项目定位
 
@@ -67,7 +65,8 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib�
 
 - Linux：默认优先使用 `gcc`
 - 其他 Unix 目标：使用 CMake 选定的本地 C 编译器，或按需显式指定工具链
-- Windows / Cygwin：构建入口仍保留，但当前暂不支持，实际编译阶段会直接提示无法编译
+- Linux 主机交叉编译 Windows：使用 `mingw-w64`，推荐通过 `cmake/toolchains/mingw64.cmake` 进入
+- Windows / Cygwin 本机构建：构建入口仍保留，但建议优先使用 Linux + MinGW-w64 交叉编译路径
 - 其他非 Linux/Unix/Windows 目标平台：配置阶段直接提示无法编译
 - 不支持 C11 或 GNU 扩展（如 `__auto_type`、`typeof`、`cleanup`、`weakref`）的编译器：配置阶段直接提示无法编译
 
@@ -114,7 +113,35 @@ cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/linux-clang.cmake
 make
 ```
 
-当前版本如果通过 Windows 相关入口完成配置，库目标会在编译阶段直接报错，明确提示该环境暂不受支持。
+### MinGW-w64 交叉编译 Windows 目标
+
+在 Linux / WSL2 主机上可以使用 MinGW-w64 生成 Windows x86_64 静态库和 `.exe` 示例 / 测试程序。推荐使用仓库内的工具链文件：
+
+```bash
+mkdir -p build-mingw64
+cd build-mingw64
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mingw64.cmake
+make
+```
+
+也可以直接指定交叉编译器和目标系统：
+
+```bash
+mkdir -p build-mingw64
+cd build-mingw64
+CC=x86_64-w64-mingw32-gcc cmake .. -DCMAKE_SYSTEM_NAME=Windows
+make
+```
+
+生成结果通常为：
+
+- 静态库：`build-mingw64/lib/atlan.lib`
+- 示例程序：`build-mingw64/sample/*.exe`
+- 测试程序：`build-mingw64/test/*.exe`
+
+MinGW-w64 构建要求运行时提供 `timespec_get` / `TIME_UTC`，因此推荐使用 UCRT 兼容的 MinGW-w64 工具链。CMake 会为 MinGW 目标检测该能力，并公开定义 `_UCRT`、链接 `ucrtbase`。
+
+交叉编译只能验证 Windows 目标程序已经成功生成；如果要在 Linux / WSL2 内直接执行这些 `.exe` 测试，需要额外安装 Wine。没有 Wine 时，可先在构建阶段确认所有 `.exe` 均已链接成功，再复制到 Windows 环境运行。
 
 ### 编译示例
 
@@ -267,7 +294,8 @@ A_TYPE_REGISTER(ATree(int, AString));
 - `a_signal_connection(id, addressee, call)` 对同一个 `(id, addressee)` 重复连接时，会覆盖原有回调，而不是忽略此次连接。
 - `AHash(K,V)` 的遍历顺序依赖桶布局与插入路径，不应把它当成稳定顺序容器。
 - 迭代器更适合只读遍历或就地修改元素值，不适合边遍历边插入/删除；只要容器结构发生变化，就应丢弃旧迭代器并重新获取。
-- `APtr(T)` 不是 `unique_ptr` 的等价物：复制后新对象是弱别名，不会接管释放责任；如果需要转移所有权，请显式使用 `A_MOVE` 或避免复制。
+- `APtr(T)` 不是 `unique_ptr` 的等价物：复制后新对象是弱别名，不会接管释放责任；如果需要转移包装对象本身，请使用 `APtrCvs(T, ptr)` 或 `A_MOVE`。
+- `APtrCvs(T, ptr)` / `AShPtrCvs(T, sp)` 会按字节取走原包装对象并把原对象清零；它们不复制底层对象，`AShPtrCvs` 也不会增加引用计数，适合显式移动指针包装。
 - `AReceEnd` 可以在析构时自动断开信号连接；信号回调内部也可以断连，但实际操作会延迟到本轮派发结束后执行。
 - `AMtxCnd_wait()` 必须在已经持有同一把 `AMtxCnd_lock()` 的前提下使用，并且要放在 `while (...)` 循环里反复检查共享谓词。
 - `ASemaphore` 初始化后默认 `max == 0`；第一次 `ASemaphore_lock()` 前要先 `ASemaphore_setMax()`，而且把上限调大且当前存在空位时，会唤醒等待中的线程重新竞争名额。

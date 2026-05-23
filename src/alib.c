@@ -73,16 +73,12 @@ static void __alib_default_delete(void* p, void(*dest_func)(void*)){
     }
 }
 
-#if defined(__C_WINDOWS__)
-alib_free_func_t alib_free = __alib_default_free;
-alib_alloc_func_t alib_alloc = __alib_default_alloc;
-alib_realloc_func_t alib_realloc = __alib_default_realloc;
-alib_new_func_t alib_new = __alib_default_new;
-alib_cpnew_func_t alib_cpnew = __alib_default_cpnew;
-alib_delete_func_t alib_delete = __alib_default_delete;
-#else
-__unused __weak void  alib_free(void* p){ __alib_default_free(p); };
-__unused __weak void* alib_alloc(uint32_t size){ return __alib_default_alloc(size); };
+__unused __weak void  alib_free(void* p){
+    __alib_default_free(p);
+}
+__unused __weak void* alib_alloc(uint32_t size){
+    return __alib_default_alloc(size);
+}
 __unused __weak void* alib_realloc(void* p, uint32_t size){
     return __alib_default_realloc(p, size);
 }
@@ -95,7 +91,6 @@ __unused __weak void* alib_cpnew(uint32_t size, const void* that, void(*copy_fun
 __unused __weak void  alib_delete(void* p, void(*dest_func)(void*)){
     __alib_default_delete(p, dest_func);
 }
-#endif
 
 
 
