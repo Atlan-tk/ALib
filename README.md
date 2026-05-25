@@ -94,7 +94,7 @@ cmake --build build
 - `linux-clang-make`：Linux / Unix 本地 Clang，GCC 风格命令行参数，Makefile。
 - `unix-clang-make`：Unix 本地 Clang 别名，GCC 风格命令行参数，Makefile。
 - `windows-clang-cl-vs`：Windows 本地 `clang-cl`，Visual Studio 项目文件，VS 风格命令行参数；使用 `-T ClangCL`。
-- `linux-windows-mingw64-make`：Linux 到 Windows 的 MinGW-w64 交叉编译，Makefile。
+- `linux-windows-mingw64-make`：Linux 到 Windows 的 UCRT MinGW-w64 交叉编译，Makefile。
 - `linux-windows-clang-cl-make`：Linux 到 Windows 的 `clang-cl` 交叉编译，Makefile。
 - `linux-linux-gcc-cross-make`：Linux 到 Linux 的 GCC 交叉编译，Makefile；需要设置 `ALIB_LINUX_GCC_TRIPLET`。
 
@@ -114,7 +114,7 @@ Linux / Unix 本地构建通常生成 `build/lib/libatlan.a`。Windows 目标构
 
 ### 交叉编译
 
-MinGW-w64 交叉编译 Windows x86_64 目标：
+UCRT MinGW-w64 交叉编译 Windows x86_64 目标：
 
 ```bash
 cmake --fresh -S . -B build -G "Unix Makefiles" \
@@ -122,7 +122,7 @@ cmake --fresh -S . -B build -G "Unix Makefiles" \
 cmake --build build
 ```
 
-MinGW-w64 构建要求目标运行时提供 `timespec_get` / `TIME_UTC`，推荐使用 UCRT 兼容的 MinGW-w64 编译器/runtime。CMake 会在对应配置中检测该能力，并为 MinGW 目标公开定义 `_UCRT`、链接 `ucrtbase`。
+MinGW-w64 构建要求目标运行时默认提供 `timespec_get` / `TIME_UTC`。请使用 UCRT MinGW-w64 或 llvm-mingw 工具链；不要使用 MSVCRT 版 `x86_64-w64-mingw32-gcc` 再手动链接 `ucrtbase`。CMake 会在对应配置中检测该能力。
 
 Linux 到 Linux 的 GCC 交叉编译示例：
 

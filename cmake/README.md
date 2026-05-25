@@ -15,7 +15,7 @@ Bundled `CONFIG` values:
 - `linux-clang-make`: Linux/Unix native Clang build with GCC-style command-line flags, Makefiles.
 - `unix-clang-make`: Unix native Clang build alias with GCC-style command-line flags, Makefiles.
 - `windows-clang-cl-vs`: Windows native `clang-cl`, Visual Studio project files; use `-T ClangCL`.
-- `linux-windows-mingw64-make`: Linux-to-Windows MinGW-w64 cross build, Makefiles.
+- `linux-windows-mingw64-make`: Linux-to-Windows UCRT MinGW-w64 cross build, Makefiles.
 - `linux-windows-clang-cl-make`: Linux-to-Windows `clang-cl` cross build, Makefiles.
 - `linux-linux-gcc-cross-make`: Linux-to-Linux GCC cross build, Makefiles; set `ALIB_LINUX_GCC_TRIPLET`.
 

@@ -59,7 +59,7 @@ ctest --test-dir build --output-on-failure
 - `linux-clang-make`：Linux / Unix 本地 Clang，GCC 风格命令行参数，Makefile。
 - `unix-clang-make`：Unix 本地 Clang 别名，GCC 风格命令行参数，Makefile。
 - `windows-clang-cl-vs`：Windows 本地 `clang-cl`，Visual Studio 项目文件，VS 风格命令行参数。
-- `linux-windows-mingw64-make`：Linux 到 Windows 的 MinGW-w64 交叉编译，Makefile。
+- `linux-windows-mingw64-make`：Linux 到 Windows 的 UCRT MinGW-w64 交叉编译，Makefile。
 - `linux-windows-clang-cl-make`：Linux 到 Windows 的 `clang-cl` 交叉编译，Makefile。
 - `linux-linux-gcc-cross-make`：Linux 到 Linux 的 GCC 交叉编译，Makefile；需要设置 `ALIB_LINUX_GCC_TRIPLET`。
 
@@ -102,7 +102,7 @@ cmake --fresh -S . -B build -G "Visual Studio 17 2022" -T ClangCL -DCONFIG=windo
 cmake --build build --config Release
 ```
 
-MinGW-w64 构建要求目标运行时提供 `timespec_get` / `TIME_UTC`，因此推荐使用 UCRT 兼容的 MinGW-w64 编译器/runtime。CMake 会在对应配置中检测该能力，并为 MinGW 目标公开定义 `_UCRT`、链接 `ucrtbase`。在 Linux / WSL2 中只能完成编译和链接验证；如果要直接执行生成的 Windows `.exe` 测试，需要额外安装 Wine，或者复制到 Windows 环境运行。
+MinGW-w64 构建要求目标运行时默认提供 `timespec_get` / `TIME_UTC`，因此需要 UCRT MinGW-w64 或 llvm-mingw 工具链。不要使用 MSVCRT 版 `x86_64-w64-mingw32-gcc` 再手动链接 `ucrtbase`；CMake 会在对应配置中检测该能力。在 Linux / WSL2 中只能完成编译和链接验证；如果要直接执行生成的 Windows `.exe` 测试，需要额外安装 Wine，或者复制到 Windows 环境运行。
 
 安装规则：
 
