@@ -60,135 +60,122 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib�
 
 ## 构建、测试与安装
 
-### 构建静态库
+ALib 使用 CMake 构建。推荐固定使用仓库根目录下的 `build/` 作为编译目录，配置文件放在 `cmake/`；顶层 `CMakeLists.txt` 会扫描 `cmake/*.cmake`，每个 `<name>.cmake` 都自动成为一个可用的 `CONFIG=<name>` 构建配置。
 
-默认编译器约定：
+### 常用本机构建
 
-- Linux：默认优先使用 `gcc`
-- 其他 Unix 目标：使用 CMake 选定的本地 C 编译器，或按需显式指定工具链
-- Linux 主机交叉编译 Windows：使用 `mingw-w64`，推荐通过 `cmake/toolchains/mingw64.cmake` 进入
-- Windows / Cygwin 本机构建：构建入口仍保留，但建议优先使用 Linux + MinGW-w64 交叉编译路径
-- 其他非 Linux/Unix/Windows 目标平台：配置阶段直接提示无法编译
-- 不支持 C11 或 GNU 扩展（如 `__auto_type`、`typeof`、`cleanup`、`weakref`）的编译器：配置阶段直接提示无法编译
+Linux / Unix 默认配置会优先选择 `linux-gcc-make`（Linux）或 `unix-gcc-make`（其他 Unix）：
 
 ```bash
-mkdir -p build
-cd build
-cmake ..
-make
+cmake --fresh -S . -B build -G "Unix Makefiles"
+cmake --build build
 ```
 
-默认生成：
-
-- 静态库目标：`libatlan.a`
-- 中间文件目录：`build/obj`
-- 临时头文件映射：`build/inc -> inc`，并额外生成 `build/alib -> inc` 以兼容 `<alib/...>` 引用
-- 目标文件目录：库在 `build/lib`，示例在 `build/sample`，测试在 `build/test`
-
-默认会同时构建库本身、`sample/` 下的示例程序和 `test/` 下的测试程序。
-
-### toolchains 目录
-
-仓库内当前提供这些工具链文件：
-
-- `cmake/toolchains/linux-gcc.cmake`：Linux 本机构建，显式使用 `gcc`
-- `cmake/toolchains/linux-clang.cmake`：Linux 本机构建，显式使用 `clang`
-- `cmake/toolchains/windows-clang-cl.cmake`：Windows 本机构建入口，显式使用 `clang-cl`
-- `cmake/toolchains/mingw64.cmake`：Linux 主机交叉编译 Windows 的入口，使用 `mingw-w64`
-
-Linux 下如果要显式切换编译器，可直接这样用：
+也可以显式指定配置：
 
 ```bash
-mkdir -p build
-cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/linux-gcc.cmake
-make
+cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-gcc-make
+cmake --build build
 ```
 
-或：
+使用 Clang（GCC 风格命令行参数、Makefile）：
 
 ```bash
-mkdir -p build
-cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/linux-clang.cmake
-make
+cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-clang-make
+cmake --build build
 ```
 
-### MinGW-w64 交叉编译 Windows 目标
+### 可用 CONFIG
 
-在 Linux / WSL2 主机上可以使用 MinGW-w64 生成 Windows x86_64 静态库和 `.exe` 示例 / 测试程序。推荐使用仓库内的工具链文件：
+当前仓库内置配置文件位于 `cmake/`：
+
+- `linux-gcc-make`：Linux / Unix 本地 GCC，Makefile。
+- `unix-gcc-make`：Unix 本地 GCC 别名，Makefile。
+- `linux-clang-make`：Linux / Unix 本地 Clang，GCC 风格命令行参数，Makefile。
+- `unix-clang-make`：Unix 本地 Clang 别名，GCC 风格命令行参数，Makefile。
+- `windows-clang-cl-vs`：Windows 本地 `clang-cl`，Visual Studio 项目文件，VS 风格命令行参数；使用 `-T ClangCL`。
+- `linux-windows-mingw64-make`：Linux 到 Windows 的 MinGW-w64 交叉编译，Makefile。
+- `linux-windows-clang-cl-make`：Linux 到 Windows 的 `clang-cl` 交叉编译，Makefile。
+- `linux-linux-gcc-cross-make`：Linux 到 Linux 的 GCC 交叉编译，Makefile；需要设置 `ALIB_LINUX_GCC_TRIPLET`。
+
+新增编译配置时，只需在 `cmake/` 下增加新的 `<name>.cmake`，之后使用 `-DCONFIG=<name>` 即可。切换不同 generator、编译器或目标平台时建议使用 `cmake --fresh`，或清理 `build/` 后重新配置。
+
+### 输出目录
+
+默认会同时构建库、`sample/` 示例和 `test/` 测试。构建输出固定在：
+
+- 中间文件：`build/obj`
+- 编译期头文件：`build/inc/alib/*.h`
+- 静态库：`build/lib`
+- 示例程序：`build/sample`
+- 测试程序：`build/test`
+
+Linux / Unix 本地构建通常生成 `build/lib/libatlan.a`。Windows 目标构建通常生成 `build/lib/atlan.lib` 和 `.exe` 程序。
+
+### 交叉编译
+
+MinGW-w64 交叉编译 Windows x86_64 目标：
 
 ```bash
-mkdir -p build-mingw64
-cd build-mingw64
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mingw64.cmake
-make
+cmake --fresh -S . -B build -G "Unix Makefiles" \
+  -DCONFIG=linux-windows-mingw64-make
+cmake --build build
 ```
 
-也可以直接指定交叉编译器和目标系统：
+MinGW-w64 构建要求目标运行时提供 `timespec_get` / `TIME_UTC`，推荐使用 UCRT 兼容的 MinGW-w64 编译器/runtime。CMake 会在对应配置中检测该能力，并为 MinGW 目标公开定义 `_UCRT`、链接 `ucrtbase`。
+
+Linux 到 Linux 的 GCC 交叉编译示例：
 
 ```bash
-mkdir -p build-mingw64
-cd build-mingw64
-CC=x86_64-w64-mingw32-gcc cmake .. -DCMAKE_SYSTEM_NAME=Windows
-make
+cmake --fresh -S . -B build -G "Unix Makefiles" \
+  -DCONFIG=linux-linux-gcc-cross-make \
+  -DALIB_LINUX_GCC_TRIPLET=aarch64-linux-gnu
+cmake --build build
 ```
 
-生成结果通常为：
+交叉编译通常只能验证目标程序已经生成；若要在 Linux / WSL2 中运行 Windows `.exe` 测试，需要额外安装 Wine，或复制到 Windows 环境运行。
 
-- 静态库：`build-mingw64/lib/atlan.lib`
-- 示例程序：`build-mingw64/sample/*.exe`
-- 测试程序：`build-mingw64/test/*.exe`
+### Windows 本机构建
 
-MinGW-w64 构建要求运行时提供 `timespec_get` / `TIME_UTC`，因此推荐使用 UCRT 兼容的 MinGW-w64 工具链。CMake 会为 MinGW 目标检测该能力，并公开定义 `_UCRT`、链接 `ucrtbase`。
+Windows 本地配置使用 `clang-cl` 和 Visual Studio 项目文件：
 
-交叉编译只能验证 Windows 目标程序已经成功生成；如果要在 Linux / WSL2 内直接执行这些 `.exe` 测试，需要额外安装 Wine。没有 Wine 时，可先在构建阶段确认所有 `.exe` 均已链接成功，再复制到 Windows 环境运行。
-
-### 编译示例
-
-```bash
-mkdir -p build
-cd build
-cmake ..
-make samples
+```powershell
+cmake --fresh -S . -B build -G "Visual Studio 17 2022" -T ClangCL -DCONFIG=windows-clang-cl-vs
+cmake --build build --config Release
 ```
 
-### 编译测试
+Windows 本地配置不生成安装规则。
+
+### 编译示例和测试
 
 ```bash
-mkdir -p build
-cd build
-cmake ..
-make tests
-```
-
-### 运行测试
-
-```bash
-cd build
-ctest --output-on-failure
+cmake --build build --target samples
+cmake --build build --target tests
+ctest --test-dir build --output-on-failure
 ```
 
 ### 安装
 
+使用 Makefile 配置时，可在 `build` 下执行 `make install`，或使用通用命令：
+
 ```bash
-cd build
-make install
+cmake --build build --target install
 ```
 
-默认安装结果：
+默认安装位置：
 
-- 头文件：`/usr/local/include/alib/*.h`
-- 静态库：`/usr/local/lib/libatlan.a`
+- Linux / Unix 本地编译：头文件安装到 `/usr/local/include/alib`，静态库安装到 `/usr/local/lib`。
+- Linux 交叉编译：头文件安装到 `$HOME/.alib/inc/alib`，静态库安装到 `$HOME/.alib/lib`。
+- Windows 本地编译：不安装。
 
 如需覆盖默认安装前缀：
 
 ```bash
-mkdir -p build
-cd build
-cmake -DCMAKE_INSTALL_PREFIX=<your-prefix> ..
-make
-make install
+cmake --fresh -S . -B build -G "Unix Makefiles" \
+  -DCONFIG=linux-gcc-make \
+  -DCMAKE_INSTALL_PREFIX=<your-prefix>
+cmake --build build
+cmake --build build --target install
 ```
 
 ## 快速开始
@@ -234,12 +221,10 @@ gcc -std=gnu11 -Wall -Wextra -O2 example.c -latlan -pthread -o example
 如果只是想在仓库目录里临时编译（Linux / GCC）：
 
 ```bash
-mkdir -p build
-cd build
-cmake ..
-make
-cd ..
-gcc -std=gnu11 -Wall -Wextra -O2 -Ibuild example.c build/lib/libatlan.a -pthread -o example
+cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-gcc-make
+cmake --build build
+
+gcc -std=gnu11 -Wall -Wextra -O2 -Ibuild/inc example.c build/lib/libatlan.a -pthread -o example
 ```
 
 ## 使用模式

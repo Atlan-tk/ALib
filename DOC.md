@@ -2,7 +2,7 @@
 
 本文以 `inc/` 中的公共头文件为准，系统说明 ALib 当前提供的模块、类型、宏和函数，以及它们的参数、返回值、异常语义与使用约定。
 
-当前版本支持 Linux / Unix 本机构建，也支持在 Linux / WSL2 主机上通过 MinGW-w64 交叉编译 Windows x86_64 目标。Windows 本机构建入口仍保留，但推荐优先使用 Linux + MinGW-w64 的交叉编译路径。
+当前版本支持 Linux / Unix 本机构建、Linux 主机交叉编译 Windows / Linux 目标，以及 Windows 本地 clang-cl + Visual Studio 项目文件构建。构建配置由顶层 CMake 扫描 `cmake/*.cmake` 自动发现。
 
 文档范围约定：
 
@@ -26,88 +26,91 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，核心目标不是复�
 
 ```text
 ALib/
-├── cmake/     # CMake 构建脚本
+├── cmake/     # 构建配置文件，每个 <name>.cmake 对应 CONFIG=<name>
 ├── CMakeLists.txt
 ├── inc/       # 公共头文件
-├── src/       # 非模板实现
-├── sample/    # 示例程序
-├── test/      # 回归测试
+├── src/       # 非模板实现与库目标 CMakeLists.txt
+├── sample/    # 示例程序与示例目标 CMakeLists.txt
+├── test/      # 回归测试与测试目标 CMakeLists.txt
 ├── README.md
 └── DOC.md
 ```
 
-常用命令：
+常用本机构建命令：
 
 ```bash
-mkdir -p build
-cd build
-cmake ..
-make
+cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-gcc-make
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 默认约定：
 
-- Linux：默认优先使用 `gcc`
-- 其他 Unix 目标：使用 CMake 选定的本地 C 编译器，或按需显式指定工具链
-- Linux 主机交叉编译 Windows：使用 `mingw-w64`，推荐通过 `cmake/toolchains/mingw64.cmake` 进入
-- Windows / Cygwin 本机构建：构建入口仍保留，但建议优先使用 Linux + MinGW-w64 交叉编译路径
-- 其他非 Linux/Unix/Windows 目标平台：配置阶段直接提示无法编译
-- 不支持 C11 或 GNU 扩展（如 `__auto_type`、`typeof`、`cleanup`、`weakref`）的编译器：配置阶段直接提示无法编译
+- Linux 未指定 `CONFIG` 时自动选择 `linux-gcc-make`。
+- 其他 Unix 未指定 `CONFIG` 时自动选择 `unix-gcc-make`。
+- Windows 未指定 `CONFIG` 时自动选择 `windows-clang-cl-vs`。
+- 其他非 Linux/Unix/Windows 目标平台：配置阶段直接提示无法编译。
+- 不支持 C11 或 GNU 扩展（如 `__auto_type`、`typeof`、`cleanup`、`weakref`）的编译器：配置阶段直接提示无法编译。
+
+当前内置配置：
+
+- `linux-gcc-make`：Linux / Unix 本地 GCC，Makefile。
+- `unix-gcc-make`：Unix 本地 GCC 别名，Makefile。
+- `linux-clang-make`：Linux / Unix 本地 Clang，GCC 风格命令行参数，Makefile。
+- `unix-clang-make`：Unix 本地 Clang 别名，GCC 风格命令行参数，Makefile。
+- `windows-clang-cl-vs`：Windows 本地 `clang-cl`，Visual Studio 项目文件，VS 风格命令行参数。
+- `linux-windows-mingw64-make`：Linux 到 Windows 的 MinGW-w64 交叉编译，Makefile。
+- `linux-windows-clang-cl-make`：Linux 到 Windows 的 `clang-cl` 交叉编译，Makefile。
+- `linux-linux-gcc-cross-make`：Linux 到 Linux 的 GCC 交叉编译，Makefile；需要设置 `ALIB_LINUX_GCC_TRIPLET`。
+
+顶层 `CMakeLists.txt` 会自动扫描 `cmake/*.cmake`。新增配置时，只需添加新的 `cmake/<name>.cmake`，之后使用 `-DCONFIG=<name>` 即可。切换不同 generator、编译器或目标平台时建议使用 `cmake --fresh`，或清理 `build/` 后重新配置。
 
 默认产物：
 
-- 静态库：`libatlan.a`
 - 中间文件目录：`build/obj`
-- 临时头文件映射：`build/inc -> inc`，并额外生成 `build/alib -> inc` 以兼容 `<alib/...>` 引用
+- 编译期头文件目录：`build/inc/alib`
 - 库输出目录：`build/lib`
 - 示例输出目录：`build/sample`
 - 测试输出目录：`build/test`
-- 安装头文件目录：`PREFIX/include/alib`
-- 安装库目录：`PREFIX/lib`
+- Linux / Unix 本地静态库：`build/lib/libatlan.a`
+- Windows 目标静态库：`build/lib/atlan.lib`
 
 默认会同时构建库本身、`sample/` 下的示例程序和 `test/` 下的测试程序。
 
-`cmake/toolchains/` 当前提供：
-
-- `linux-gcc.cmake`：Linux 本机构建，显式使用 `gcc`
-- `linux-clang.cmake`：Linux 本机构建，显式使用 `clang`
-- `windows-clang-cl.cmake`：Windows 本机构建入口，显式使用 `clang-cl`
-- `mingw64.cmake`：Linux 主机交叉编译 Windows 的入口，使用 `mingw-w64`
-
-Linux 本机如需显式切换编译器，可在配置阶段指定对应工具链文件，例如：
+常用变体：
 
 ```bash
-mkdir -p build
-cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/linux-clang.cmake
-make
+# Clang，本地 Unix / Linux，GCC 风格命令行参数
+cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-clang-make
+cmake --build build
+
+# Linux -> Windows，MinGW-w64
+cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-windows-mingw64-make
+cmake --build build
+
+# Linux -> Linux，GCC 交叉编译器
+cmake --fresh -S . -B build -G "Unix Makefiles" \
+  -DCONFIG=linux-linux-gcc-cross-make \
+  -DALIB_LINUX_GCC_TRIPLET=aarch64-linux-gnu
+cmake --build build
 ```
 
-Linux / WSL2 主机交叉编译 Windows x86_64 目标时，推荐使用 `cmake/toolchains/mingw64.cmake`：
+Windows 本地构建示例：
 
-```bash
-mkdir -p build-mingw64
-cd build-mingw64
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mingw64.cmake
-make
+```powershell
+cmake --fresh -S . -B build -G "Visual Studio 17 2022" -T ClangCL -DCONFIG=windows-clang-cl-vs
+cmake --build build --config Release
 ```
 
-也可以直接指定交叉编译器和目标系统：
+MinGW-w64 构建要求目标运行时提供 `timespec_get` / `TIME_UTC`，因此推荐使用 UCRT 兼容的 MinGW-w64 编译器/runtime。CMake 会在对应配置中检测该能力，并为 MinGW 目标公开定义 `_UCRT`、链接 `ucrtbase`。在 Linux / WSL2 中只能完成编译和链接验证；如果要直接执行生成的 Windows `.exe` 测试，需要额外安装 Wine，或者复制到 Windows 环境运行。
 
-```bash
-mkdir -p build-mingw64
-cd build-mingw64
-CC=x86_64-w64-mingw32-gcc cmake .. -DCMAKE_SYSTEM_NAME=Windows
-make
-```
+安装规则：
 
-MinGW-w64 交叉编译的默认产物：
+- Linux / Unix 本地编译：头文件安装到 `/usr/local/include/alib`，静态库安装到 `/usr/local/lib`。
+- Linux 交叉编译：头文件安装到 `$HOME/.alib/inc/alib`，静态库安装到 `$HOME/.alib/lib`。
+- Windows 本地编译：不安装。
 
-- 静态库：`build-mingw64/lib/atlan.lib`
-- 示例程序：`build-mingw64/sample/*.exe`
-- 测试程序：`build-mingw64/test/*.exe`
-
-MinGW-w64 构建要求目标运行时提供 `timespec_get` / `TIME_UTC`，因此推荐使用 UCRT 兼容的 MinGW-w64 工具链。CMake 会检测该能力，并为 MinGW 目标公开定义 `_UCRT`、链接 `ucrtbase`。在 Linux / WSL2 中只能完成编译和链接验证；如果要直接执行生成的 Windows `.exe` 测试，需要额外安装 Wine，或者复制到 Windows 环境运行。
+使用 Makefile 配置时，可在 `build` 下执行 `make install`；也可使用 `cmake --build build --target install`。
 
 ## 3. 先读这些通用约定
 
@@ -119,7 +122,7 @@ ALib 依赖：
 - GNU 扩展（`__auto_type`、`typeof`、`cleanup`、`weakref` 等）
 - C11 线程 / 时间接口；优先复用系统 `<threads.h>`，缺失时由 `athrd.h` 在 POSIX / Win32 上补齐
 
-因此推荐直接使用仓库内的 CMake 构建，并在仓库根目录下手动创建 `build/` 后进入该目录执行 `cmake ..` 和 `make`。默认安装前缀为 `/usr/local`。如果需要 Windows 目标，推荐在 Linux / WSL2 主机上通过 MinGW-w64 交叉编译；如果目标平台不是 Linux/Unix/Windows，或者编译器缺少 C11 / GNU 扩展支持，CMake 会在配置阶段直接终止并提示无法编译。
+因此推荐直接使用仓库内的 CMake 构建，并在仓库根目录执行 `cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=<name>` 与 `cmake --build build`。默认本地安装前缀为 `/usr/local`，Linux 交叉编译默认安装到 `$HOME/.alib`。如果目标平台不是 Linux/Unix/Windows，或者编译器缺少 C11 / GNU 扩展支持，CMake 会在配置阶段直接终止并提示无法编译。
 
 ### 3.2 类型协议：所有容器都依赖 `A_TYPE_REGISTER`
 
@@ -1434,18 +1437,15 @@ a_signal_transmit(signal, &collector);
 推荐最少验证命令：
 
 ```bash
-mkdir -p build
-cd build
-cmake ..
-make
-ctest --output-on-failure
+cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-gcc-make
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 如果修改了示例相关接口，再补：
 
 ```bash
-cd build
-make samples
+cmake --build build --target samples
 ```
 
 ## 7. 常见误区速记

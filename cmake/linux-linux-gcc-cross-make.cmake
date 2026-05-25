@@ -1,0 +1,39 @@
+set(ALIB_CONFIG_DESCRIPTION "Linux-to-Linux GCC cross build with Makefiles")
+set(ALIB_CONFIG_GENERATOR_REGEX "(^|.* )Makefiles$")
+set(ALIB_INSTALL_KIND "linux-cross")
+
+if(NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "CONFIG='linux-linux-gcc-cross-make' must be configured on Linux.")
+endif()
+
+set(CMAKE_SYSTEM_NAME Linux)
+
+set(ALIB_LINUX_GCC_TRIPLET "" CACHE STRING "Linux cross GCC target triplet, e.g. aarch64-linux-gnu")
+set(ALIB_LINUX_GCC_PREFIX "" CACHE PATH "Optional path prefix containing cross GCC binaries")
+set(ALIB_LINUX_GCC_SYSROOT "" CACHE PATH "Optional target sysroot")
+
+if(NOT ALIB_LINUX_GCC_TRIPLET)
+    message(FATAL_ERROR "Set ALIB_LINUX_GCC_TRIPLET for CONFIG='linux-linux-gcc-cross-make'.")
+endif()
+
+if(ALIB_LINUX_GCC_PREFIX)
+    set(ALIB_LINUX_GCC_BIN_PREFIX "${ALIB_LINUX_GCC_PREFIX}/bin/${ALIB_LINUX_GCC_TRIPLET}-")
+else()
+    set(ALIB_LINUX_GCC_BIN_PREFIX "${ALIB_LINUX_GCC_TRIPLET}-")
+endif()
+
+set(CMAKE_C_COMPILER "${ALIB_LINUX_GCC_BIN_PREFIX}gcc")
+set(CMAKE_AR "${ALIB_LINUX_GCC_BIN_PREFIX}ar")
+set(CMAKE_RANLIB "${ALIB_LINUX_GCC_BIN_PREFIX}ranlib")
+set(CMAKE_NM "${ALIB_LINUX_GCC_BIN_PREFIX}nm")
+set(CMAKE_STRIP "${ALIB_LINUX_GCC_BIN_PREFIX}strip")
+
+if(ALIB_LINUX_GCC_SYSROOT)
+    set(CMAKE_SYSROOT "${ALIB_LINUX_GCC_SYSROOT}")
+    list(APPEND CMAKE_FIND_ROOT_PATH "${ALIB_LINUX_GCC_SYSROOT}")
+endif()
+
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)

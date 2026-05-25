@@ -5,27 +5,56 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(ALIB_TOP_LEVEL_PROJECT ON)
 endif()
 
-if(ALIB_TOP_LEVEL_PROJECT
-        AND NOT DEFINED CMAKE_TOOLCHAIN_FILE
-        AND (NOT DEFINED ENV{CC} OR "$ENV{CC}" STREQUAL "")
-        AND NOT DEFINED CMAKE_C_COMPILER)
-    if(CMAKE_HOST_WIN32)
-        if(CMAKE_GENERATOR MATCHES "^Visual Studio" AND NOT DEFINED CMAKE_GENERATOR_TOOLSET)
-            set(CMAKE_GENERATOR_TOOLSET ClangCL CACHE STRING "Default toolset for ALib" FORCE)
-            set(ALIB_DEFAULT_COMPILER_HINT "ClangCL")
+set(CONFIG "" CACHE STRING "ALib build configuration name")
+
+if(ALIB_TOP_LEVEL_PROJECT)
+    function(alib_normalize_config input output)
+        string(TOLOWER "${input}" ALIB_CONFIG_LOWER)
+        string(REPLACE "_" "-" ALIB_CONFIG_LOWER "${ALIB_CONFIG_LOWER}")
+        set(${output} "${ALIB_CONFIG_LOWER}" PARENT_SCOPE)
+    endfunction()
+
+    file(GLOB ALIB_CONFIG_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/*.cmake")
+    set(ALIB_AVAILABLE_CONFIGS "")
+    foreach(ALIB_CONFIG_CANDIDATE IN LISTS ALIB_CONFIG_FILES)
+        get_filename_component(ALIB_CONFIG_NAME "${ALIB_CONFIG_CANDIDATE}" NAME_WE)
+        list(APPEND ALIB_AVAILABLE_CONFIGS "${ALIB_CONFIG_NAME}")
+    endforeach()
+    list(SORT ALIB_AVAILABLE_CONFIGS)
+    set_property(CACHE CONFIG PROPERTY STRINGS ${ALIB_AVAILABLE_CONFIGS})
+
+    if(NOT CONFIG)
+        if(CMAKE_HOST_WIN32 AND "windows-clang-cl-vs" IN_LIST ALIB_AVAILABLE_CONFIGS)
+            set(CONFIG "windows-clang-cl-vs" CACHE STRING "ALib build configuration name" FORCE)
+        elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND "linux-gcc-make" IN_LIST ALIB_AVAILABLE_CONFIGS)
+            set(CONFIG "linux-gcc-make" CACHE STRING "ALib build configuration name" FORCE)
+        elseif(UNIX AND "unix-gcc-make" IN_LIST ALIB_AVAILABLE_CONFIGS)
+            set(CONFIG "unix-gcc-make" CACHE STRING "ALib build configuration name" FORCE)
         else()
-            find_program(ALIB_BOOTSTRAP_CLANG_CL NAMES clang-cl)
-            if(ALIB_BOOTSTRAP_CLANG_CL)
-                set(CMAKE_C_COMPILER "${ALIB_BOOTSTRAP_CLANG_CL}" CACHE FILEPATH "Default C compiler for ALib" FORCE)
-                set(ALIB_DEFAULT_COMPILER_HINT "${ALIB_BOOTSTRAP_CLANG_CL}")
-            endif()
+            message(FATAL_ERROR "Cannot auto-select ALib CONFIG for host '${CMAKE_HOST_SYSTEM_NAME}'.")
         endif()
-    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
-        find_program(ALIB_BOOTSTRAP_GCC NAMES gcc)
-        if(ALIB_BOOTSTRAP_GCC)
-            set(CMAKE_C_COMPILER "${ALIB_BOOTSTRAP_GCC}" CACHE FILEPATH "Default C compiler for ALib" FORCE)
-            set(ALIB_DEFAULT_COMPILER_HINT "${ALIB_BOOTSTRAP_GCC}")
-        endif()
+    endif()
+
+    alib_normalize_config("${CONFIG}" ALIB_SELECTED_CONFIG)
+    set(CONFIG "${ALIB_SELECTED_CONFIG}" CACHE STRING "ALib build configuration name" FORCE)
+
+    set(ALIB_CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${CONFIG}.cmake")
+    if(NOT EXISTS "${ALIB_CONFIG_FILE}")
+        string(REPLACE ";" ", " ALIB_AVAILABLE_CONFIG_TEXT "${ALIB_AVAILABLE_CONFIGS}")
+        message(FATAL_ERROR
+            "Unknown ALib CONFIG='${CONFIG}'. Add '${CONFIG}.cmake' under '${CMAKE_CURRENT_SOURCE_DIR}/cmake' "
+            "or choose one of: ${ALIB_AVAILABLE_CONFIG_TEXT}."
+        )
+    endif()
+
+    include("${ALIB_CONFIG_FILE}")
+
+    if(DEFINED ALIB_CONFIG_GENERATOR_REGEX AND NOT CMAKE_GENERATOR MATCHES "${ALIB_CONFIG_GENERATOR_REGEX}")
+        message(FATAL_ERROR
+            "CONFIG='${CONFIG}' requires a CMake generator matching "
+            "'${ALIB_CONFIG_GENERATOR_REGEX}', but current generator is '${CMAKE_GENERATOR}'. "
+            "Reconfigure ALib/build with the required -G option."
+        )
     endif()
 endif()
 
@@ -38,14 +67,25 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang|IntelLLVM")
 endif()
 
 if(ALIB_TOP_LEVEL_PROJECT AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    if(WIN32)
-        set(CMAKE_INSTALL_PREFIX "C:/Program Files (x86)/alib" CACHE PATH "Install path prefix." FORCE)
-    else()
+    if(ALIB_INSTALL_KIND STREQUAL "linux-cross")
+        if(DEFINED ENV{HOME} AND NOT "$ENV{HOME}" STREQUAL "")
+            set(CMAKE_INSTALL_PREFIX "$ENV{HOME}/.alib" CACHE PATH "Install path prefix." FORCE)
+        else()
+            message(FATAL_ERROR "HOME is required to select the default Linux cross install prefix.")
+        endif()
+    elseif(NOT ALIB_DISABLE_INSTALL)
         set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Install path prefix." FORCE)
     endif()
 endif()
 
 include(GNUInstallDirs)
+
+set(ALIB_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}")
+set(ALIB_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/alib")
+if(ALIB_INSTALL_KIND STREQUAL "linux-cross")
+    set(ALIB_INSTALL_LIBDIR "lib")
+    set(ALIB_INSTALL_INCLUDEDIR "inc/alib")
+endif()
 include(CMakePushCheckState)
 include(CheckCSourceCompiles)
 
@@ -71,8 +111,11 @@ if(MSVC OR CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     set(ALIB_MSVC_LIKE ON)
 endif()
 
-if(ALIB_TOP_LEVEL_PROJECT AND DEFINED ALIB_DEFAULT_COMPILER_HINT)
-    message(STATUS "ALib default C compiler/toolset: ${ALIB_DEFAULT_COMPILER_HINT}")
+if(ALIB_TOP_LEVEL_PROJECT)
+    message(STATUS "ALib CONFIG: ${CONFIG}")
+    if(DEFINED ALIB_CONFIG_DESCRIPTION)
+        message(STATUS "ALib config description: ${ALIB_CONFIG_DESCRIPTION}")
+    endif()
 endif()
 
 set(ALIB_REQUIRED_C_STANDARD_FLAG "")
@@ -140,31 +183,34 @@ set(ALIB_OBJECT_ROOT "${PROJECT_BINARY_DIR}/obj")
 set(ALIB_LIBRARY_OUTPUT_DIR "${PROJECT_BINARY_DIR}/lib")
 set(ALIB_SAMPLE_OUTPUT_DIR "${PROJECT_BINARY_DIR}/sample")
 set(ALIB_TEST_OUTPUT_DIR "${PROJECT_BINARY_DIR}/test")
-set(ALIB_BUILD_INCLUDE_ROOT "${PROJECT_BINARY_DIR}")
+set(ALIB_BUILD_INCLUDE_ROOT "${PROJECT_BINARY_DIR}/inc")
+set(ALIB_BUILD_ALIB_INCLUDE_DIR "${ALIB_BUILD_INCLUDE_ROOT}/alib")
 
-function(alib_create_link link_path target_path)
-    if(NOT EXISTS "${link_path}")
-        file(CREATE_LINK
-            "${target_path}"
-            "${link_path}"
-            SYMBOLIC
-            COPY_ON_ERROR
-            RESULT ALIB_LINK_RESULT
-        )
-        if(ALIB_LINK_RESULT)
-            message(FATAL_ERROR "failed to create link '${link_path}': ${ALIB_LINK_RESULT}")
-        endif()
+foreach(ALIB_LEGACY_INCLUDE_LINK IN ITEMS
+        "${PROJECT_BINARY_DIR}/inc"
+        "${PROJECT_BINARY_DIR}/alib")
+    if(IS_SYMLINK "${ALIB_LEGACY_INCLUDE_LINK}")
+        file(REMOVE "${ALIB_LEGACY_INCLUDE_LINK}")
     endif()
-endfunction()
+endforeach()
 
 file(MAKE_DIRECTORY
     "${ALIB_OBJECT_ROOT}"
     "${ALIB_LIBRARY_OUTPUT_DIR}"
     "${ALIB_SAMPLE_OUTPUT_DIR}"
     "${ALIB_TEST_OUTPUT_DIR}"
+    "${ALIB_BUILD_INCLUDE_ROOT}"
+    "${ALIB_BUILD_ALIB_INCLUDE_DIR}"
 )
-alib_create_link("${PROJECT_BINARY_DIR}/inc" "${PROJECT_SOURCE_DIR}/inc")
-alib_create_link("${PROJECT_BINARY_DIR}/alib" "${PROJECT_SOURCE_DIR}/inc")
+
+foreach(ALIB_HEADER IN LISTS ALIB_PUBLIC_HEADERS)
+    get_filename_component(ALIB_HEADER_NAME "${ALIB_HEADER}" NAME)
+    configure_file(
+        "${ALIB_HEADER}"
+        "${ALIB_BUILD_ALIB_INCLUDE_DIR}/${ALIB_HEADER_NAME}"
+        COPYONLY
+    )
+endforeach()
 
 function(alib_enable_warnings target)
     if(ALIB_MSVC_LIKE)
@@ -198,48 +244,28 @@ find_package(Threads REQUIRED)
 set(ALIB_PUBLIC_COMPILE_DEFINITIONS "")
 set(ALIB_PUBLIC_LINK_LIBRARIES Threads::Threads)
 
-if(MINGW)
-    cmake_push_check_state(RESET)
-    set(CMAKE_REQUIRED_DEFINITIONS "-D_UCRT")
-    set(CMAKE_REQUIRED_LIBRARIES ucrtbase)
-    check_c_source_compiles([=[
-        #include <time.h>
-
-        int main(void) {
-            struct timespec now;
-            return timespec_get(&now, TIME_UTC) == TIME_UTC ? 0 : 1;
-        }
-    ]=] ALIB_MINGW_UCRT_HAS_TIMESPEC_GET)
-    cmake_pop_check_state()
-
-    if(NOT ALIB_MINGW_UCRT_HAS_TIMESPEC_GET)
-        message(FATAL_ERROR
-            "ALib MinGW builds require a UCRT-compatible runtime that provides "
-            "timespec_get/TIME_UTC. Install a MinGW-w64 UCRT toolchain or provide "
-            "ucrtbase."
-        )
-    endif()
-
-    list(APPEND ALIB_PUBLIC_COMPILE_DEFINITIONS _UCRT)
-    list(APPEND ALIB_PUBLIC_LINK_LIBRARIES ucrtbase)
+if(COMMAND alib_configure_platform)
+    alib_configure_platform()
 endif()
 
-add_subdirectory(cmake/lib "${ALIB_OBJECT_ROOT}/lib")
+add_subdirectory(src "${ALIB_OBJECT_ROOT}/lib")
 add_library(ALib::atlan ALIAS atlan)
 
 if(ALIB_BUILD_SAMPLES)
-    add_subdirectory(cmake/sample "${ALIB_OBJECT_ROOT}/sample")
+    add_subdirectory(sample "${ALIB_OBJECT_ROOT}/sample")
 endif()
 
 if(ALIB_BUILD_TESTS)
     enable_testing()
-    add_subdirectory(cmake/test "${ALIB_OBJECT_ROOT}/test")
+    add_subdirectory(test "${ALIB_OBJECT_ROOT}/test")
 endif()
 
-install(TARGETS atlan
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
-install(DIRECTORY "${PROJECT_SOURCE_DIR}/inc/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/alib"
-    FILES_MATCHING PATTERN "*.h"
-)
+if(NOT ALIB_DISABLE_INSTALL)
+    install(TARGETS atlan
+        ARCHIVE DESTINATION "${ALIB_INSTALL_LIBDIR}"
+    )
+    install(DIRECTORY "${PROJECT_SOURCE_DIR}/inc/"
+        DESTINATION "${ALIB_INSTALL_INCLUDEDIR}"
+        FILES_MATCHING PATTERN "*.h"
+    )
+endif()
