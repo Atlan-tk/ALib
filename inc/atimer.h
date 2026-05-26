@@ -13,6 +13,18 @@ extern "C" {
 #include "alib.h"
 #include <time.h>
 
+#ifndef TIME_UTC
+    #define __ALIB_TIME__
+    #define TIME_UTC 1
+    struct timespec{
+        time_t  tv_sec;
+        long    tv_nsec;
+    };
+    int timespec_get(struct timespec *ts, int base);
+#endif
+
+
+
 typedef struct{
     struct timespec clock;
 }AClock;

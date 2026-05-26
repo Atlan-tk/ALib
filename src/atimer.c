@@ -10,6 +10,65 @@
 #include <asortque.h>
 #include <stdatomic.h>
 
+#if defined (__ALIB_TIME__)
+#if defined (__C_POSIX__)
+__unused int timespec_get(struct timespec *ts, int base){
+    if (ts == NULL || base != TIME_UTC)
+        return 0;
+    if (clock_gettime(CLOCK_REALTIME, ts) == 0)
+        return base;
+    else
+        return 0;
+}
+#elif defined (__C_WINDOWS__)
+__unused int timespec_get(struct timespec *ts, int base){
+    if (ts == NULL || base != TIME_UTC)
+        return 0;
+
+    FILETIME ft;
+    /* 优先使用更高精度的版本（Win8+），否则回退 */
+    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+    if (hKernel32) {
+        FARPROC proc = GetProcAddress(hKernel32, "GetSystemTimePreciseAsFileTime");
+        if (proc) {
+            ((void (WINAPI*)(FILETIME*))proc)(&ft);
+        } else {
+            GetSystemTimeAsFileTime(&ft);
+        }
+    } else {
+        GetSystemTimeAsFileTime(&ft);
+    }
+
+    /* FILETIME 到 64 位 100 纳秒数 */
+    ULARGE_INTEGER uli;
+    uli.LowPart  = ft.dwLowDateTime;
+    uli.HighPart = ft.dwHighDateTime;
+
+    /* 1601-01-01 到 1970-01-01 的 100 纳秒间隔数：116444736000000000 */
+    const ULONGLONG EPOCH_DIFF = 116444736000000000ULL;
+    uli.QuadPart -= EPOCH_DIFF;
+
+    ts->tv_sec  = (time_t)(uli.QuadPart / 10000000ULL);   /* 100ns -> 秒 */
+    ts->tv_nsec = (long)((uli.QuadPart % 10000000ULL) * 100); /* 余数 -> 纳秒 */
+
+    return base;
+}
+#else
+__unused int timespec_get(struct timespec *ts, int base){
+    if (ts == NULL || base != TIME_UTC)
+        return 0;
+    struct timeval tv;
+    if (gettimeofday(&tv, NULL) != 0)
+        return 0;
+    ts->tv_sec  = tv.tv_sec;
+    ts->tv_nsec = tv.tv_usec * 1000L;  /* 微秒 -> 纳秒 */
+    return base;
+}
+#endif /* __C_POSIX__ || __C_WINDOWS__ */
+#endif /* __ALIB_TIME__ */
+
+
+
 typedef struct{
     void(*call)(void* data);    //任务处理函数
     void*       data;           //任务数据
