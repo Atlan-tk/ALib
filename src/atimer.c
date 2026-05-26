@@ -13,7 +13,7 @@
 /* timespec_get */
 #if defined (__C_POSIX__)
 __weak __unused int timespec_get(struct timespec *ts, int base){
-	if(ts == NULL || base != TIME_UTC){
+	if(base != TIME_UTC){
 		return 0;
 	}
 	if(clock_gettime(CLOCK_REALTIME, ts) == 0){
@@ -24,8 +24,9 @@ __weak __unused int timespec_get(struct timespec *ts, int base){
 }
 #elif defined (__C_WINDOWS__)
 __weak  __unused int timespec_get(struct timespec *ts, int base){
-    if (ts == NULL || base != TIME_UTC)
+	if(base != TIME_UTC){
         return 0;
+    }
 
     FILETIME ft;
     /* 优先使用更高精度的版本（Win8+），否则回退 */
