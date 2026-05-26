@@ -10,18 +10,20 @@
 #include <asortque.h>
 #include <stdatomic.h>
 
-#if defined (__ALIB_TIME__)
+/* timespec_get */
 #if defined (__C_POSIX__)
-__unused int timespec_get(struct timespec *ts, int base){
-    if (ts == NULL || base != TIME_UTC)
-        return 0;
-    if (clock_gettime(CLOCK_REALTIME, ts) == 0)
-        return base;
-    else
-        return 0;
+__weak __unused int timespec_get(struct timespec *ts, int base){
+	if(ts == NULL || base != TIME_UTC){
+		return 0;
+	}
+	if(clock_gettime(CLOCK_REALTIME, ts) == 0){
+		return base;
+	}else{
+		return 0;
+	}
 }
 #elif defined (__C_WINDOWS__)
-__unused int timespec_get(struct timespec *ts, int base){
+__weak  __unused int timespec_get(struct timespec *ts, int base){
     if (ts == NULL || base != TIME_UTC)
         return 0;
 
@@ -53,19 +55,8 @@ __unused int timespec_get(struct timespec *ts, int base){
 
     return base;
 }
-#else
-__unused int timespec_get(struct timespec *ts, int base){
-    if (ts == NULL || base != TIME_UTC)
-        return 0;
-    struct timeval tv;
-    if (gettimeofday(&tv, NULL) != 0)
-        return 0;
-    ts->tv_sec  = tv.tv_sec;
-    ts->tv_nsec = tv.tv_usec * 1000L;  /* 微秒 -> 纳秒 */
-    return base;
-}
 #endif /* __C_POSIX__ || __C_WINDOWS__ */
-#endif /* __ALIB_TIME__ */
+/* timespec_get */
 
 
 

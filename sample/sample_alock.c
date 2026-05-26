@@ -8,9 +8,9 @@
  */
 
 #include <alib/alib.h>
+#include <alib/athrd.h>
 #include <alib/alock.h>
 #include <stdio.h>
-#include <threads.h>
 
 enum {
     WORKER_COUNT = 4,

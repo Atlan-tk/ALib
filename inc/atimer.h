@@ -14,14 +14,17 @@ extern "C" {
 #include <time.h>
 
 #ifndef TIME_UTC
-    #define __ALIB_TIME__
     #define TIME_UTC 1
+#endif /* TIME_UTC */
+
+#if !defined(__timespec_defined) && !defined(_STRUCT_TIMESPEC) && \
+	!defined(_TIMESPEC_DECLARED) && !defined(HAVE_STRUCT_TIMESPEC)
     struct timespec{
         time_t  tv_sec;
         long    tv_nsec;
     };
-    int timespec_get(struct timespec *ts, int base);
-#endif
+#endif /* timespec */
+__weak int timespec_get(struct timespec *ts, int base);
 
 
 
