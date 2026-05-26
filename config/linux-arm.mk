@@ -5,8 +5,8 @@ CC := aarch64-linux-gnu-gcc
 AR := aarch64-linux-gnu-ar
 export CC AR
 
-EXE := exe
-LIB := alib.lib
+EXE := out
+LIB := libalib.a
 export EXE LIB
 
 BUILD := $(ALIB)build/
@@ -16,8 +16,8 @@ INCLUDE := $(BUILD).include/
 export TARLIB OUTDIR BUILD INCLUDE
 
 CFLAGS_AR := rcs
-CFLAGS_LD := -lpthread -L$(OUTDIR) -lalib
-CFLAGS_CC := -O0 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc -DGNU_SOURCE
+CFLAGS_LD := -lpthread -latomic -L$(OUTDIR) -lalib
+CFLAGS_CC := -O2 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc -DGNU_SOURCE
 CFLAGS_TEST := -g -O0 -Wall -Wextra -Werror -I$(INCLUDE) -DGNU_SOURCE
 export CFLAGS_CC CFLAGS_AR CFLAGS_LD CFLAGS_TEST
 
