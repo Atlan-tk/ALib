@@ -1,8 +1,8 @@
 
-CONFIG := linux-mips
+CONFIG := mingw64
 
-CC := mips-linux-gnu-gcc
-AR := mips-linux-gnu-ar
+CC := x86_64-w64-mingw32-gcc
+AR := x86_64-w64-mingw32ucrt-ar
 export CC AR
 
 EXE := exe
@@ -15,15 +15,16 @@ TARLIB := $(OUTDIR)$(LIB)
 INCLUDE := $(BUILD).include/
 export TARLIB OUTDIR BUILD INCLUDE
 
-CFLAGS_AR := rcs
-CFLAGS_LD := -lpthread -L$(OUTDIR) -lalib
-CFLAGS_CC := -O0 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc -DGNU_SOURCE
-CFLAGS_TEST := -g -O0 -Wall -Wextra -Werror -I$(INCLUDE) -DGNU_SOURCE
+CFLAGS_AR := rcs -lucrt
+CFLAGS_LD := -lpthread -L$(OUTDIR) -lalib -lucrt
+CFLAGS_CC := -O0 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc -DGNU_SOURCE -D_UCRT
+CFLAGS_TEST := -g -O0 -Wall -Wextra -Werror -I$(INCLUDE) -DGNU_SOURCE -D_UCRT
 export CFLAGS_CC CFLAGS_AR CFLAGS_LD CFLAGS_TEST
 
 INSTALL_INC := $(HOME)/.alib/include/alib/
 INSTALL_LIB := $(HOME)/.alib/lib/
 export INSTALL_LIB INSTALL_INC
+
 
 
 

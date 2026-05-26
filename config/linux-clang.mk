@@ -1,12 +1,12 @@
 
-CONFIG := linux-mips
+CONFIG := linux-clang
 
-CC := mips-linux-gnu-gcc
-AR := mips-linux-gnu-ar
+CC := clang
+AR := llvm-ar
 export CC AR
 
-EXE := exe
-LIB := alib.lib
+EXE := out
+LIB := libalib.a
 export EXE LIB
 
 BUILD := $(ALIB)build/
@@ -17,13 +17,14 @@ export TARLIB OUTDIR BUILD INCLUDE
 
 CFLAGS_AR := rcs
 CFLAGS_LD := -lpthread -L$(OUTDIR) -lalib
-CFLAGS_CC := -O0 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc -DGNU_SOURCE
+CFLAGS_CC := -O3 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc -DGNU_SOURCE
 CFLAGS_TEST := -g -O0 -Wall -Wextra -Werror -I$(INCLUDE) -DGNU_SOURCE
 export CFLAGS_CC CFLAGS_AR CFLAGS_LD CFLAGS_TEST
 
-INSTALL_INC := $(HOME)/.alib/include/alib/
-INSTALL_LIB := $(HOME)/.alib/lib/
+INSTALL_INC := /usr/local/include/alib/
+INSTALL_LIB := /usr/local/lib/
 export INSTALL_LIB INSTALL_INC
+
 
 
 

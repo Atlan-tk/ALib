@@ -1,33 +1,39 @@
 
 ALIB := $(CURDIR)/
+CONDIR := $(ALIB)config/
 export ALIB
 
 CONFIG ?=
 export CONFIG
 
-ifeq ($(CONFIG), )
-    ifeq ($(OS),Windows_NT)
-        CONFIG := windows
+ifneq ($(CONFIG), )
+    -include $(CONDIR)$(CONFIG).mk
+else
+    ifneq ($(wildcard $(ALIB).config), )
+        -include $(ALIB).config
     else
-        UNAME_S := $(shell uname -s)
-        ifeq ($(UNAME_S),Linux)
-            CONFIG := linux
-        else ifeq ($(UNAME_S),Unix)
-            CONFIG := unix
-        else ifeq ($(UNAME_S),Darwin)
-            CONFIG := mac
+        ifeq ($(OS),Windows_NT)
+            CONFIG := windows
         else
-            CONFIG := linux
+            UNAME_S := $(shell uname -s)
+            ifeq ($(UNAME_S),Linux)
+                CONFIG := linux
+            else ifeq ($(UNAME_S),Unix)
+                CONFIG := unix
+            else ifeq ($(UNAME_S),Darwin)
+                CONFIG := mac
+            else
+                CONFIG := linux
+            endif
         endif
+        -include $(CONDIR)$(CONFIG).mk
     endif
 endif
 
-CONDIR := $(ALIB)config/
--include $(CONDIR)$(CONFIG).mk
-
-.PHONY: all clean install remove
+.PHONY: all clean disclean install uninstall
 
 all: $(BUILD)
+	@cp $(CONDIR)$(CONFIG).mk $(ALIB).config
 	$(MAKE) -C $(ALIB)src DIR=$(ALIB)src/
 	$(MAKE) -C $(ALIB)test DIR=$(ALIB)test/
 	$(MAKE) -C $(ALIB)sample DIR=$(ALIB)sample/
@@ -38,22 +44,25 @@ clean:
 	$(MAKE) -C $(ALIB)sample DIR=$(ALIB)sample/ clean
 	@rm -rf $(BUILD)
 
+disclean:
+	@rm -rf $(ALIB).config
+
 $(BUILD):
-	@mkdir $(BUILD) $(OUTDIR) $(INCLUDE)
+	@mkdir -p $(BUILD) $(OUTDIR) $(INCLUDE)
 	@ln -s $(ALIB)inc $(INCLUDE)alib
 
 install: $(TARLIB) $(INSTALL_LIB) $(INSTALL_INC)
 	@cp $(ALIB)inc/*.h $(INSTALL_INC)
 	@cp $(TARLIB) $(INSTALL_LIB)
 
-remove:
-	@rm -rf $(INSTALL_LIB) $(INSTALL_INC)
+uninstall:
+	@rm -rf $(INSTALL_LIB)$(LIB) $(INSTALL_INC)
 
 $(INSTALL_LIB):
-	@mkdir $@
+	@mkdir -p $@
 
 $(INSTALL_INC):
-	@mkdir $@
+	@mkdir -p $@
 
 $(TARLIB): $(BUILD)
 	$(MAKE) -C $(ALIB)src DIR=$(ALIB)src/

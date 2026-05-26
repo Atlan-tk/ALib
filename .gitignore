@@ -62,6 +62,7 @@ cmake_install.cmake
 compile_commands.json
 CTestTestfile.cmake
 Testing/
+.config
 
 .tmp_versions/
 modules.order

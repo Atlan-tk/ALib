@@ -1,4 +1,6 @@
 
+CONFIG := linux
+
 CC := cc
 AR := ar
 export CC AR
@@ -15,12 +17,12 @@ export TARLIB OUTDIR BUILD INCLUDE
 
 CFLAGS_AR := rcs
 CFLAGS_LD := -lpthread -L$(OUTDIR) -lalib
-CFLAGS_CC := -O3 -Wall -Werror -fPIC -I$(ALIB)inc
-CFLAGS_TEST := -g -O0 -Wall -Werror -I$(INCLUDE)
+CFLAGS_CC := -O3 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc -DGNU_SOURCE
+CFLAGS_TEST := -g -O0 -Wall -Wextra -Werror -I$(INCLUDE) -DGNU_SOURCE
 export CFLAGS_CC CFLAGS_AR CFLAGS_LD CFLAGS_TEST
 
 INSTALL_INC := /usr/local/include/alib/
-INSTALL_LIB := /usr/local/lib/$(LIB)
+INSTALL_LIB := /usr/local/lib/
 export INSTALL_LIB INSTALL_INC
 
 
