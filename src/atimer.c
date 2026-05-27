@@ -11,20 +11,21 @@
 #include <stdatomic.h>
 
 /* timespec_get */
+#if defined (__ALIB_TIMESPEC__)
 #if defined (__C_POSIX__)
 __weak __noused int timespec_get(struct timespec *ts, int base){
-	if(base != TIME_UTC){
-		return 0;
-	}
-	if(clock_gettime(CLOCK_REALTIME, ts) == 0){
-		return base;
-	}else{
-		return 0;
-	}
+    if(base != TIME_UTC){
+        return 0;
+    }
+    if(clock_gettime(CLOCK_REALTIME, ts) == 0){
+        return base;
+    }else{
+        return 0;
+    }
 }
 #elif defined (__C_WINDOWS__)
 __weak  __noused int timespec_get(struct timespec *ts, int base){
-	if(base != TIME_UTC){
+    if(base != TIME_UTC){
         return 0;
     }
 
@@ -57,7 +58,7 @@ __weak  __noused int timespec_get(struct timespec *ts, int base){
     return base;
 }
 #endif /* __C_POSIX__ || __C_WINDOWS__ */
-/* timespec_get */
+#endif /* __ALIB_TIMESPEC__ */
 
 
 
@@ -68,7 +69,7 @@ typedef struct{
     uint32_t    num;            //执行次数, =-1时为长期任务
     uint32_t    cycle;          //执行周期,ms
     uint32_t    wait;           //等待时间,ms,=0时立即执行
-    atomic_bool rm_flag;        //被删除
+    atomic_int  rm_flag;        //被删除
 }AWork;
 __weak int A_OBJ_CMPD(AWork)(const AWork* self, const AWork* that){
     int ret = A_CMPD(uint32_t, self->wait, that->wait);
@@ -81,7 +82,7 @@ static inline void AWork_call(AWork* self){
         aExcSet(AEXC_nullptr);
         return;
     }
-    if(!atomic_load_explicit(&self->rm_flag, memory_order_relaxed)){
+    if(0 == atomic_load_explicit(&self->rm_flag, memory_order_relaxed)){
         self->call(self->data);
         self->wait = self->cycle;   //重置等待时间
         if(self->num != aLongWork){
@@ -96,14 +97,14 @@ static inline void AWork_set_rm(AWork* self){
         aExcSet(AEXC_nullptr);
         return;
     }
-    atomic_store_explicit(&self->rm_flag, true, memory_order_relaxed);
+    atomic_store_explicit(&self->rm_flag, 1, memory_order_relaxed);
 }
 __noused static inline void AWork_clean_rm(AWork* self){
     if(self == nullptr){
         aExcSet(AEXC_nullptr);
         return;
     }
-    atomic_store_explicit(&self->rm_flag, false, memory_order_relaxed);
+    atomic_store_explicit(&self->rm_flag, 0, memory_order_relaxed);
 }
 
 
@@ -230,7 +231,7 @@ static inline void AWorkQue_putQue(AWorkQue* self, AWorkQue* that){
             break;
         }
 
-        if(!work.rm_flag && work.num != 0){
+        if(work.rm_flag == 0 && work.num != 0){
             AWorkQue_push(self, work);
             if(aExcOccur()){
                 break;
@@ -487,7 +488,11 @@ static inline void ATimer_poweroff(ATimer* self){
     thrd_join(self->tid, &self->thret);
 }
 
+#if __SIZEOF_POINTER__ == 8
 static atomic_llong a_work_count = 0;
+#else
+static atomic_long a_work_count = 0;
+#endif /* 64 or 32 */
 static ATimer a_timer_0;
 
 /* 毫秒级定时器 */

@@ -361,7 +361,11 @@ A_TYPE_REGISTER(AHash(const_ptr_t,ASignalRadio));
 
 /* 信号系统 */
 typedef struct{
+#if __SIZEOF_POINTER__ == 8
     atomic_llong                count;
+#else
+    atomic_long                 count;
+#endif /* 64 or 32 */
     AList(ALink)                linkPool;
     AHash(Aint,ASignalTower)    idMap;
     AHash(const_ptr_t,ASignalRadio)  adMap;

@@ -66,14 +66,14 @@ extern "C" {
 
 
 /* 初始化计数为1 */
-static inline void __a_ref_count_init(atomic_ullong* ref_count){
+static inline void __a_ref_count_init(atomic_uint* ref_count){
     atomic_store_explicit(ref_count, 1, memory_order_relaxed);
 }
-__noused static inline bool __a_ref_count_valid(atomic_ullong* ref_count){
+__noused static inline bool __a_ref_count_valid(atomic_uint* ref_count){
     return atomic_load_explicit(ref_count, memory_order_relaxed) >= 1;
 }
 /* 返回为真则自增成功 */
-static inline bool __a_ref_count_add(atomic_ullong* ref_count){
+static inline bool __a_ref_count_add(atomic_uint* ref_count){
     if(__a_unlikely(atomic_fetch_add(ref_count, 1) > 0)){
         return true;
     }else{
@@ -82,7 +82,7 @@ static inline bool __a_ref_count_add(atomic_ullong* ref_count){
     return false;
 }
 /* 返回为真则可释放 */
-static inline bool __a_ref_count_sub(atomic_ullong* ref_count){
+static inline bool __a_ref_count_sub(atomic_uint* ref_count){
     if(__a_unlikely(atomic_fetch_sub(ref_count, 1) == 1)){
         return true;
     }
@@ -101,7 +101,7 @@ static inline bool __a_ref_count_sub(atomic_ullong* ref_count){
     struct AShPtr(T){                                                                   \
         T* p;                                                                           \
         void(*dest)(void*);                                                             \
-        atomic_ullong* ref_count;                                                       \
+        atomic_uint* ref_count;                                                         \
     };                                                                                  \
 
 #define AShPtr_Generate(T)                                                              \
@@ -114,7 +114,7 @@ static inline bool __a_ref_count_sub(atomic_ullong* ref_count){
         }                                                                               \
     }                                                                                   \
     __noused __weak void A_OBJ_INIT(AShPtr(T))(AShPtr(T)* self){                        \
-        self->ref_count = alib_alloc(sizeof(atomic_ullong));                            \
+        self->ref_count = alib_alloc(sizeof(atomic_uint));                              \
         if(__a_unlikely(self->ref_count == nullptr)){                                   \
             aExcSet(AEXC_alloc_failed); return;                                         \
         }                                                                               \
@@ -143,7 +143,7 @@ static inline bool __a_ref_count_sub(atomic_ullong* ref_count){
     }                                                                                   \
     __noused static inline AShPtr(T) __AShPtr_cpnew(T)(T* obj){                         \
         AShPtr(T) sh = {};                                                              \
-        sh.ref_count = alib_alloc(sizeof(atomic_ullong));                               \
+        sh.ref_count = alib_alloc(sizeof(atomic_uint));                                 \
         if(__a_unlikely(sh.ref_count == nullptr)){                                      \
             aExcSet(AEXC_alloc_failed); return sh;                                      \
         }                                                                               \

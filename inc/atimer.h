@@ -19,6 +19,7 @@ extern "C" {
 
 #if !defined(__timespec_defined) && !defined(_STRUCT_TIMESPEC) && \
 	!defined(_TIMESPEC_DECLARED) && !defined(HAVE_STRUCT_TIMESPEC)
+    #define __ALIB_TIMESPEC__
     struct timespec{
         time_t  tv_sec;
         long    tv_nsec;

@@ -1,8 +1,8 @@
 
 CONFIG := linux-mips
 
-CC := mips-linux-gnu-gcc
-AR := mips-linux-gnu-ar
+CC := mips-linux-uclibc-gnu-gcc
+AR := mips-linux-uclibc-gnu-ar
 export CC AR
 
 EXE := out
@@ -16,7 +16,7 @@ INCLUDE := $(BUILD).include/
 export TARLIB OUTDIR BUILD INCLUDE
 
 CFLAGS_AR := rcs
-CFLAGS_LD := -lpthread  -Wl,-Bstatic -latomic -L$(OUTDIR) -lalib
+CFLAGS_LD := -lpthread -lgcc_s -L$(OUTDIR) -lalib
 CFLAGS_CC := -O2 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc -DGNU_SOURCE
 CFLAGS_TEST := -g -O0 -Wall -Wextra -Werror -I$(INCLUDE) -DGNU_SOURCE
 export CFLAGS_CC CFLAGS_AR CFLAGS_LD CFLAGS_TEST
