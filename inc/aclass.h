@@ -57,7 +57,7 @@ extern "C" {
     static inline void __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that);                                   \
     static inline int  __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that);                             \
                                                                                                             \
-    __unused static inline void __A_OBJ_DEST_FUNC_SELF(T)(T* self){                                         \
+    __noused static inline void __A_OBJ_DEST_FUNC_SELF(T)(T* self){                                         \
         /* 空对象不析构 */                                                                                  \
         if(__a_unlikely(self == nullptr)) { return; }                                                       \
                                                                                                             \
@@ -68,7 +68,7 @@ extern "C" {
         __A_OBJ_DEST_FUNC_BASE(T)((__A_CLASS_BASE(T)*)self);                                                \
         memset(self, 0, sizeof(T));                                                                         \
     }                                                                                                       \
-    __unused static inline void __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                         \
+    __noused static inline void __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                         \
         aExcClean();                                                                                        \
         if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
                                                                                                             \
@@ -85,7 +85,7 @@ extern "C" {
         if(!aExcOccur() && A_OBJ_INIT(T) != nullptr) A_OBJ_INIT(T)(self);                                   \
         if(aExcOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
     }                                                                                                       \
-    __unused static inline void __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){                          \
+    __noused static inline void __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){                          \
         aExcClean();                                                                                        \
         if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
                                                                                                             \
@@ -112,7 +112,7 @@ extern "C" {
                                                                                                             \
         if(aExcOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
     }                                                                                                       \
-    __unused static inline int  __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){                    \
+    __noused static inline int  __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){                    \
         if(self == that || (self == nullptr && that == nullptr)){ return 0; }                               \
         if(self == nullptr){ return 1; } if(that == nullptr){ return -1; }                                  \
         int ret = __A_OBJ_CMPD_FUNC_BASE(T)((const void*)self, (const void*)that);if(ret != 0){return ret; }\

@@ -12,7 +12,7 @@
 
 /* timespec_get */
 #if defined (__C_POSIX__)
-__weak __unused int timespec_get(struct timespec *ts, int base){
+__weak __noused int timespec_get(struct timespec *ts, int base){
 	if(base != TIME_UTC){
 		return 0;
 	}
@@ -23,7 +23,7 @@ __weak __unused int timespec_get(struct timespec *ts, int base){
 	}
 }
 #elif defined (__C_WINDOWS__)
-__weak  __unused int timespec_get(struct timespec *ts, int base){
+__weak  __noused int timespec_get(struct timespec *ts, int base){
 	if(base != TIME_UTC){
         return 0;
     }
@@ -98,7 +98,7 @@ static inline void AWork_set_rm(AWork* self){
     }
     atomic_store_explicit(&self->rm_flag, true, memory_order_relaxed);
 }
-__unused static inline void AWork_clean_rm(AWork* self){
+__noused static inline void AWork_clean_rm(AWork* self){
     if(self == nullptr){
         aExcSet(AEXC_nullptr);
         return;
@@ -121,7 +121,7 @@ __weak void A_OBJ_INIT(AWorkQue)(AWorkQue* self){
 __weak void A_OBJ_DEST(AWorkQue)(AWorkQue* self){
     A_DEST(ASortque(AWork), self->que);
 }
-__weak void A_OBJ_COPY(AWorkQue)(AWorkQue* self, __unused const AWorkQue* that){
+__weak void A_OBJ_COPY(AWorkQue)(AWorkQue* self, __noused const AWorkQue* that){
     self->que = A_COPY(ASortque(AWork), that->que);
 }
 __weak int A_OBJ_CMPD(AWorkQue)(const AWorkQue* self, const AWorkQue* that){

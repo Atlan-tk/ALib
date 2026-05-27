@@ -36,7 +36,7 @@ __weak void A_OBJ_INIT(AClock)(AClock* self){
         aExcSet(AEXC_system_error);
    }
 }
-__weak void A_OBJ_COPY(AClock)(AClock* self, __unused const AClock* that){
+__weak void A_OBJ_COPY(AClock)(AClock* self, __noused const AClock* that){
     A_OBJ_INIT(AClock)(self);
 }
 static inline int64_t AClock_nsDiff(AClock self, AClock that);

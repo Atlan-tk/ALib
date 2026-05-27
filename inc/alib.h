@@ -45,6 +45,10 @@ extern "C" {
             #define thread_local _Thread_local
         #endif /* thread_local */
 
+        #ifndef static_assert
+            #define static_assert _Static_assert
+        #endif /* static_assert */
+
         #ifndef typeof
             #define typeof __typeof__
         #endif /* typeof */
@@ -72,13 +76,13 @@ extern "C" {
     #endif
 #endif /* __weakref */
 
-#ifndef __unused
+#ifndef __noused
     #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
-        #define __unused [[gnu::unused]]
+        #define __noused [[gnu::unused]]
     #else
-        #define __unused __attribute__((unused))
+        #define __noused __attribute__((unused))
     #endif
-#endif /* __unused */
+#endif /* __noused */
 
 #ifndef __cleanup
     #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
@@ -98,7 +102,6 @@ extern "C" {
 
 #include <string.h>
 #include <stdint.h>
-#include <assert.h>
 
 
 
@@ -135,13 +138,13 @@ extern "C" {
 
 
 /* alloc and free */
-__unused __weak void  alib_free(void* p);
-__unused __weak void* alib_alloc(uint32_t size);
-__unused __weak void* alib_realloc(void* p, uint32_t size);
+__noused __weak void  alib_free(void* p);
+__noused __weak void* alib_alloc(uint32_t size);
+__noused __weak void* alib_realloc(void* p, uint32_t size);
 
-__unused __weak void* alib_new(uint32_t size, void(*init_func)(void*));
-__unused __weak void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
-__unused __weak void  alib_delete(void* p, void(*dest_func)(void*));
+__noused __weak void* alib_new(uint32_t size, void(*init_func)(void*));
+__noused __weak void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
+__noused __weak void  alib_delete(void* p, void(*dest_func)(void*));
 
 
 
@@ -172,7 +175,7 @@ static inline int __a_memcmp(const void* s0, const void* s1, uint32_t size){
     return memcmp(s0, s1, size);
 }
 
-__unused static inline void a_class_dest(void* _self);
+__noused static inline void a_class_dest(void* _self);
 
 
 
@@ -247,7 +250,7 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
     __weak int  A_OBJ_CMPD(T)(const T* self, const T* that);                                                \
     __weak uint32_t A_OBJ_HASH(T)(const T*);                                                                \
                                                                                                             \
-    __unused static inline void __A_OBJ_DEST_FUNC_SELF(T)(T* self){                                         \
+    __noused static inline void __A_OBJ_DEST_FUNC_SELF(T)(T* self){                                         \
         /* 空对象不析构 */                                                                                  \
         if(__a_unlikely(self == nullptr)) { return; }                                                       \
                                                                                                             \
@@ -257,13 +260,13 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
         if(A_OBJ_DEST(T) != nullptr) A_OBJ_DEST(T)(self);                                                   \
         memset(self, 0, sizeof(T));                                                                         \
     }                                                                                                       \
-    __unused static inline void __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                         \
+    __noused static inline void __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                         \
         aExcClean();                                                                                        \
         if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
         memset(self, 0, sizeof(T)); if(A_OBJ_INIT(T) != nullptr) A_OBJ_INIT(T)(self);                       \
         if(aExcOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
     }                                                                                                       \
-    __unused static inline void __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){                          \
+    __noused static inline void __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){                          \
         aExcClean();                                                                                        \
         if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
         if(__a_unlikely(that == nullptr)) { __A_OBJ_INIT_FUNC_SELF(T)(self); return; }                      \
@@ -274,7 +277,7 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
         }                                                                                                   \
         if(aExcOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
     }                                                                                                       \
-    __unused static inline int __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){                     \
+    __noused static inline int __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){                     \
         if(self == that || (self == nullptr && that == nullptr)) return 0;                                  \
         if(self == nullptr){ return 1; } if(that == nullptr){ return -1; }                                  \
         return A_OBJ_CMPD(T) != nullptr ? A_OBJ_CMPD(T)(self,that) : __A_OBJ_CMPD_AUTO(T,self,that);        \
@@ -388,32 +391,32 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
 /* PRIMITIVE TYPE REGISTER */
 /********************************************************************/
 //void
-__unused static inline void __A_OBJ_DEST_FUNC_SELF(void)(__unused void* self){}
-__unused static inline void __A_OBJ_INIT_FUNC_SELF(void)(__unused void* self){}
-__unused static inline void __A_OBJ_COPY_FUNC_SELF(void)(__unused void* self, __unused const void* that){}
-__unused static inline int  __A_OBJ_CMPD_FUNC_SELF(void)(__unused const void* self, __unused const void* that){ return 0; }
-__unused static inline uint32_t A_OBJ_HASH(void)(__unused const void* self){ return 0; };
+__noused static inline void __A_OBJ_DEST_FUNC_SELF(void)(__noused void* self){}
+__noused static inline void __A_OBJ_INIT_FUNC_SELF(void)(__noused void* self){}
+__noused static inline void __A_OBJ_COPY_FUNC_SELF(void)(__noused void* self, __noused const void* that){}
+__noused static inline int  __A_OBJ_CMPD_FUNC_SELF(void)(__noused const void* self, __noused const void* that){ return 0; }
+__noused static inline uint32_t A_OBJ_HASH(void)(__noused const void* self){ return 0; };
 
 //int
 #define __A_PRIMITIVE_TYPE_REGISTER(T)                                                  \
     enum{ __A_IS_CLASS(T) = 0 };                                                        \
-    __unused static void __A_OBJ_DEST_FUNC_SELF(T)(__unused T* self){                   \
+    __noused static void __A_OBJ_DEST_FUNC_SELF(T)(__noused T* self){                   \
         memset(self, 0, sizeof(T));                                                     \
     }                                                                                   \
-    __unused static void  __A_OBJ_INIT_FUNC_SELF(T)(T* self){                           \
+    __noused static void  __A_OBJ_INIT_FUNC_SELF(T)(T* self){                           \
         if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }             \
         memset(self, 0, sizeof(T));                                                     \
     }                                                                                   \
-    __unused static void  __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){            \
+    __noused static void  __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){            \
         if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }             \
         memset(self, 0, sizeof(T)); if(that != nullptr) *self = *that;                  \
     }                                                                                   \
-    __unused static int __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){        \
+    __noused static int __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){        \
         if(self == that || (self == nullptr && that == nullptr)) return 0;              \
         if(self == nullptr){ return 1; } if(that == nullptr){ return -1; }              \
         return __A_OBJ_CMPD_AUTO(T,self,that);                                          \
     }                                                                                   \
-    __unused __weak uint32_t A_OBJ_HASH(T)(const T*);                                   \
+    __noused __weak uint32_t A_OBJ_HASH(T)(const T*);                                   \
 
 
 __A_PRIMITIVE_TYPE_REGISTER(int);
@@ -458,31 +461,31 @@ static const A_FUNC(Atlan) A_FUNC_TAB(Atlan);
 
 enum{ __A_IS_CLASS(Atlan) = 1 };
 
-__unused static inline void A_SET_VTAB(Atlan)(__unused Atlan* self){}
+__noused static inline void A_SET_VTAB(Atlan)(__noused Atlan* self){}
 
-__unused static inline void __A_OBJ_DEST_FUNC_SELF(Atlan)(__unused Atlan* self){}
+__noused static inline void __A_OBJ_DEST_FUNC_SELF(Atlan)(__noused Atlan* self){}
 
-__unused static inline void __A_OBJ_INIT_FUNC_SELF(Atlan)(Atlan* self){
+__noused static inline void __A_OBJ_INIT_FUNC_SELF(Atlan)(Atlan* self){
     if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }
     self->f = &A_FUNC_TAB(Atlan);
 }
 
-__unused static inline void __A_OBJ_COPY_FUNC_SELF(Atlan)(Atlan* self, const Atlan* that){
+__noused static inline void __A_OBJ_COPY_FUNC_SELF(Atlan)(Atlan* self, const Atlan* that){
     if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }
     memset(self, 0, sizeof(Atlan)); if(that != nullptr) *self = *that;
 }
 
-__unused static inline int  __A_OBJ_CMPD_FUNC_SELF(Atlan)(const Atlan* self, const Atlan* that){
+__noused static inline int  __A_OBJ_CMPD_FUNC_SELF(Atlan)(const Atlan* self, const Atlan* that){
     if(self == that || (self == nullptr && that == nullptr)) return 0;
     if(self == nullptr){ return 1; } if(that == nullptr){ return -1; }
     return 0;
 }
 
-__unused static inline uint32_t A_OBJ_HASH(Atlan)(__unused const Atlan* self){ return 0; }
+__noused static inline uint32_t A_OBJ_HASH(Atlan)(__noused const Atlan* self){ return 0; }
 
 static const A_FUNC(Atlan) A_FUNC_TAB(Atlan) = { .flag = true, (void*)__A_OBJ_DEST_FUNC_SELF(Atlan) };
 
-__unused static inline void a_class_dest(void* _self){
+__noused static inline void a_class_dest(void* _self){
     Atlan* self = _self;
 
     if(self->f != nullptr && self->f->dest != nullptr)

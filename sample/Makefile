@@ -1,5 +1,6 @@
 
 SRC = $(wildcard $(DRI)*.c)
+INC = $(wildcard $(INCLUDE)*.h)
 OBJ = $(patsubst $(DRI)%.c, $(BUILD)%.o, $(SRC))
 TAR = $(patsubst $(BUILD)%.o, $(OUTDIR)%.$(EXE), $(OBJ))
 
@@ -16,5 +17,6 @@ $(TAR): $(OUTDIR)%.$(EXE): $(BUILD)%.o
 $(OBJ): $(BUILD)%.o: $(DRI)%.c
 	$(CC) $(CFLAGS_TEST) -c $< -o $@
 
+$(SRC): $(INC)
 
 

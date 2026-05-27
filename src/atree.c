@@ -561,7 +561,7 @@ static inline __AtrNode* __AtrNode_get_nep_f(__AtrNode* node){
 }
 
 /* -------------------------------------- */
-static inline void __Atree_install_2_red(__unused __Atree* tree, __AtrNode* n){
+static inline void __Atree_install_2_red(__noused __Atree* tree, __AtrNode* n){
     while(1){
         if(n == nullptr || n->par == nullptr){
             break;
@@ -593,7 +593,7 @@ static inline void __Atree_install_2_red(__unused __Atree* tree, __AtrNode* n){
     }
 }
 
-static inline void __Atree_remove_2_black(__unused __Atree* tree, __unused __AtrNode* n, bool de){
+static inline void __Atree_remove_2_black(__noused __Atree* tree, __noused __AtrNode* n, bool de){
     __AtrNode* rm_node = n;
 
     while(n != tree->root && __AtrNode_is_black(n)){

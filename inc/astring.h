@@ -53,13 +53,13 @@ void AString_addBack(AString* self, AString that);
 void AString_addFront(AString* self, AString that);
 void  AString_truncate(AString* self, uint32_t index);
 
-__unused static uint32_t AString_getNumber(const AString* self){
+__noused static uint32_t AString_getNumber(const AString* self){
     return self->number;
 }
-__unused static uint32_t AString_getCapacity(const AString* self){
+__noused static uint32_t AString_getCapacity(const AString* self){
     return self->capacity;
 }
-__unused static bool AString_empty(const AString* self){
+__noused static bool AString_empty(const AString* self){
     return self->number == 0;
 }
 

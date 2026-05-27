@@ -81,11 +81,11 @@ static inline uint32_t AText_getNumber(const AText* self) {
     return self->char_num;
 }
 
-__unused static inline uint32_t AText_getCapacity(const AText* self) {
+__noused static inline uint32_t AText_getCapacity(const AText* self) {
     return self->capacity;
 }
 
-__unused static inline bool AText_empty(const AText* self) {
+__noused static inline bool AText_empty(const AText* self) {
     return self->char_num == 0;
 }
 
