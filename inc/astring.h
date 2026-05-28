@@ -64,6 +64,12 @@ __noused static bool AString_empty(const AString* self){
     return self->number == 0;
 }
 
+__noused __weak uint32_t A_OBJ_HASH(AString)(const AString* self){
+    if(__a_unlikely(self == nullptr || self->s == nullptr)){
+        return 0;
+    }
+    return alib_hash_str(self->s);
+}
 A_TYPE_REGISTER(AString);
 
 static const A_FUNC(AString) A_FUNC_TAB(AString) = {
@@ -133,13 +139,6 @@ __noused __weak int A_OBJ_CMPD(AString)(const AString* self, const AString* that
     }else{
         return 1;
     }
-}
-
-uint32_t A_OBJ_HASH(AString)(const AString* self){
-    if(__a_unlikely(self == nullptr || self->s == nullptr)){
-        return 0;
-    }
-    return alib_hash_str(self->s);
 }
 
 

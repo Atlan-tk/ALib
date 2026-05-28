@@ -15,6 +15,6 @@ clean:
 $(TAR): $(OBJ)
 	$(AR) $(CFLAGS_AR) $@ $^
 
-$(OBJ): $(BUILD)%.o: $(DRI)%.c $(INC)
+$(OBJ): $(BUILD)%.o: $(DRI)%.c $(INC) $(ALIB).config
 	$(CC) $(CFLAGS_CC) -c $< -o $@
 
