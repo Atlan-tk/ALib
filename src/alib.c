@@ -93,24 +93,28 @@ __noused __weak void  alib_delete(void* p, void(*dest_func)(void*)){
     __alib_default_delete(p, dest_func);
 }
 #else
-__noused void  alib_free(void* p){
-    __alib_default_free(p);
-}
-__noused void* alib_alloc(uint32_t size){
-    return __alib_default_alloc(size);
-}
-__noused void* alib_realloc(void* p, uint32_t size){
-    return __alib_default_realloc(p, size);
-}
-__noused void* alib_new(uint32_t size, void(*init_func)(void*)){
-    return __alib_default_new(size, init_func);
-}
-__noused void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*)){
-    return __alib_default_cpnew(size, that, copy_func);
-}
-__noused void  alib_delete(void* p, void(*dest_func)(void*)){
-    __alib_default_delete(p, dest_func);
-}
+    #if defined (__ALIB_USER_ALLOC__)
+        void  __alib_user_free(void* p);
+        void* __alib_user_alloc(uint32_t size);
+        void* __alib_user_realloc(void* p, uint32_t size);
+        void* __alib_user_new(uint32_t size, void(*init_func)(void*));
+        void* __alib_user_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
+        void  __alib_user_delete(void* p, void(*dest_func)(void*));
+
+        void  (*const alib_free)(void* p) = __alib_user_free;
+        void* (*const alib_alloc)(uint32_t size) = __alib_user_alloc;
+        void* (*const alib_realloc)(void* p, uint32_t size) = __alib_user_realloc;
+        void* (*const alib_new)(uint32_t size, void(*init_func)(void*)) = __alib_user_new;
+        void* (*const alib_cpnew)(uint32_t size, const void* that, void(*copy_func)(void*, const void*)) = __alib_user_cpnew;
+        void  (*const alib_delete)(void* p, void(*dest_func)(void*)) = __alib_user_delete;
+    #else
+        void  (*const alib_free)(void* p) = __alib_default_free;
+        void* (*const alib_alloc)(uint32_t size) = __alib_default_alloc;
+        void* (*const alib_realloc)(void* p, uint32_t size) = __alib_default_realloc;
+        void* (*const alib_new)(uint32_t size, void(*init_func)(void*)) = __alib_default_new;
+        void* (*const alib_cpnew)(uint32_t size, const void* that, void(*copy_func)(void*, const void*)) = __alib_default_cpnew;
+        void  (*const alib_delete)(void* p, void(*dest_func)(void*)) = __alib_default_delete;
+    #endif /* __ALIB_USER_ALLOC__ */
 #endif /* posix or windows */
 
 
