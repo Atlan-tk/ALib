@@ -11,6 +11,13 @@ extern "C" {
 #endif /* __cplusplus */
 
 #include "alib.h"
+
+#if defined(__C_WINDOWS__)
+    #ifndef HAVE_STRUCT_TIMESPEC
+        #define HAVE_STRUCT_TIMESPEC
+    #endif /* HAVE_STRUCT_TIMESPEC */
+#endif /* __C_WINDOWS__ */
+
 #include <time.h>
 
 #ifndef TIME_UTC
@@ -25,7 +32,7 @@ extern "C" {
         long    tv_nsec;
     };
 #endif /* timespec */
-__weak int timespec_get(struct timespec *ts, int base);
+__weak __noused __nonnull int timespec_get(struct timespec *ts, int base);
 
 
 

@@ -83,13 +83,13 @@ static const A_FUNC(AString) A_FUNC_TAB(AString) = {
 };
 
 /* 将字面量转换为AString */
-static inline AString AString_new(char* s){
+static inline AString AString_new(const char* s){
     return  (AString){
         .f = &A_FUNC_TAB(AString),
         .number = s ? strlen(s) : 0,
         .noLiteral = false,
         .capacity = 0,
-        .s = s,
+        .s = (char*)s,
     };
 }
 

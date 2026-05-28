@@ -84,6 +84,14 @@ extern "C" {
     #endif
 #endif /* __noused */
 
+#ifndef __nonnull
+    #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
+        #define __nonnull [[gnu::nonnull]]
+    #else
+        #define __nonnull __attribute__((nonnull))
+    #endif
+#endif /* __nonnull */
+
 #ifndef __cleanup
     #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
         #define __cleanup(func) [[gnu::cleanup(func)]]

@@ -10,7 +10,7 @@ TAR = $(TARLIB)
 all: $(TAR)
 
 clean:
-	@rm -rf $(TAR) $(OBJ)
+	rm -rf $(TAR) $(OBJ)
 
 $(TAR): $(OBJ)
 	$(AR) $(CFLAGS_AR) $@ $^

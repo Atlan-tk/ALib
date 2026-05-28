@@ -13,7 +13,7 @@
 /* timespec_get */
 #if defined (__ALIB_TIMESPEC__)
 #if defined (__C_POSIX__)
-__weak __noused int timespec_get(struct timespec *ts, int base){
+__weak __noused __nonnull int timespec_get(struct timespec *ts, int base){
     if(base != TIME_UTC){
         return 0;
     }
@@ -24,7 +24,7 @@ __weak __noused int timespec_get(struct timespec *ts, int base){
     }
 }
 #elif defined (__C_WINDOWS__)
-__weak  __noused int timespec_get(struct timespec *ts, int base){
+__weak  __noused __nonnull int timespec_get(struct timespec *ts, int base){
     if(base != TIME_UTC){
         return 0;
     }

@@ -333,7 +333,7 @@ static iconv_t AText_iconv_open_utf8_to_gbk(void) {
 #endif
 
 /*******************************************************************************/
-uint32_t astrlen_u8(char* s) {
+uint32_t astrlen_u8(const char* s) {
     uint32_t count = 0;
     uint32_t off = 0;
 
@@ -349,7 +349,7 @@ uint32_t astrlen_u8(char* s) {
     return count;
 }
 
-uint32_t astrlen_u16(char* s) {
+uint32_t astrlen_u16(const char* s) {
     uint32_t count = 0;
     uint32_t off = 0;
 
@@ -376,7 +376,7 @@ uint32_t astrlen_u16(char* s) {
     return count;
 }
 
-uint32_t astrlen_u32(char* s) {
+uint32_t astrlen_u32(const char* s) {
     uint32_t count = 0;
     uint32_t off = 0;
 
@@ -392,7 +392,7 @@ uint32_t astrlen_u32(char* s) {
     return count;
 }
 
-uint32_t astrlen_gbk(char* s) {
+uint32_t astrlen_gbk(const char* s) {
     uint32_t count = 0;
     uint32_t off = 0;
 

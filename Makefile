@@ -33,7 +33,7 @@ endif
 .PHONY: all clean disclean install uninstall
 
 all: $(BUILD)
-	@cp $(CONDIR)$(CONFIG).mk $(ALIB).config
+	cp $(CONDIR)$(CONFIG).mk $(ALIB).config
 	$(MAKE) -C $(ALIB)src DIR=$(ALIB)src/
 	$(MAKE) -C $(ALIB)test DIR=$(ALIB)test/
 	$(MAKE) -C $(ALIB)sample DIR=$(ALIB)sample/
@@ -42,27 +42,27 @@ clean:
 	$(MAKE) -C $(ALIB)src DIR=$(ALIB)src/ clean
 	$(MAKE) -C $(ALIB)test DIR=$(ALIB)test/ clean
 	$(MAKE) -C $(ALIB)sample DIR=$(ALIB)sample/ clean
-	@rm -rf $(BUILD)
+	rm -rf $(BUILD)
 
 disclean:
-	@rm -rf $(ALIB).config
+	rm -rf $(ALIB).config
 
 $(BUILD):
-	@mkdir -p $(BUILD) $(OUTDIR) $(INCLUDE)
-	@ln -s $(ALIB)inc $(INCLUDE)alib
+	mkdir -p $(BUILD) $(OUTDIR) $(INCLUDE)
+	ln -s $(ALIB)inc $(INCLUDE)alib
 
 install: $(TARLIB) $(INSTALL_LIB) $(INSTALL_INC)
-	@cp $(ALIB)inc/*.h $(INSTALL_INC)
-	@cp $(TARLIB) $(INSTALL_LIB)
+	cp $(ALIB)inc/*.h $(INSTALL_INC)
+	cp $(TARLIB) $(INSTALL_LIB)
 
 uninstall:
-	@rm -rf $(INSTALL_LIB)$(LIB) $(INSTALL_INC)
+	rm -rf $(INSTALL_LIB)$(LIB) $(INSTALL_INC)
 
 $(INSTALL_LIB):
-	@mkdir -p $@
+	mkdir -p $@
 
 $(INSTALL_INC):
-	@mkdir -p $@
+	mkdir -p $@
 
 $(TARLIB): $(BUILD)
 	$(MAKE) -C $(ALIB)src DIR=$(ALIB)src/

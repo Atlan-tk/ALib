@@ -14,10 +14,10 @@ extern "C" {
 #include "astring.h"
 
 /* 计算字符数 */
-uint32_t astrlen_u8(char* s);
-uint32_t astrlen_u16(char* s);
-uint32_t astrlen_u32(char* s);
-uint32_t astrlen_gbk(char* s);
+uint32_t astrlen_u8(const char* s);
+uint32_t astrlen_u16(const char* s);
+uint32_t astrlen_u32(const char* s);
+uint32_t astrlen_gbk(const char* s);
 
 /* 4 字节字符，表示单个 UTF-8 字符 */
 /* c[0]-c[3] 按低位到高位存储字节 */
@@ -109,14 +109,14 @@ static const A_FUNC(AText) A_FUNC_TAB(AText) = {
 };
 
 /* 将字面量转换为 AText，必须是 UTF-8 字符串 */
-static inline AText AText_new(char* s) {
+static inline AText AText_new(const char* s) {
     return (AText){
         .f = &A_FUNC_TAB(AText),
         .byte_num = s ? (uint32_t)strlen(s) : 0,
         .char_num = s ? astrlen_u8(s) : 0,
         .noLiteral = false,
         .capacity = 0,
-        .s = s,
+        .s = (char*)s,
     };
 }
 

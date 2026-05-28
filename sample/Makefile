@@ -9,7 +9,7 @@ TAR = $(patsubst $(BUILD)%.o, $(OUTDIR)%.$(EXE), $(OBJ))
 all: $(TAR)
 
 clean:
-	@rm -rf $(TAR) $(OBJ)
+	rm -rf $(TAR) $(OBJ)
 
 $(TAR): $(OUTDIR)%.$(EXE): $(BUILD)%.o
 	$(CC) $< -o $@ $(CFLAGS_LD)

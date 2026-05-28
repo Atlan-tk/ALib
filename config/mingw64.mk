@@ -15,10 +15,10 @@ TARLIB := $(OUTDIR)$(LIB)
 INCLUDE := $(BUILD).include/
 export TARLIB OUTDIR BUILD INCLUDE
 
-CFLAGS_AR := rcs -lucrt
-CFLAGS_LD := -lpthread -L$(OUTDIR) -lalib -lucrt
-CFLAGS_CC := -O0 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc -DGNU_SOURCE -D_UCRT
-CFLAGS_TEST := -g -O0 -Wall -Wextra -Werror -I$(INCLUDE) -DGNU_SOURCE -D_UCRT
+CFLAGS_AR := rcs
+CFLAGS_LD := -fuse-ld=lld -lpthread -L$(OUTDIR) -lalib
+CFLAGS_CC := -O0 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc -DGNU_SOURCE
+CFLAGS_TEST := -g -O0 -Wall -Wextra -Werror -I$(INCLUDE) -DGNU_SOURCE
 export CFLAGS_CC CFLAGS_AR CFLAGS_LD CFLAGS_TEST
 
 INSTALL_INC := $(HOME)/.alib/include/alib/
