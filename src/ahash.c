@@ -405,48 +405,25 @@ static inline bool __Aiter_exist(const __Ahash* hash, __Aiter* it){
     return true;
 }
 int __Ahash_cmpd(const __Ahash* self, const __Ahash* that){
-    /*
-     * 哈希表的比较基于迭代器，因此即使元素相同的两个哈希表，
-     * 如果插入顺序不一致比较结果也不一致
-     * 这并不被认为是错误行为
-     */
-
     int ret = 0;
 
-    if(self->num == 0 || that->num == 0){
-        if(self->num == 0 && that->num == 0){
-            return 0;
-        }else if(self->num != 0 && that->num == 0){
-            return 1;
-        }else{
-            return -1;
-        }
-    }
-
     __Aiter it_self = {}; __Ahash_get_head(self, &it_self);
-    __Aiter it_that = {}; __Ahash_get_head(that, &it_that);
-    while(__Aiter_exist(self, &it_self) && __Aiter_exist(that, &it_that)){
+    while(__Aiter_exist(self, &it_self)){
         char* obj_self = (char*)(it_self.p);
-        char* obj_that = (char*)(it_that.p);
+        char* obj_that = __Ahash_at(that, obj_self);
         ret = self->cmpd(obj_self, obj_that);
         if(ret != 0) return ret;
 
         __Ahash_iter_next(self, &it_self);
-        __Ahash_iter_next(that, &it_that);
     }
 
-    if(!__Aiter_exist(self, &it_self) || !__Aiter_exist(that, &it_that)){
-        if(!__Aiter_exist(self, &it_self) && !__Aiter_exist(that, &it_that)){
-            ret = 0;
-        }else if(!__Aiter_exist(self, &it_self)){
-            ret = -1;
-        }else{
-            ret = 1;
-        }
-    }
+    if(self->num == that->num) return 0;
+    if(self->num > that->num) return 1;
+    if(self->num < that->num) return -1;
 
-    return ret;
+    return 0;
 }
+
 int __Ahash_copy(__Ahash* self, const __Ahash* that){
     *self = *that;
     self->num = 0;
