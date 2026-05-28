@@ -1,6 +1,6 @@
 
 SRC = $(wildcard $(DRI)*.c)
-INC = $(wildcard $(INCLUDE)*.h)
+INC = $(wildcard $(ALIB)inc/*.h)
 OBJ = $(patsubst $(DRI)%.c, $(BUILD)%.o, $(SRC))
 TAR = $(TARLIB)
 
@@ -15,9 +15,6 @@ clean:
 $(TAR): $(OBJ)
 	$(AR) $(CFLAGS_AR) $@ $^
 
-$(OBJ): $(BUILD)%.o: $(DRI)%.c
+$(OBJ): $(BUILD)%.o: $(DRI)%.c $(INC)
 	$(CC) $(CFLAGS_CC) -c $< -o $@
-
-$(SRC): $(INC)
-
 
