@@ -85,6 +85,7 @@ typedef struct{
     int64_t         id;
     ALine(ALinkp)   linkpList;
 }ASignalTower;
+A_TYPE_REGISTER(ASignalTower);
 __noused void A_OBJ_INIT(ASignalTower)(ASignalTower* self){
     self->id = 0; self->linkpList = A_INIT(ALine(ALinkp));
 }
@@ -98,7 +99,6 @@ __noused int A_OBJ_CMPD(ASignalTower)(const ASignalTower* self, const ASignalTow
     int ret = A_CMPD(int64_t, self->id, that->id);
     return ret != 0 ? ret : A_CMPD(ALine(ALinkp), self->linkpList, that->linkpList);
 }
-A_TYPE_REGISTER(ASignalTower);
 
 static inline uint32_t ASignalTower_find_i(const ASignalTower* self, const void* addressee){
     if(__a_unlikely(self == nullptr)){
@@ -241,6 +241,7 @@ typedef struct{
     const void*     addressee;
     ALine(ALinkp)   linkpList;
 }ASignalRadio;
+A_TYPE_REGISTER(ASignalRadio);
 __noused void A_OBJ_INIT(ASignalRadio)(ASignalRadio* self){
     self->addressee = nullptr; self->linkpList = A_INIT(ALine(ALinkp));
 }
@@ -254,7 +255,6 @@ __noused int A_OBJ_CMPD(ASignalRadio)(const ASignalRadio* self, const ASignalRad
     int ret = A_CMPD(const_ptr_t, (const_ptr_t)(self->addressee), (const_ptr_t)(that->addressee));
     return ret != 0 ? ret : A_CMPD(ALine(ALinkp), self->linkpList, that->linkpList);
 }
-A_TYPE_REGISTER(ASignalRadio);
 
 static inline uint32_t ASignalRadio_find_i(const ASignalRadio* self, int64_t id){
     if(__a_unlikely(self == nullptr)){
@@ -370,6 +370,7 @@ typedef struct{
     AHash(int64_t,ASignalTower)    idMap;
     AHash(const_ptr_t,ASignalRadio)  adMap;
 }ASignalSystem;
+A_TYPE_REGISTER(ASignalSystem);
 __noused void A_OBJ_INIT(ASignalSystem)(ASignalSystem* self){
     aExcClean();
     atomic_store_explicit(&self->count, 1, memory_order_relaxed);
@@ -396,7 +397,6 @@ __noused int A_OBJ_CMPD(ASignalSystem)(const ASignalSystem* self, const ASignalS
     if(ret == 0) ret = A_CMPD(AHash(const_ptr_t,ASignalRadio), self->adMap, that->adMap);
     return ret;
 }
-A_TYPE_REGISTER(ASignalSystem);
 
 static inline int64_t ASignalSystem_alloc(ASignalSystem* self){
     if(__a_unlikely(self == nullptr)){

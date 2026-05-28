@@ -90,12 +90,6 @@ __noused static inline bool AText_empty(const AText* self) {
     return self->char_num == 0;
 }
 
-__noused __weak uint32_t A_OBJ_HASH(AText)(const AText* self) {
-    if (__a_unlikely(self == nullptr || self->s == nullptr)) {
-        return 0;
-    }
-    return alib_hash_str(self->s);
-}
 A_TYPE_REGISTER(AText);
 
 static const A_FUNC(AText) A_FUNC_TAB(AText) = {
@@ -182,6 +176,13 @@ __noused __weak int A_OBJ_CMPD(AText)(const AText* self, const AText* that) {
         return -1;
     }
     return 1;
+}
+
+__noused __weak uint32_t A_OBJ_HASH(AText)(const AText* self) {
+    if (__a_unlikely(self == nullptr || self->s == nullptr)) {
+        return 0;
+    }
+    return alib_hash_str(self->s);
 }
 
 
