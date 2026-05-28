@@ -15,8 +15,8 @@ A_CLASS_REGISTER(TestSignal);
 
 typedef struct {
     int hits;
-    Aint last_id;
-    Aint last_value;
+    int64_t last_id;
+    int64_t last_value;
     const void* last_sender;
 } Counter;
 
@@ -54,7 +54,7 @@ static void duplicate_target(const ASignal *signal, void *addressee) {
 }
 
 static void test_signal_transmit_basic(void) {
-    Aint id = a_signal_alloc();
+    int64_t id = a_signal_alloc();
     assert(!aExcOccur());
     assert(id >= 0);
 
@@ -102,7 +102,7 @@ static void test_signal_transmit_basic(void) {
 }
 
 static void test_signal_duplicate_addressee_replaced(void) {
-    Aint id = a_signal_alloc();
+    int64_t id = a_signal_alloc();
     assert(!aExcOccur());
     assert(id >= 0);
 
@@ -137,8 +137,8 @@ static void test_signal_duplicate_addressee_replaced(void) {
 }
 
 static void test_disconnect_all_helpers(void) {
-    Aint id0 = a_signal_alloc();
-    Aint id1 = a_signal_alloc();
+    int64_t id0 = a_signal_alloc();
+    int64_t id1 = a_signal_alloc();
     assert(!aExcOccur());
     assert(id0 >= 0);
     assert(id1 >= 0);
@@ -190,9 +190,9 @@ static void test_disconnect_all_helpers(void) {
 }
 
 static void test_invalid_id_rejected(void) {
-    Aint id = a_signal_alloc();
+    int64_t id = a_signal_alloc();
     assert(!aExcOccur());
-    Aint invalid_id = id + 1;
+    int64_t invalid_id = id + 1;
     Counter receiver = {0};
 
     a_signal_connection(invalid_id, &receiver, count_target);
@@ -220,7 +220,7 @@ static void test_invalid_id_rejected(void) {
 }
 
 static int g_nested_hits = 0;
-static Aint g_inner_id = -1;
+static int64_t g_inner_id = -1;
 
 static void nested_target(const ASignal *signal, void *addressee) {
     (void)addressee;
@@ -242,7 +242,7 @@ static void outer_target(const ASignal *signal, void *addressee) {
 }
 
 static void test_signal_transmit_reentrant(void) {
-    Aint outer_id = a_signal_alloc();
+    int64_t outer_id = a_signal_alloc();
     assert(!aExcOccur());
     g_inner_id = a_signal_alloc();
     assert(!aExcOccur());
@@ -264,7 +264,7 @@ static void test_signal_transmit_reentrant(void) {
 }
 
 static int g_registered_hits = 0;
-static Aint g_register_target_id = -1;
+static int64_t g_register_target_id = -1;
 static int g_collect_target_hits = 0;
 
 static void registered_target(const ASignal *signal, void *addressee) {
@@ -276,7 +276,7 @@ static void registered_target(const ASignal *signal, void *addressee) {
 static void alloc_register_target(const ASignal *signal, void *addressee) {
     (void)signal;
 
-    Aint nested_id = a_signal_alloc();
+    int64_t nested_id = a_signal_alloc();
     assert(!aExcOccur());
     assert(nested_id >= 0);
 
@@ -295,7 +295,7 @@ static void collect_target(const ASignal *signal, void *addressee) {
 
 static void test_signal_callback_alloc_and_register(void) {
     int receiver = 0;
-    Aint outer_id = a_signal_alloc();
+    int64_t outer_id = a_signal_alloc();
     assert(!aExcOccur());
     g_register_target_id = a_signal_alloc();
     assert(!aExcOccur());
@@ -321,7 +321,7 @@ static void test_signal_callback_alloc_and_register(void) {
 }
 
 static void test_signal_collect_exceptions(void) {
-    Aint id = a_signal_alloc();
+    int64_t id = a_signal_alloc();
     assert(!aExcOccur());
     assert(id >= 0);
 

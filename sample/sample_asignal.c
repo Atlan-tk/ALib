@@ -17,7 +17,7 @@ typedef struct PingSignal PingSignal;
 typedef struct PingReceiver PingReceiver;
 
 typedef struct {
-    Aint id;
+    int64_t id;
     const char* name;
 } PingSource;
 
@@ -64,7 +64,7 @@ static int ping_source_init(PingSource* source, const char* name) {
     return print_exc("a_signal_alloc");
 }
 
-static Aint ping_id(const PingSource* source) {
+static int64_t ping_id(const PingSource* source) {
     if (source == NULL) {
         aExcSet(AEXC_nullptr);
         return -1;
@@ -148,7 +148,7 @@ int main(void) {
     guard.name = "guard";
     guard.reject_negative = true;
 
-    Aint id = ping_id(&source);
+    int64_t id = ping_id(&source);
 
     printf("Ping signal id = %" PRId64 "\n", (int64_t)id);
 
