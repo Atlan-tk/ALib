@@ -12,6 +12,7 @@
 
 /* timespec_get */
 #if defined (__C_POSIX__)
+#include <sys/time.h>
 __weak int timespec_get(struct timespec *ts, int base){
     if(base != TIME_UTC){
         return 0;
@@ -23,7 +24,9 @@ __weak int timespec_get(struct timespec *ts, int base){
     }
 }
 #endif /* __C_POSIX__ */
+
 #if defined (__C_WINDOWS__) && !defined(_UCRT)
+#include <windows.h>
 int timespec_get(struct timespec *ts, int base){
     if(base != TIME_UTC){
         return 0;

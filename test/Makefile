@@ -14,6 +14,6 @@ clean:
 $(TAR): $(OUTDIR)%.$(EXE): $(BUILD)%.o
 	$(CC) $< -o $@ $(CFLAGS_LD)
 
-$(OBJ): $(BUILD)%.o: $(DRI)%.c $(INC) $(ALIB).config
+$(OBJ): $(BUILD)%.o: $(DRI)%.c $(INC)
 	$(CC) $(CFLAGS_TEST) -c $< -o $@
 

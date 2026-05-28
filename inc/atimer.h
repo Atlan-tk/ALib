@@ -26,16 +26,18 @@ extern "C" {
     #define _TIMESPEC_DEFINED
     #define __timespec_defined
     struct timespec{
-        time_t  tv_sec;
-        long    tv_nsec;
+        time_t      tv_sec;
+        long        tv_nsec;
     };
 #endif /* __C_POSIX__ && no timespec */
 
-#if defined(__C_WINDOWS__) && !defined(_TIMESPEC_DEFINED)
+#if defined(__C_WINDOWS__) &&                                       \
+    !defined(_TIMESPEC_DEFINED) && !defined(_UCRT)                  \
+
     #define _TIMESPEC_DEFINED
     struct timespec{
-        time_t  tv_sec;
-        long    tv_nsec;
+        time_t      tv_sec;
+        long long   tv_nsec;
     };
 #endif /* __C_WINDOWS__ && no timespec */
 
