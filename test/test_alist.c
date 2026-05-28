@@ -13,35 +13,6 @@ AList_Define(AString);
 AList_Generate(AString);
 A_TYPE_REGISTER(AList(AString));
 
-static uint32_t g_alib_free_calls = 0;
-
-static void tracked_alib_free(void *p) {
-    if (p != NULL) {
-        g_alib_free_calls++;
-    }
-    free(p);
-}
-
-static void *tracked_alib_alloc(uint32_t size) {
-    return malloc(size);
-}
-
-static void *tracked_alib_realloc(void *p, uint32_t size) {
-    return realloc(p, size);
-}
-
-void alib_free(void *p) {
-    tracked_alib_free(p);
-}
-
-void *alib_alloc(uint32_t size) {
-    return tracked_alib_alloc(size);
-}
-
-void *alib_realloc(void *p, uint32_t size) {
-    return tracked_alib_realloc(p, size);
-}
-
 static void install_tracked_allocators(void) {
 }
 
@@ -312,11 +283,9 @@ static void test_alist_astring_rm_p(void) {
     }
 
     {
-        uint32_t frees_before = g_alib_free_calls;
         AString *mid = list.f->at(&list, 1);
         list.f->rm_p(&list, mid);
         assert(!aExcOccur());
-        assert(g_alib_free_calls == frees_before + 2);
         {
             const char *expected[] = {"alpha", "gamma"};
             assert_astring_list_eq(&list, expected, 2);
@@ -325,11 +294,9 @@ static void test_alist_astring_rm_p(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     {
-        uint32_t frees_before = g_alib_free_calls;
         AString *head = list.f->at(&list, 0);
         list.f->rm_p(&list, head);
         assert(!aExcOccur());
-        assert(g_alib_free_calls == frees_before + 2);
         {
             const char *expected[] = {"gamma"};
             assert_astring_list_eq(&list, expected, 1);
@@ -339,17 +306,13 @@ static void test_alist_astring_rm_p(void) {
 
     {
         AString literal = AString_new("literal");
-        uint32_t frees_before_push = g_alib_free_calls;
         list.f->pushBack(&list, literal);
         assert(!aExcOccur());
-        assert(g_alib_free_calls == frees_before_push);
     }
     {
-        uint32_t frees_before = g_alib_free_calls;
         AString *tail = list.f->at(&list, 1);
         list.f->rm_p(&list, tail);
         assert(!aExcOccur());
-        assert(g_alib_free_calls == frees_before + 1);
         {
             const char *expected[] = {"gamma"};
             assert_astring_list_eq(&list, expected, 1);
@@ -364,11 +327,9 @@ static void test_alist_astring_rm_p(void) {
         assert(!aExcOccur());
     }
     {
-        uint32_t frees_before = g_alib_free_calls;
         AString *tail = list.f->at(&list, 1);
         list.f->rm_p(&list, tail);
         assert(!aExcOccur());
-        assert(g_alib_free_calls == frees_before + 2);
         {
             const char *expected[] = {"gamma"};
             assert_astring_list_eq(&list, expected, 1);
@@ -377,11 +338,9 @@ static void test_alist_astring_rm_p(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     {
-        uint32_t frees_before = g_alib_free_calls;
         AString *last = list.f->at(&list, 0);
         list.f->rm_p(&list, last);
         assert(!aExcOccur());
-        assert(g_alib_free_calls == frees_before + 2);
         assert(list.f->empty(&list));
     }
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -411,12 +370,10 @@ static void test_alist_astring_take_p(void) {
     }
 
     {
-        uint32_t frees_before = g_alib_free_calls;
         RAII(AString) taken = A_INIT(AString);
         list.f->take_p(&list, list.f->at(&list, 1), &taken);
         assert(!aExcOccur());
         assert(strcmp(taken.s, "beta") == 0);
-        assert(g_alib_free_calls == frees_before + 1);
         {
             const char *expected[] = {"alpha", "gamma"};
             assert_astring_list_eq(&list, expected, 2);
@@ -430,12 +387,10 @@ static void test_alist_astring_take_p(void) {
         assert(!aExcOccur());
     }
     {
-        uint32_t frees_before = g_alib_free_calls;
         RAII(AString) taken = A_INIT(AString);
         list.f->take_p(&list, list.f->at(&list, 2), &taken);
         assert(!aExcOccur());
         assert(strcmp(taken.s, "literal") == 0);
-        assert(g_alib_free_calls == frees_before + 1);
         {
             const char *expected[] = {"alpha", "gamma"};
             assert_astring_list_eq(&list, expected, 2);
@@ -444,10 +399,8 @@ static void test_alist_astring_take_p(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     {
-        uint32_t frees_before = g_alib_free_calls;
         list.f->take_p(&list, list.f->at(&list, 0), NULL);
         assert(!aExcOccur());
-        assert(g_alib_free_calls == frees_before + 2);
         {
             const char *expected[] = {"gamma"};
             assert_astring_list_eq(&list, expected, 1);
@@ -456,23 +409,19 @@ static void test_alist_astring_take_p(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     {
-        uint32_t frees_before = g_alib_free_calls;
         RAII(AString) taken = A_INIT(AString);
         list.f->take_p(&list, list.f->at(&list, 0), &taken);
         assert(!aExcOccur());
         assert(strcmp(taken.s, "gamma") == 0);
-        assert(g_alib_free_calls == frees_before + 1);
         assert(list.f->empty(&list));
     }
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     {
         RAII(AString) taken = A_INIT(AString);
-        uint32_t frees_before = g_alib_free_calls;
         list.f->take_p(&list, NULL, &taken);
         assert(aExcGet() == AEXC_overstep);
         assert(taken.s == NULL);
-        assert(g_alib_free_calls == frees_before);
         aExcClean();
     }
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);

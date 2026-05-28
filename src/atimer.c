@@ -71,7 +71,7 @@ typedef struct{
     uint32_t    wait;           //等待时间,ms,=0时立即执行
     atomic_int  rm_flag;        //被删除
 }AWork;
-__weak int A_OBJ_CMPD(AWork)(const AWork* self, const AWork* that){
+int A_OBJ_CMPD(AWork)(const AWork* self, const AWork* that){
     int ret = A_CMPD(uint32_t, self->wait, that->wait);
     if(ret == 0) ret = A_CMPD(int64_t, self->id, that->id);
     return ret;
@@ -116,16 +116,16 @@ A_TYPE_REGISTER(ASortque(AWork));
 typedef struct{
     ASortque(AWork) que;
 }AWorkQue;
-__weak void A_OBJ_INIT(AWorkQue)(AWorkQue* self){
+void A_OBJ_INIT(AWorkQue)(AWorkQue* self){
     self->que = A_INIT(ASortque(AWork));
 }
-__weak void A_OBJ_DEST(AWorkQue)(AWorkQue* self){
+void A_OBJ_DEST(AWorkQue)(AWorkQue* self){
     A_DEST(ASortque(AWork), self->que);
 }
-__weak void A_OBJ_COPY(AWorkQue)(AWorkQue* self, __noused const AWorkQue* that){
+void A_OBJ_COPY(AWorkQue)(AWorkQue* self, __noused const AWorkQue* that){
     self->que = A_COPY(ASortque(AWork), that->que);
 }
-__weak int A_OBJ_CMPD(AWorkQue)(const AWorkQue* self, const AWorkQue* that){
+int A_OBJ_CMPD(AWorkQue)(const AWorkQue* self, const AWorkQue* that){
     return A_CMPD(ASortque(AWork), self->que, that->que);
 }
 A_TYPE_REGISTER(AWorkQue);
@@ -286,7 +286,7 @@ typedef struct{
     bool stat;
     int thret;
 }ATimer;
-__weak void A_OBJ_INIT(ATimer)(ATimer* self){
+void A_OBJ_INIT(ATimer)(ATimer* self){
     aExcClean();
     self->lock = A_INIT(AMtxCnd); if(aExcOccur()){ return; }
     self->clock = A_INIT(AClock); if(aExcOccur()){ return; }
@@ -295,7 +295,7 @@ __weak void A_OBJ_INIT(ATimer)(ATimer* self){
     self->stat = false;
     self->thret = 0;
 }
-__weak void A_OBJ_DEST(ATimer)(ATimer* self){
+void A_OBJ_DEST(ATimer)(ATimer* self){
     A_DEST(AClock, self->clock);
     A_DEST(AMtxCnd, self->lock);
     A_DEST(AWorkQue, self->queue);
@@ -303,7 +303,7 @@ __weak void A_OBJ_DEST(ATimer)(ATimer* self){
     self->stat = false;
     self->thret = 0;
 }
-__weak void A_OBJ_COPY(ATimer)(ATimer* self, const ATimer* that){
+void A_OBJ_COPY(ATimer)(ATimer* self, const ATimer* that){
     self->lock = A_INIT(AMtxCnd); if(aExcOccur()){ return; }
     self->clock = A_INIT(AClock); if(aExcOccur()){ return; }
     self->queue = A_COPY(AWorkQue, that->queue); if(aExcOccur()){ return; }
@@ -311,7 +311,7 @@ __weak void A_OBJ_COPY(ATimer)(ATimer* self, const ATimer* that){
     self->stat = false;
     self->thret = 0;
 }
-__weak int A_OBJ_CMPD(ATimer)(const ATimer* self, const ATimer* that){
+int A_OBJ_CMPD(ATimer)(const ATimer* self, const ATimer* that){
     return  A_CMPD(AWorkQue, self->queue, that->queue);
 }
 A_TYPE_REGISTER(ATimer);

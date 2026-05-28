@@ -76,6 +76,7 @@ Achar AText_popFront(AText* self);
 void AText_addBack(AText* self, AText that);
 void AText_addFront(AText* self, AText that);
 void AText_truncate(AText* self, uint32_t index);
+int  AText_reCap(AText* self, uint32_t new_cap);
 
 static inline uint32_t AText_getNumber(const AText* self) {
     return self->char_num;
@@ -129,6 +130,62 @@ AText AText_forGBK(char* s);
 void AText_toU32(const AText* self, char* buf, uint32_t buf_size);
 void AText_toU16(const AText* self, char* buf, uint32_t buf_size);
 void AText_toGBK(const AText* self, char* buf, uint32_t buf_size);
+
+
+
+__noused __weak void A_OBJ_INIT(AText)(AText* self) {
+    self->f = &A_FUNC_TAB(AText);
+}
+
+__noused __weak void A_OBJ_DEST(AText)(AText* self) {
+    if (self->noLiteral) {
+        alib_free(self->s);
+    }
+}
+
+__noused __weak void A_OBJ_COPY(AText)(AText* self, const AText* that) {
+    self->f = that->f;
+    if (that->noLiteral) {
+        int ret = AText_reCap(self, that->byte_num + 1);
+        if (ret != 0) {
+            aExcSet(AEXC_init_failed);
+            return;
+        }
+        if (that->byte_num != 0) {
+            memcpy(self->s, that->s, that->byte_num);
+        }
+        self->s[that->byte_num] = '\0';
+    } else {
+        self->s = that->s;
+        self->capacity = 0;
+    }
+
+    self->byte_num = that->byte_num;
+    self->char_num = that->char_num;
+    self->noLiteral = that->noLiteral;
+}
+
+__noused __weak int A_OBJ_CMPD(AText)(const AText* self, const AText* that) {
+    if (self->s == that->s) {
+        return 0;
+    }
+    if (self->s != nullptr && that->s != nullptr) {
+        return strcmp(self->s, that->s);
+    }
+    if (self->s == nullptr) {
+        return -1;
+    }
+    return 1;
+}
+
+__noused __weak uint32_t A_OBJ_HASH(AText)(const AText* self) {
+    if (__a_unlikely(self == nullptr || self->s == nullptr)) {
+        return 0;
+    }
+    return alib_hash_str(self->s);
+}
+
+
 
 #ifdef __cplusplus
 }

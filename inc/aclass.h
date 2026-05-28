@@ -50,7 +50,7 @@ extern "C" {
     __weak void A_OBJ_INIT(T)(T* self);                                                                     \
     __weak void A_OBJ_COPY(T)(T* self, const T* that);                                                      \
     __weak int  A_OBJ_CMPD(T)(const T* self, const T* that);                                                \
-    __weak uint32_t A_OBJ_HASH(T)(const T*);                                                                \
+    __weak uint32_t A_OBJ_HASH(T)(const T* self);                                                           \
                                                                                                             \
     static inline void __A_OBJ_INIT_FUNC_SELF(T)(T* self);                                                  \
     static inline void __A_OBJ_DEST_FUNC_SELF(T)(T* self);                                                  \

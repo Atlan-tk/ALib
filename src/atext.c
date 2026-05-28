@@ -295,7 +295,7 @@ static int AText_sub(AText* self) {
     return 0;
 }
 
-static inline int AText_reCap(AText* self, uint32_t new_cap) {
+int AText_reCap(AText* self, uint32_t new_cap) {
     if (__a_unlikely(new_cap < self->byte_num + 1)) {
         return AEXC_overstep;
     }
@@ -436,59 +436,6 @@ Achar Achar_new(const char* s) {
         return Achar_from_span(s, used);
     }
     return Achar_from_span(s, 1);
-}
-
-/*******************************************************************************/
-void A_OBJ_INIT(AText)(AText* self) {
-    self->f = &A_FUNC_TAB(AText);
-}
-
-void A_OBJ_DEST(AText)(AText* self) {
-    if (self->noLiteral) {
-        alib_free(self->s);
-    }
-}
-
-void A_OBJ_COPY(AText)(AText* self, const AText* that) {
-    self->f = that->f;
-    if (that->noLiteral) {
-        int ret = AText_reCap(self, that->byte_num + 1);
-        if (ret != 0) {
-            aExcSet(AEXC_init_failed);
-            return;
-        }
-        if (that->byte_num != 0) {
-            memcpy(self->s, that->s, that->byte_num);
-        }
-        self->s[that->byte_num] = '\0';
-    } else {
-        self->s = that->s;
-        self->capacity = 0;
-    }
-
-    self->byte_num = that->byte_num;
-    self->char_num = that->char_num;
-    self->noLiteral = that->noLiteral;
-}
-
-int A_OBJ_CMPD(AText)(const AText* self, const AText* that) {
-    if (self->s == that->s) {
-        return 0;
-    }
-    if (self->s != nullptr && that->s != nullptr) {
-        return strcmp(self->s, that->s);
-    }
-    if (self->s == nullptr) {
-        return -1;
-    }
-    return 1;
-}
-
-uint32_t A_OBJ_HASH(AText)(const AText* self) {
-    if (__a_unlikely(self == nullptr || self->s == nullptr)) {
-        return 0;
-    }
-    return alib_hash_str(self->s);
 }
 
 /*******************************************************************************/

@@ -146,13 +146,13 @@ extern "C" {
 
 
 /* alloc and free */
-__noused __weak void  alib_free(void* p);
-__noused __weak void* alib_alloc(uint32_t size);
-__noused __weak void* alib_realloc(void* p, uint32_t size);
+void  alib_free(void* p);
+void* alib_alloc(uint32_t size);
+void* alib_realloc(void* p, uint32_t size);
 
-__noused __weak void* alib_new(uint32_t size, void(*init_func)(void*));
-__noused __weak void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
-__noused __weak void  alib_delete(void* p, void(*dest_func)(void*));
+void* alib_new(uint32_t size, void(*init_func)(void*));
+void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
+void  alib_delete(void* p, void(*dest_func)(void*));
 
 
 
@@ -184,6 +184,9 @@ static inline int __a_memcmp(const void* s0, const void* s1, uint32_t size){
 }
 
 __noused static inline void a_class_dest(void* _self);
+uint32_t alib_hash(const void* k, uint32_t size_k);
+uint32_t alib_hash_str(const char* k);
+
 
 
 
@@ -256,7 +259,7 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
     __weak void A_OBJ_INIT(T)(T* self);                                                                     \
     __weak void A_OBJ_COPY(T)(T* self, const T* that);                                                      \
     __weak int  A_OBJ_CMPD(T)(const T* self, const T* that);                                                \
-    __weak uint32_t A_OBJ_HASH(T)(const T*);                                                                \
+    __weak uint32_t A_OBJ_HASH(T)(const T* self);                                                           \
                                                                                                             \
     __noused static inline void __A_OBJ_DEST_FUNC_SELF(T)(T* self){                                         \
         /* 空对象不析构 */                                                                                  \
@@ -406,25 +409,26 @@ __noused static inline int  __A_OBJ_CMPD_FUNC_SELF(void)(__noused const void* se
 __noused static inline uint32_t A_OBJ_HASH(void)(__noused const void* self){ return 0; };
 
 //int
-#define __A_PRIMITIVE_TYPE_REGISTER(T)                                                  \
-    enum{ __A_IS_CLASS(T) = 0 };                                                        \
-    __noused static void __A_OBJ_DEST_FUNC_SELF(T)(__noused T* self){                   \
-        memset(self, 0, sizeof(T));                                                     \
-    }                                                                                   \
-    __noused static void  __A_OBJ_INIT_FUNC_SELF(T)(T* self){                           \
-        if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }             \
-        memset(self, 0, sizeof(T));                                                     \
-    }                                                                                   \
-    __noused static void  __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){            \
-        if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }             \
-        memset(self, 0, sizeof(T)); if(that != nullptr) *self = *that;                  \
-    }                                                                                   \
-    __noused static int __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){        \
-        if(self == that || (self == nullptr && that == nullptr)) return 0;              \
-        if(self == nullptr){ return 1; } if(that == nullptr){ return -1; }              \
-        return __A_OBJ_CMPD_AUTO(T,self,that);                                          \
-    }                                                                                   \
-    __noused __weak uint32_t A_OBJ_HASH(T)(const T*);                                   \
+#define __A_PRIMITIVE_TYPE_REGISTER(T)                                                                      \
+    enum{ __A_IS_CLASS(T) = 0 };                                                                            \
+    __noused static void __A_OBJ_DEST_FUNC_SELF(T)(__noused T* self){                                       \
+        memset(self, 0, sizeof(T));                                                                         \
+    }                                                                                                       \
+    __noused static void  __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                               \
+        if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }                                 \
+        memset(self, 0, sizeof(T));                                                                         \
+    }                                                                                                       \
+    __noused static void  __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){                                \
+        if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }                                 \
+        memset(self, 0, sizeof(T)); if(that != nullptr) *self = *that;                                      \
+    }                                                                                                       \
+    __noused static int __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){                            \
+        if(self == that || (self == nullptr && that == nullptr)) return 0;                                  \
+        if(self == nullptr){ return 1; } if(that == nullptr){ return -1; }                                  \
+        return __A_OBJ_CMPD_AUTO(T,self,that);                                                              \
+    }                                                                                                       \
+    __weak uint32_t A_OBJ_HASH(T)(const T* self);                                                           \
+
 
 
 __A_PRIMITIVE_TYPE_REGISTER(int);
@@ -446,11 +450,23 @@ __A_PRIMITIVE_TYPE_REGISTER(uint32_t);
 __A_PRIMITIVE_TYPE_REGISTER(uint64_t);
 
 __A_PRIMITIVE_TYPE_REGISTER(cptr_t);
+
+__noused __weak uint32_t A_OBJ_HASH(cstr_t)(const cstr_t* self){
+    if(__a_unlikely(self == nullptr || *self == nullptr)){
+        return 0;
+    }
+    return alib_hash_str(*self);
+}
+
+__noused __weak uint32_t A_OBJ_HASH(astr_t)(const astr_t* self){
+    if(__a_unlikely(self == nullptr || self->s == nullptr)){
+        return 0;
+    }
+    return alib_hash_str(self->s);
+}
+
 __A_PRIMITIVE_TYPE_REGISTER(cstr_t);
 __A_PRIMITIVE_TYPE_REGISTER(astr_t);
-
-uint32_t alib_hash(const void* k, uint32_t size_k);
-uint32_t alib_hash_str(const char* k);
 
 //Atlan
 typedef struct Atlan Atlan;

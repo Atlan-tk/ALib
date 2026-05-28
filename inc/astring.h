@@ -51,7 +51,8 @@ char AString_popBack(AString* self);
 char AString_popFront(AString* self);
 void AString_addBack(AString* self, AString that);
 void AString_addFront(AString* self, AString that);
-void  AString_truncate(AString* self, uint32_t index);
+void AString_truncate(AString* self, uint32_t index);
+int  AString_reCap(AString* self, uint32_t new_cap);
 
 __noused static uint32_t AString_getNumber(const AString* self){
     return self->number;
@@ -92,6 +93,55 @@ static inline AString AString_new(const char* s){
         .s = (char*)s,
     };
 }
+
+
+__noused __weak void A_OBJ_INIT(AString)(AString* self) {
+    self->f = &A_FUNC_TAB(AString);
+}
+
+__noused __weak void A_OBJ_DEST(AString)(AString* self) {
+    if (self->noLiteral) {
+        alib_free(self->s);
+    }
+}
+
+__noused __weak void A_OBJ_COPY(AString)(AString* self, const AString* that) {
+    self->f = that->f;
+    if (that->noLiteral) {
+        int ret = AString_reCap(self, that->number + 1);
+        if(ret != 0){
+            aExcSet(AEXC_init_failed);
+            return;
+        }
+        memcpy(self->s, that->s, that->number + 1);
+        self->number = that->number;
+    } else {
+        self->s = that->s;
+        self->capacity = 0;
+    }
+
+    self->number = that->number;
+    self->noLiteral = that->noLiteral;
+}
+
+__noused __weak int A_OBJ_CMPD(AString)(const AString* self, const AString* that) {
+    if(self->s == that->s) return 0;
+    if(self->s != nullptr && that->s != nullptr){
+        return strcmp(self->s, that->s);
+    }else if(self->s == nullptr){
+        return -1;
+    }else{
+        return 1;
+    }
+}
+
+uint32_t A_OBJ_HASH(AString)(const AString* self){
+    if(__a_unlikely(self == nullptr || self->s == nullptr)){
+        return 0;
+    }
+    return alib_hash_str(self->s);
+}
+
 
 
 #ifdef __cplusplus

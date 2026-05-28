@@ -85,16 +85,16 @@ typedef struct{
     Aint            id;
     ALine(ALinkp)   linkpList;
 }ASignalTower;
-__noused __weak void A_OBJ_INIT(ASignalTower)(ASignalTower* self){
+__noused void A_OBJ_INIT(ASignalTower)(ASignalTower* self){
     self->id = 0; self->linkpList = A_INIT(ALine(ALinkp));
 }
-__noused __weak void A_OBJ_DEST(ASignalTower)(ASignalTower* self){
+__noused void A_OBJ_DEST(ASignalTower)(ASignalTower* self){
     self->id = 0; A_DEST(ALine(ALinkp), self->linkpList);
 }
-__noused __weak void A_OBJ_COPY(ASignalTower)(ASignalTower* self, const ASignalTower* that){
+__noused void A_OBJ_COPY(ASignalTower)(ASignalTower* self, const ASignalTower* that){
     self->id = that->id; self->linkpList = A_COPY(ALine(ALinkp), that->linkpList);
 }
-__noused __weak int A_OBJ_CMPD(ASignalTower)(const ASignalTower* self, const ASignalTower* that){
+__noused int A_OBJ_CMPD(ASignalTower)(const ASignalTower* self, const ASignalTower* that){
     int ret = A_CMPD(Aint, self->id, that->id);
     return ret != 0 ? ret : A_CMPD(ALine(ALinkp), self->linkpList, that->linkpList);
 }
@@ -241,16 +241,16 @@ typedef struct{
     const void*     addressee;
     ALine(ALinkp)   linkpList;
 }ASignalRadio;
-__noused __weak void A_OBJ_INIT(ASignalRadio)(ASignalRadio* self){
+__noused void A_OBJ_INIT(ASignalRadio)(ASignalRadio* self){
     self->addressee = nullptr; self->linkpList = A_INIT(ALine(ALinkp));
 }
-__noused __weak void A_OBJ_DEST(ASignalRadio)(ASignalRadio* self){
+__noused void A_OBJ_DEST(ASignalRadio)(ASignalRadio* self){
     self->addressee = nullptr; A_DEST(ALine(ALinkp), self->linkpList);
 }
-__noused __weak void A_OBJ_COPY(ASignalRadio)(ASignalRadio* self, const ASignalRadio* that){
+__noused void A_OBJ_COPY(ASignalRadio)(ASignalRadio* self, const ASignalRadio* that){
     self->addressee = that->addressee; self->linkpList = A_COPY(ALine(ALinkp), that->linkpList);
 }
-__noused __weak int A_OBJ_CMPD(ASignalRadio)(const ASignalRadio* self, const ASignalRadio* that){
+__noused int A_OBJ_CMPD(ASignalRadio)(const ASignalRadio* self, const ASignalRadio* that){
     int ret = A_CMPD(const_ptr_t, (const_ptr_t)(self->addressee), (const_ptr_t)(that->addressee));
     return ret != 0 ? ret : A_CMPD(ALine(ALinkp), self->linkpList, that->linkpList);
 }
@@ -370,7 +370,7 @@ typedef struct{
     AHash(Aint,ASignalTower)    idMap;
     AHash(const_ptr_t,ASignalRadio)  adMap;
 }ASignalSystem;
-__noused __weak void A_OBJ_INIT(ASignalSystem)(ASignalSystem* self){
+__noused void A_OBJ_INIT(ASignalSystem)(ASignalSystem* self){
     aExcClean();
     atomic_store_explicit(&self->count, 1, memory_order_relaxed);
     self->linkPool = A_INIT(AList(ALink));
@@ -380,16 +380,16 @@ __noused __weak void A_OBJ_INIT(ASignalSystem)(ASignalSystem* self){
     self->adMap = A_INIT(AHash(const_ptr_t,ASignalRadio));
     if(aExcOccur()) return;
 }
-__noused __weak void A_OBJ_DEST(ASignalSystem)(ASignalSystem* self){
+__noused void A_OBJ_DEST(ASignalSystem)(ASignalSystem* self){
     atomic_store_explicit(&self->count, 0, memory_order_relaxed);
     A_DEST(AList(ALink), self->linkPool);
     A_DEST(AHash(Aint,ASignalTower), self->idMap);
     A_DEST(AHash(const_ptr_t,ASignalRadio), self->adMap);
 }
-__noused __weak void A_OBJ_COPY(ASignalSystem)(ASignalSystem* self, __noused const ASignalSystem* that){
+__noused void A_OBJ_COPY(ASignalSystem)(ASignalSystem* self, __noused const ASignalSystem* that){
     memset(self, 0, sizeof(ASignalSystem));
 }
-__noused __weak int A_OBJ_CMPD(ASignalSystem)(const ASignalSystem* self, const ASignalSystem* that){
+__noused int A_OBJ_CMPD(ASignalSystem)(const ASignalSystem* self, const ASignalSystem* that){
     int ret = A_CMPD(Aint, (Aint)self->count, (Aint)that->count);
     if(ret == 0) ret = A_CMPD(AList(ALink), self->linkPool, that->linkPool);
     if(ret == 0) ret = A_CMPD(AHash(Aint,ASignalTower), self->idMap, that->idMap);
