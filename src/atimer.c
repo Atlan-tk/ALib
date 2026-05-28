@@ -11,9 +11,8 @@
 #include <stdatomic.h>
 
 /* timespec_get */
-#if defined (__ALIB_TIMESPEC__)
 #if defined (__C_POSIX__)
-__weak __noused __nonnull int timespec_get(struct timespec *ts, int base){
+__weak int timespec_get(struct timespec *ts, int base){
     if(base != TIME_UTC){
         return 0;
     }
@@ -23,25 +22,15 @@ __weak __noused __nonnull int timespec_get(struct timespec *ts, int base){
         return 0;
     }
 }
-#elif defined (__C_WINDOWS__)
-__weak  __noused __nonnull int timespec_get(struct timespec *ts, int base){
+#endif /* __C_POSIX__ */
+#if defined (__C_WINDOWS__) && !defined(_UCRT)
+int timespec_get(struct timespec *ts, int base){
     if(base != TIME_UTC){
         return 0;
     }
 
     FILETIME ft;
-    /* 优先使用更高精度的版本（Win8+），否则回退 */
-    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
-    if (hKernel32) {
-        FARPROC proc = GetProcAddress(hKernel32, "GetSystemTimePreciseAsFileTime");
-        if (proc) {
-            ((void (WINAPI*)(FILETIME*))proc)(&ft);
-        } else {
-            GetSystemTimeAsFileTime(&ft);
-        }
-    } else {
-        GetSystemTimeAsFileTime(&ft);
-    }
+    GetSystemTimeAsFileTime(&ft);
 
     /* FILETIME 到 64 位 100 纳秒数 */
     ULARGE_INTEGER uli;
@@ -57,8 +46,7 @@ __weak  __noused __nonnull int timespec_get(struct timespec *ts, int base){
 
     return base;
 }
-#endif /* __C_POSIX__ || __C_WINDOWS__ */
-#endif /* __ALIB_TIMESPEC__ */
+#endif /* __C_WINDOWS__ */
 
 
 

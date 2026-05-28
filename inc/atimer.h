@@ -11,28 +11,35 @@ extern "C" {
 #endif /* __cplusplus */
 
 #include "alib.h"
-
-#if defined(__C_WINDOWS__)
-    #ifndef HAVE_STRUCT_TIMESPEC
-        #define HAVE_STRUCT_TIMESPEC
-    #endif /* HAVE_STRUCT_TIMESPEC */
-#endif /* __C_WINDOWS__ */
-
 #include <time.h>
 
 #ifndef TIME_UTC
     #define TIME_UTC 1
 #endif /* TIME_UTC */
 
-#if !defined(__timespec_defined) && !defined(_STRUCT_TIMESPEC) && \
-	!defined(_TIMESPEC_DECLARED) && !defined(HAVE_STRUCT_TIMESPEC)
-    #define __ALIB_TIMESPEC__
+#if defined(__C_POSIX__) &&                                         \
+    !defined(_POSIX_TIMERS) && !defined(_STRUCT_TIMESPEC) &&        \
+    !defined(_TIMESPEC_DEFINED) && !defined(__timespec_defined)     \
+
+    #define _POSIX_TIMERS
+    #define _STRUCT_TIMESPEC
+    #define _TIMESPEC_DEFINED
+    #define __timespec_defined
     struct timespec{
         time_t  tv_sec;
         long    tv_nsec;
     };
-#endif /* timespec */
-__weak __noused __nonnull int timespec_get(struct timespec *ts, int base);
+#endif /* __C_POSIX__ && no timespec */
+
+#if defined(__C_WINDOWS__) && !defined(_TIMESPEC_DEFINED)
+    #define _TIMESPEC_DEFINED
+    struct timespec{
+        time_t  tv_sec;
+        long    tv_nsec;
+    };
+#endif /* __C_WINDOWS__ && no timespec */
+
+int timespec_get(struct timespec *ts, int base);
 
 
 
