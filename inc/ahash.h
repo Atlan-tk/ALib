@@ -190,7 +190,7 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
     }                                                                                           \
                                                                                                 \
     static uint32_t (*const __Ahsf(TK,TV,Hash))(const TK*) = A_OBJ_HASH(TK);                    \
-    __noused __weak void A_OBJ_INIT(AHash(TK,TV))(AHash(TK,TV)* self){                          \
+    __noused __weak __visibility(protected) void A_OBJ_INIT(AHash(TK,TV))(AHash(TK,TV)* self){  \
         self->f = &A_FUNC_TAB(AHash(TK,TV));                                                    \
         self->hash.size = sizeof(__Ahs_data(TK,TV));                                            \
         self->hash.size_k = sizeof(TK);                                                         \
@@ -200,15 +200,17 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
         self->hash.cmpd = (void*)__Ahsf(TK,TV,data_cmpd);                                       \
         self->hash.cmpd_k = (void*)__A_OBJ_CMPD_FUNC_SELF(TK);                                  \
     }                                                                                           \
-    __noused __weak void A_OBJ_DEST(AHash(TK,TV))(AHash(TK,TV)* self){                          \
+    __noused __weak __visibility(protected) void A_OBJ_DEST(AHash(TK,TV))(AHash(TK,TV)* self){  \
         __Ahash_dest(&self->hash);                                                              \
     }                                                                                           \
-    __noused __weak void A_OBJ_COPY(AHash(TK,TV))(AHash(TK,TV)* self, const AHash(TK,TV)* that){\
+    __noused __weak __visibility(protected) void A_OBJ_COPY(AHash(TK,TV))                       \
+    (AHash(TK,TV)* self, const AHash(TK,TV)* that){                                             \
         self->f = that->f;                                                                      \
         int ret = __Ahash_copy(&self->hash, &that->hash);                                       \
         if(__a_unlikely(ret != 0)) aExcSet(ret);                                                \
     }                                                                                           \
-    __noused __weak int  A_OBJ_CMPD(AHash(TK,TV))(const AHash(TK,TV)*self,const AHash(TK,TV)*that){ \
+    __noused __weak __visibility(protected) int  A_OBJ_CMPD(AHash(TK,TV))                       \
+    (const AHash(TK,TV)*self,const AHash(TK,TV)*that){                                          \
         return __Ahash_cmpd(&self->hash, &that->hash);                                          \
     }                                                                                           \
 

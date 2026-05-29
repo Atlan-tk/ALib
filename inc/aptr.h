@@ -25,21 +25,23 @@ extern "C" {
     };                                                                                  \
 
 #define APtr_Generate(T)                                                                \
-    __noused __weak void A_OBJ_DEST(APtr(T))(APtr(T)* self){                            \
+    __noused __weak __visibility(protected) void A_OBJ_DEST(APtr(T))(APtr(T)* self){    \
         if(self->strong_flag && self->p != nullptr){                                    \
             alib_delete(self->p, self->dest);                                           \
             self->p = nullptr, self->strong_flag = false;                               \
         }                                                                               \
     }                                                                                   \
-    __noused __weak void A_OBJ_INIT(APtr(T))(APtr(T)* self){                            \
+    __noused __weak __visibility(protected) void A_OBJ_INIT(APtr(T))(APtr(T)* self){    \
         self->p = A_NEW(T); if(self->p != nullptr) self->strong_flag = true;            \
         self->dest = (__A_IS_CLASS(T) != 0) ?                                           \
             (void*)a_class_dest : (void*)__A_OBJ_DEST_FUNC_SELF(T);                     \
     }                                                                                   \
-    __noused __weak void A_OBJ_COPY(APtr(T))(APtr(T)* self, const APtr(T)* that){       \
+    __noused __weak __visibility(protected) void A_OBJ_COPY(APtr(T))                    \
+    (APtr(T)* self, const APtr(T)* that){                                               \
         self->p = that->p, self->strong_flag = false; self->dest = that->dest;          \
     }                                                                                   \
-    __noused __weak int  A_OBJ_CMPD(APtr(T))(const APtr(T)* self,const APtr(T)*that){   \
+    __noused __weak __visibility(protected) int  A_OBJ_CMPD(APtr(T))                    \
+    (const APtr(T)* self,const APtr(T)*that){                                           \
         if(self->p == that->p) return 0;                                                \
         if(self->p == nullptr) return -1;                                               \
         if(that->p == nullptr) return 1;                                                \
@@ -105,7 +107,7 @@ static inline bool __a_ref_count_sub(atomic_uint* ref_count){
     };                                                                                  \
 
 #define AShPtr_Generate(T)                                                              \
-    __noused __weak void A_OBJ_DEST(AShPtr(T))(AShPtr(T)* self){                        \
+    __noused __weak __visibility(protected) void A_OBJ_DEST(AShPtr(T))(AShPtr(T)* self){\
         if(__a_likely(self->p != nullptr)){                                             \
             if(__a_unlikely(__a_ref_count_sub(self->ref_count))){                       \
                 alib_delete(self->p, self->dest);                                       \
@@ -113,7 +115,7 @@ static inline bool __a_ref_count_sub(atomic_uint* ref_count){
             }                                                                           \
         }                                                                               \
     }                                                                                   \
-    __noused __weak void A_OBJ_INIT(AShPtr(T))(AShPtr(T)* self){                        \
+    __noused __weak __visibility(protected) void A_OBJ_INIT(AShPtr(T))(AShPtr(T)* self){\
         self->ref_count = alib_alloc(sizeof(atomic_uint));                              \
         if(__a_unlikely(self->ref_count == nullptr)){                                   \
             aExcSet(AEXC_alloc_failed); return;                                         \
@@ -126,7 +128,8 @@ static inline bool __a_ref_count_sub(atomic_uint* ref_count){
         self->dest = (__A_IS_CLASS(T) != 0) ?                                           \
             (void*)a_class_dest : (void*)__A_OBJ_DEST_FUNC_SELF(T);                     \
     }                                                                                   \
-    __noused __weak void A_OBJ_COPY(AShPtr(T))(AShPtr(T)* self, const AShPtr(T)* that){ \
+    __noused __weak __visibility(protected) void A_OBJ_COPY(AShPtr(T))                  \
+    (AShPtr(T)* self, const AShPtr(T)* that){                                           \
         if(__a_likely(that->p != nullptr)){                                             \
             if(__a_likely(__a_ref_count_add(that->ref_count))){                         \
                 *self = *that;                                                          \
@@ -135,7 +138,8 @@ static inline bool __a_ref_count_sub(atomic_uint* ref_count){
             }                                                                           \
         }                                                                               \
     }                                                                                   \
-    __noused __weak int  A_OBJ_CMPD(AShPtr(T))(const AShPtr(T)* self,const AShPtr(T)*that){   \
+    __noused __weak __visibility(protected) int  A_OBJ_CMPD(AShPtr(T))                  \
+    (const AShPtr(T)* self,const AShPtr(T)*that){                                       \
         if(self->p == that->p) return 0;                                                \
         if(self->p == nullptr) return -1;                                               \
         if(that->p == nullptr) return 1;                                                \

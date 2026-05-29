@@ -48,16 +48,16 @@ int timespec_get(struct timespec *ts, int base);
 typedef struct{
     struct timespec clock;
 }AClock;
-__weak void A_OBJ_INIT(AClock)(AClock* self){
+__weak __visibility(protected) void A_OBJ_INIT(AClock)(AClock* self){
    if(TIME_UTC != timespec_get(&self->clock, TIME_UTC)){
         aExcSet(AEXC_system_error);
    }
 }
-__weak void A_OBJ_COPY(AClock)(AClock* self, __noused const AClock* that){
+__weak __visibility(protected) void A_OBJ_COPY(AClock)(AClock* self, __noused const AClock* that){
     A_OBJ_INIT(AClock)(self);
 }
 static inline int64_t AClock_nsDiff(AClock self, AClock that);
-__weak int A_OBJ_CMPD(AClock)(const AClock* self, const AClock* that){
+__weak __visibility(protected) int A_OBJ_CMPD(AClock)(const AClock* self, const AClock* that){
     auto ret = AClock_nsDiff(*self, *that);
     return ret == 0 ? 0 : (ret > 0 ? 1 : -1);
 }

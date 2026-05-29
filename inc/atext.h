@@ -133,17 +133,17 @@ void AText_toGBK(const AText* self, char* buf, uint32_t buf_size);
 
 
 
-__noused __weak void A_OBJ_INIT(AText)(AText* self) {
+__noused __weak __visibility(protected) void A_OBJ_INIT(AText)(AText* self) {
     self->f = &A_FUNC_TAB(AText);
 }
 
-__noused __weak void A_OBJ_DEST(AText)(AText* self) {
+__noused __weak __visibility(protected) void A_OBJ_DEST(AText)(AText* self) {
     if (self->noLiteral) {
         alib_free(self->s);
     }
 }
 
-__noused __weak void A_OBJ_COPY(AText)(AText* self, const AText* that) {
+__noused __weak __visibility(protected) void A_OBJ_COPY(AText)(AText* self, const AText* that) {
     self->f = that->f;
     if (that->noLiteral) {
         int ret = AText_reCap(self, that->byte_num + 1);
@@ -165,7 +165,7 @@ __noused __weak void A_OBJ_COPY(AText)(AText* self, const AText* that) {
     self->noLiteral = that->noLiteral;
 }
 
-__noused __weak int A_OBJ_CMPD(AText)(const AText* self, const AText* that) {
+__noused __weak __visibility(protected) int A_OBJ_CMPD(AText)(const AText* self, const AText* that) {
     if (self->s == that->s) {
         return 0;
     }
@@ -178,7 +178,7 @@ __noused __weak int A_OBJ_CMPD(AText)(const AText* self, const AText* that) {
     return 1;
 }
 
-__noused __weak uint32_t A_OBJ_HASH(AText)(const AText* self) {
+__noused __weak __visibility(protected) uint32_t A_OBJ_HASH(AText)(const AText* self) {
     if (__a_unlikely(self == nullptr || self->s == nullptr)) {
         return 0;
     }

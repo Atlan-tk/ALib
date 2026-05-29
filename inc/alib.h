@@ -100,6 +100,22 @@ extern "C" {
     #endif
 #endif /* __noreturn */
 
+#ifndef __visibility
+    #if defined(__C_POSIX__)
+        #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
+            #define __visibility(mode) [[gnu::visibility(__A_Str(mode))]]
+        #else
+            #define __visibility(mode) __attribute__((visibility(__A_Str(mode))))
+        #endif
+    #else
+        #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
+            #define __visibility(mode) [[gnu::visibility(__A_Str(default))]]
+        #else
+            #define __visibility(mode) __attribute__((visibility(__A_Str(default))))
+        #endif
+    #endif /* posix or windows */
+#endif /* __visibility */
+
 #include <string.h>
 #include <stdint.h>
 
