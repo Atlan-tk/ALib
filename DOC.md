@@ -56,7 +56,6 @@ make CONFIG=linux
 - `linux-clang`：Linux / Unix 本地 Clang 构建，使用 `clang` 和 `llvm-ar`。
 - `linux-arm`：Linux 到 AArch64 的交叉编译，使用 `aarch64-linux-gnu-gcc`。
 - `linux-mips`：Linux 到 MIPS 的交叉编译，使用 `mips-linux-uclibc-gnu-gcc`。
-- `mingw64`：Linux 到 Windows x86_64 的 MinGW-w64 交叉编译。
 
 新增配置时，只需添加新的 `config/<name>.mk`，之后使用 `make CONFIG=<name>` 即可。切换不同配置时建议显式传入 `CONFIG`，或执行 `make disclean` 删除旧 `.config` 后重新构建。
 
@@ -84,8 +83,6 @@ make CONFIG=linux-arm
 # Linux -> MIPS
 make CONFIG=linux-mips
 
-# Linux -> Windows，MinGW-w64
-make CONFIG=mingw64
 ```
 
 交叉编译通常只能验证目标程序已经生成；如果要直接执行生成的 Windows `.exe` 测试，需要额外安装 Wine，或者复制到 Windows 环境运行。
@@ -93,7 +90,7 @@ make CONFIG=mingw64
 安装规则：
 
 - `linux` / `linux-clang`：头文件安装到 `/usr/local/include/alib/`，静态库安装到 `/usr/local/lib/`。
-- `linux-arm` / `linux-mips` / `mingw64`：头文件安装到 `$HOME/.alib/include/alib/`，静态库安装到 `$HOME/.alib/lib/`。
+- `linux-arm` / `linux-mips` ：头文件安装到 `$HOME/.alib/include/alib/`，静态库安装到 `$HOME/.alib/lib/`。
 
 安装和卸载命令：
 
@@ -1398,11 +1395,11 @@ a_signal_transmit(signal, &collector);
 
 当前实现要求：
 
-1. 已连接的接收者对象在析构前必须断开连接，或者直接继承 `AReceEnd`。  
-2. 回调执行期间可以断连（`disconnect` / `disconnect_all`），但实际操作会延迟到本轮派发结束后执行。  
-3. 同一个 `(id, addressee)` 重复调用 `a_signal_connection` / `AReceEnd_connection` 时，会更新为新的回调函数，而不是保留旧回调。  
-4. 回调里不要析构任何仍处于连接表中的接收者对象，否则会制造悬空指针。  
-5. 回调里不要等待其他线程执行信号连接 / 断开操作，否则可能形成锁等待。  
+1. 已连接的接收者对象在析构前必须断开连接，或者直接继承 `AReceEnd`。
+2. 回调执行期间可以断连（`disconnect` / `disconnect_all`），但实际操作会延迟到本轮派发结束后执行。
+3. 同一个 `(id, addressee)` 重复调用 `a_signal_connection` / `AReceEnd_connection` 时，会更新为新的回调函数，而不是保留旧回调。
+4. 回调里不要析构任何仍处于连接表中的接收者对象，否则会制造悬空指针。
+5. 回调里不要等待其他线程执行信号连接 / 断开操作，否则可能形成锁等待。
 
 ### 5.19 `afile.h` — 文件读写器与设备对象
 

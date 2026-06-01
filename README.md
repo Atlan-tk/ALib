@@ -95,7 +95,6 @@ make disclean
 - `linux-clang`：Linux / Unix 本地 Clang 构建，使用 `clang` 和 `llvm-ar`。
 - `linux-arm`：Linux 到 AArch64 的交叉编译，使用 `aarch64-linux-gnu-gcc`。
 - `linux-mips`：Linux 到 MIPS 的交叉编译，使用 `mips-linux-uclibc-gnu-gcc`。
-- `mingw64`：Linux 到 Windows x86_64 的 MinGW-w64 交叉编译。
 
 新增编译配置时，只需在 `config/` 下增加新的 `<name>.mk`，之后使用 `make CONFIG=<name>` 即可。顶层构建会把本次配置复制到 `.config`，之后未显式传入 `CONFIG` 时会继续沿用它。
 
@@ -123,12 +122,6 @@ MIPS 示例：
 make CONFIG=linux-mips
 ```
 
-MinGW-w64 Windows x86_64 示例：
-
-```bash
-make CONFIG=mingw64
-```
-
 交叉编译通常只能验证目标程序已经生成；若要在 Linux / WSL2 中运行 Windows `.exe` 测试，需要额外安装 Wine，或复制到 Windows 环境运行。
 
 ### 安装
@@ -140,7 +133,7 @@ make install
 默认安装位置：
 
 - `linux` / `linux-clang`：头文件安装到 `/usr/local/include/alib/`，静态库安装到 `/usr/local/lib/`。
-- `linux-arm` / `linux-mips` / `mingw64`：头文件安装到 `$HOME/.alib/include/alib/`，静态库安装到 `$HOME/.alib/lib/`。
+- `linux-arm` / `linux-mips` ：头文件安装到 `$HOME/.alib/include/alib/`，静态库安装到 `$HOME/.alib/lib/`。
 
 卸载：
 
