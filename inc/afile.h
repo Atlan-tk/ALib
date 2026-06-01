@@ -122,7 +122,7 @@ AClass_Inherit(ADev);
 AClass_Struct(ADev,
     AText   name;           //设备名
     int32_t fd;             //设备描述符
-    bool    noblock;        //是否阻塞
+    bool    noblock;        //是否非阻塞
     bool    stat;           //设备状态
 );
 AClass_Function(ADev,
@@ -189,7 +189,7 @@ AClass_Inherit(ADev);
 AClass_Struct(ADev,
     AText   name;           //设备名
     HANDLE  fd;             //设备句柄
-    bool    noblock;        //是否阻塞
+    bool    noblock;        //是否非阻塞
     bool    stat;           //设备状态
 );
 AClass_Function(ADev,

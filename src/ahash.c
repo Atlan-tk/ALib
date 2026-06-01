@@ -407,19 +407,23 @@ static inline bool __Aiter_exist(const __Ahash* hash, __Aiter* it){
 int __Ahash_cmpd(const __Ahash* self, const __Ahash* that){
     int ret = 0;
 
+    if(self->num != that->num){
+        return self->num > that->num ? 1 : -1;
+    }
+
     __Aiter it_self = {}; __Ahash_get_head(self, &it_self);
     while(__Aiter_exist(self, &it_self)){
         char* obj_self = (char*)(it_self.p);
+        if(obj_self == nullptr) break;
+
         char* obj_that = __Ahash_at(that, obj_self);
-        ret = self->cmpd(obj_self, obj_that);
+        if(obj_that == nullptr) return 1;
+
+        ret = self->cmpd_v(obj_self, obj_that);
         if(ret != 0) return ret;
 
         __Ahash_iter_next(self, &it_self);
     }
-
-    if(self->num == that->num) return 0;
-    if(self->num > that->num) return 1;
-    if(self->num < that->num) return -1;
 
     return 0;
 }
@@ -469,6 +473,5 @@ int __Ahash_copy(__Ahash* self, const __Ahash* that){
 
     return 0;
 }
-
 
 

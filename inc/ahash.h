@@ -29,7 +29,7 @@ typedef struct{
 
     void(*dest)(void*);
     void(*copy)(void*,const void*);
-    int (*cmpd)(const void*,const void*);
+    int (*cmpd_v)(const void*,const void*);
     int (*cmpd_k)(const void*,const void*);
     uint32_t (*hash_func)(const void*);
     char type[0];
@@ -126,9 +126,7 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
     }                                                                                           \
     static inline int  __Ahsf(TK,TV,data_cmpd)(const __Ahs_data(TK,TV)* data,                   \
             const __Ahs_data(TK,TV)* that_data){                                                \
-        int ret = A_CMPD(TK, data->k, that_data->k);                                            \
-        if(ret == 0) ret = A_CMPD(TV, data->v, that_data->v);                                   \
-        return ret;                                                                             \
+        return A_CMPD(TV, data->v, that_data->v);                                               \
     }                                                                                           \
     /******************************************************************************************/\
     static inline TV* __Ahsf(TK,TV,at)(const AHash(TK,TV)* self, const TK k){                   \
@@ -197,7 +195,7 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
         self->hash.hash_func = (void*)__Ahsf(TK,TV,Hash);                                       \
         self->hash.copy = (void*)__Ahsf(TK,TV,data_copy);                                       \
         self->hash.dest = (void*)__Ahsf(TK,TV,data_dest);                                       \
-        self->hash.cmpd = (void*)__Ahsf(TK,TV,data_cmpd);                                       \
+        self->hash.cmpd_v = (void*)__Ahsf(TK,TV,data_cmpd);                                     \
         self->hash.cmpd_k = (void*)__A_OBJ_CMPD_FUNC_SELF(TK);                                  \
     }                                                                                           \
     __weak __visibility(protected) void A_OBJ_DEST(AHash(TK,TV))(AHash(TK,TV)* self){           \
