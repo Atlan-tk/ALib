@@ -198,7 +198,7 @@ void      __Atree_take(__Atree* tree, void* data);
         return container_of(it.p,__Atr_data(TK,TV),v)->k;                                       \
     }                                                                                           \
                                                                                                 \
-    __noused __weak __visibility(protected) void A_OBJ_INIT(ATree(TK,TV))(ATree(TK,TV)* self){  \
+    __weak __visibility(protected) void A_OBJ_INIT(ATree(TK,TV))(ATree(TK,TV)* self){           \
         self->f = &A_FUNC_TAB(ATree(TK,TV));                                                    \
         self->tree.size = sizeof(__Atr_data(TK,TV));                                            \
         self->tree.copy = (void*)__Atrf(TK,TV,data_copy);                                       \
@@ -206,15 +206,15 @@ void      __Atree_take(__Atree* tree, void* data);
         self->tree.cmpd = (void*)__Atrf(TK,TV,data_cmpd);                                       \
         self->tree.cmpd_k = (void*)__A_OBJ_CMPD_FUNC_SELF(TK);                                  \
     }                                                                                           \
-    __noused __weak __visibility(protected) void A_OBJ_DEST(ATree(TK,TV))(ATree(TK,TV)* self){  \
+    __weak __visibility(protected) void A_OBJ_DEST(ATree(TK,TV))(ATree(TK,TV)* self){           \
         __Atree_dest(&self->tree);                                                              \
     }                                                                                           \
-    __noused __weak __visibility(protected) void A_OBJ_COPY(ATree(TK,TV))                       \
+    __weak __visibility(protected) void A_OBJ_COPY(ATree(TK,TV))                                \
     (ATree(TK,TV)* self, const ATree(TK,TV)* that){                                             \
         self->f = that->f;                                                                      \
         __Atree_copy(&self->tree, &that->tree);                                                 \
     }                                                                                           \
-    __noused __weak __visibility(protected) int  A_OBJ_CMPD(ATree(TK,TV))                       \
+    __weak __visibility(protected) int  A_OBJ_CMPD(ATree(TK,TV))                                \
     (const ATree(TK,TV)*self,const ATree(TK,TV)*that){                                          \
         return __Atree_cmpd(&self->tree, &that->tree);                                          \
     }                                                                                           \

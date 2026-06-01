@@ -86,16 +86,16 @@ typedef struct{
     ALine(__ASignalLinkp)   linkpList;
 }__ASignalTower;
 A_TYPE_REGISTER(__ASignalTower);
-__noused __visibility(hidden) void A_OBJ_INIT(__ASignalTower)(__ASignalTower* self){
+__visibility(hidden) void A_OBJ_INIT(__ASignalTower)(__ASignalTower* self){
     self->id = 0; self->linkpList = A_INIT(ALine(__ASignalLinkp));
 }
-__noused __visibility(hidden) void A_OBJ_DEST(__ASignalTower)(__ASignalTower* self){
+__visibility(hidden) void A_OBJ_DEST(__ASignalTower)(__ASignalTower* self){
     self->id = 0; A_DEST(ALine(__ASignalLinkp), self->linkpList);
 }
-__noused __visibility(hidden) void A_OBJ_COPY(__ASignalTower)(__ASignalTower* self, const __ASignalTower* that){
+__visibility(hidden) void A_OBJ_COPY(__ASignalTower)(__ASignalTower* self, const __ASignalTower* that){
     self->id = that->id; self->linkpList = A_COPY(ALine(__ASignalLinkp), that->linkpList);
 }
-__noused __visibility(hidden) int A_OBJ_CMPD(__ASignalTower)(const __ASignalTower* self, const __ASignalTower* that){
+__visibility(hidden) int A_OBJ_CMPD(__ASignalTower)(const __ASignalTower* self, const __ASignalTower* that){
     int ret = A_CMPD(int64_t, self->id, that->id);
     return ret != 0 ? ret : A_CMPD(ALine(__ASignalLinkp), self->linkpList, that->linkpList);
 }
@@ -242,16 +242,16 @@ typedef struct{
     ALine(__ASignalLinkp)   linkpList;
 }__ASignalRadio;
 A_TYPE_REGISTER(__ASignalRadio);
-__noused __visibility(hidden) void A_OBJ_INIT(__ASignalRadio)(__ASignalRadio* self){
+__visibility(hidden) void A_OBJ_INIT(__ASignalRadio)(__ASignalRadio* self){
     self->addressee = nullptr; self->linkpList = A_INIT(ALine(__ASignalLinkp));
 }
-__noused __visibility(hidden) void A_OBJ_DEST(__ASignalRadio)(__ASignalRadio* self){
+__visibility(hidden) void A_OBJ_DEST(__ASignalRadio)(__ASignalRadio* self){
     self->addressee = nullptr; A_DEST(ALine(__ASignalLinkp), self->linkpList);
 }
-__noused __visibility(hidden) void A_OBJ_COPY(__ASignalRadio)(__ASignalRadio* self, const __ASignalRadio* that){
+__visibility(hidden) void A_OBJ_COPY(__ASignalRadio)(__ASignalRadio* self, const __ASignalRadio* that){
     self->addressee = that->addressee; self->linkpList = A_COPY(ALine(__ASignalLinkp), that->linkpList);
 }
-__noused __visibility(hidden) int A_OBJ_CMPD(__ASignalRadio)(const __ASignalRadio* self, const __ASignalRadio* that){
+__visibility(hidden) int A_OBJ_CMPD(__ASignalRadio)(const __ASignalRadio* self, const __ASignalRadio* that){
     int ret = A_CMPD(const_ptr_t, (const_ptr_t)(self->addressee), (const_ptr_t)(that->addressee));
     return ret != 0 ? ret : A_CMPD(ALine(__ASignalLinkp), self->linkpList, that->linkpList);
 }
@@ -371,7 +371,7 @@ typedef struct{
     AHash(const_ptr_t,__ASignalRadio)   adMap;
 }__ASignalSystem;
 A_TYPE_REGISTER(__ASignalSystem);
-__noused __visibility(hidden) void A_OBJ_INIT(__ASignalSystem)(__ASignalSystem* self){
+__visibility(hidden) void A_OBJ_INIT(__ASignalSystem)(__ASignalSystem* self){
     aExcClean();
     atomic_store_explicit(&self->count, 1, memory_order_relaxed);
     self->linkPool = A_INIT(AList(__ASignalLink));
@@ -381,16 +381,16 @@ __noused __visibility(hidden) void A_OBJ_INIT(__ASignalSystem)(__ASignalSystem* 
     self->adMap = A_INIT(AHash(const_ptr_t,__ASignalRadio));
     if(aExcOccur()) return;
 }
-__noused __visibility(hidden) void A_OBJ_DEST(__ASignalSystem)(__ASignalSystem* self){
+__visibility(hidden) void A_OBJ_DEST(__ASignalSystem)(__ASignalSystem* self){
     atomic_store_explicit(&self->count, 0, memory_order_relaxed);
     A_DEST(AList(__ASignalLink), self->linkPool);
     A_DEST(AHash(int64_t,__ASignalTower), self->idMap);
     A_DEST(AHash(const_ptr_t,__ASignalRadio), self->adMap);
 }
-__noused __visibility(hidden) void A_OBJ_COPY(__ASignalSystem)(__ASignalSystem* self, __noused const __ASignalSystem* that){
+__visibility(hidden) void A_OBJ_COPY(__ASignalSystem)(__ASignalSystem* self, __noused const __ASignalSystem* that){
     memset(self, 0, sizeof(__ASignalSystem));
 }
-__noused __visibility(hidden) int A_OBJ_CMPD(__ASignalSystem)(const __ASignalSystem* self, const __ASignalSystem* that){
+__visibility(hidden) int A_OBJ_CMPD(__ASignalSystem)(const __ASignalSystem* self, const __ASignalSystem* that){
     int ret = A_CMPD(int64_t, (int64_t)self->count, (int64_t)that->count);
     if(ret == 0) ret = A_CMPD(AList(__ASignalLink), self->linkPool, that->linkPool);
     if(ret == 0) ret = A_CMPD(AHash(int64_t,__ASignalTower), self->idMap, that->idMap);

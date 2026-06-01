@@ -232,16 +232,16 @@ static inline void __Aarr_pop_back(__Aarr* arr){
         it->p--, it->i--;                                                               \
     }                                                                                   \
                                                                                         \
-    __noused __weak __visibility(protected) void A_OBJ_DEST(ALine(T))(ALine(T)* self){  \
+    __weak __visibility(protected) void A_OBJ_DEST(ALine(T))(ALine(T)* self){           \
         for(uint32_t i = 0; i < self->arr.num; i++){                                    \
             A_DEST(T, self->p[i]);                                                      \
         }                                                                               \
         __Aarr_dest(&self->arr);                                                        \
     }                                                                                   \
-    __noused __weak __visibility(protected) void A_OBJ_INIT(ALine(T))(ALine(T)* self){  \
+    __weak __visibility(protected) void A_OBJ_INIT(ALine(T))(ALine(T)* self){           \
         self->arr.size = sizeof(T); self->f = &A_FUNC_TAB(ALine(T));                    \
     }                                                                                   \
-    __noused __weak __visibility(protected) void A_OBJ_COPY(ALine(T))                   \
+    __weak __visibility(protected) void A_OBJ_COPY(ALine(T))                            \
     (ALine(T)* self, const ALine(T)* that){                                             \
         self->f = that->f;                                                              \
         int ret = __Aarr_copy(&self->arr, &that->arr);                                  \
@@ -252,7 +252,7 @@ static inline void __Aarr_pop_back(__Aarr* arr){
             self->arr.num++;                                                            \
         }                                                                               \
     }                                                                                   \
-    __noused __weak __visibility(protected) int  A_OBJ_CMPD(ALine(T))                   \
+    __weak __visibility(protected) int  A_OBJ_CMPD(ALine(T))                            \
     (const ALine(T)* self,const ALine(T)*that){                                         \
         int ret = 0;                                                                    \
         uint32_t num = self->arr.num <= that->arr.num ? self->arr.num : that->arr.num;  \

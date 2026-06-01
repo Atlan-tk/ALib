@@ -95,17 +95,17 @@ static inline AString AString_new(const char* s){
 }
 
 
-__noused __weak __visibility(protected) void A_OBJ_INIT(AString)(AString* self) {
+__weak __visibility(protected) void A_OBJ_INIT(AString)(AString* self) {
     self->f = &A_FUNC_TAB(AString);
 }
 
-__noused __weak __visibility(protected) void A_OBJ_DEST(AString)(AString* self) {
+__weak __visibility(protected) void A_OBJ_DEST(AString)(AString* self) {
     if (self->noLiteral) {
         alib_free(self->s);
     }
 }
 
-__noused __weak __visibility(protected) void A_OBJ_COPY(AString)(AString* self, const AString* that) {
+__weak __visibility(protected) void A_OBJ_COPY(AString)(AString* self, const AString* that) {
     self->f = that->f;
     if (that->noLiteral) {
         int ret = AString_reCap(self, that->number + 1);
@@ -124,7 +124,7 @@ __noused __weak __visibility(protected) void A_OBJ_COPY(AString)(AString* self, 
     self->noLiteral = that->noLiteral;
 }
 
-__noused __weak __visibility(protected) int A_OBJ_CMPD(AString)(const AString* self, const AString* that) {
+__weak __visibility(protected) int A_OBJ_CMPD(AString)(const AString* self, const AString* that) {
     if(self->s == that->s) return 0;
     if(self->s != nullptr && that->s != nullptr){
         return strcmp(self->s, that->s);
@@ -135,7 +135,7 @@ __noused __weak __visibility(protected) int A_OBJ_CMPD(AString)(const AString* s
     }
 }
 
-__noused __weak __visibility(protected) uint32_t A_OBJ_HASH(AString)(const AString* self){
+__weak __visibility(protected) uint32_t A_OBJ_HASH(AString)(const AString* self){
     if(__a_unlikely(self == nullptr || self->s == nullptr)){
         return 0;
     }

@@ -125,19 +125,19 @@ extern "C" {
         it->i--; it->p = __Aquf(T,at)(it->con, it->i);                              \
     }                                                                               \
                                                                                     \
-    __noused __weak __visibility(protected) void A_OBJ_DEST(AQueue(T))              \
+    __weak __visibility(protected) void A_OBJ_DEST(AQueue(T))                       \
     (AQueue(T)* self){                                                              \
         for(uint32_t i = 0; i < self->deq.num; i++){                                \
             A_DEST(T, *(T*)__Aquf(T,at)(self, i));                                  \
         }                                                                           \
         __Adeq_dest(&self->deq);                                                    \
     }                                                                               \
-    __noused __weak __visibility(protected) void A_OBJ_INIT(AQueue(T))              \
+    __weak __visibility(protected) void A_OBJ_INIT(AQueue(T))                       \
     (AQueue(T)* self){                                                              \
         __Adeq_init(&self->deq, sizeof(T));                                         \
         self->f = &A_FUNC_TAB(AQueue(T));                                           \
     }                                                                               \
-    __noused __weak __visibility(protected) void A_OBJ_COPY(AQueue(T))              \
+    __weak __visibility(protected) void A_OBJ_COPY(AQueue(T))                       \
     (AQueue(T)* self, const AQueue(T)* that){                                       \
         self->f = that->f;                                                          \
         __Adeq_init(&self->deq, sizeof(T));                                         \
@@ -147,7 +147,7 @@ extern "C" {
             if(aExcOccur()) return;                                                 \
         }                                                                           \
     }                                                                               \
-    __noused __weak __visibility(protected) int A_OBJ_CMPD(AQueue(T))               \
+    __weak __visibility(protected) int A_OBJ_CMPD(AQueue(T))                        \
     (const AQueue(T)*self,const AQueue(T)*that){                                    \
         int ret = 0;                                                                \
         uint32_t num = self->deq.num <= that->deq.num ? self->deq.num:that->deq.num;\

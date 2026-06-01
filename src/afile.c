@@ -186,3 +186,57 @@ uint32_t APFile_append(APFile* self, uint32_t size, void* target){
 }
 
 
+
+#if defined(__C_POSIX__)
+int32_t  ADev_ioctl(ADev* self, int32_t cmd, void* buf){
+    if(self == nullptr){
+        aExcSet(AEXC_nullptr);
+        return aExcGet();
+    }
+    if(!self->stat){
+        aExcSet(AEXC_system_error);
+        return aExcGet();
+    }
+    return ioctl(self->fd, cmd, buf);
+}
+uint32_t ADev_read (ADev* self, uint32_t size, void* source){
+    if(self == nullptr){
+        aExcSet(AEXC_nullptr);
+        return aExcGet();
+    }
+    if(!self->stat){
+        aExcSet(AEXC_system_error);
+        return aExcGet();
+    }
+    return read(self->fd, source, size);
+}
+uint32_t ADev_write(ADev* self, uint32_t size, void* target){
+    if(self == nullptr){
+        aExcSet(AEXC_nullptr);
+        return aExcGet();
+    }
+    if(!self->stat){
+        aExcSet(AEXC_system_error);
+        return aExcGet();
+    }
+    return write(self->fd, target, size);
+}
+
+ADev aDevOpen(const char* name){
+    ADev dev = A_INIT(ADev);
+    dev.name = AText_new(name);
+    if(name == nullptr){
+        aExcSet(AEXC_system_error);
+    }else{
+        dev.fd = open(name, O_RDWR | O_NONBLOCK);
+        if(dev.fd < 0){
+            aExcSet(AEXC_system_error);
+        }else{
+            dev.stat = true;
+        }
+    }
+    return dev;
+}
+
+#endif /* posix */
+
