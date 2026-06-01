@@ -225,6 +225,24 @@ uint32_t ADev_write(ADev* self, uint32_t size, void* target){
 ADev aDevOpen(const char* name){
     ADev dev = A_INIT(ADev);
     dev.name = AText_new(name);
+    dev.noblock = false;
+    if(name == nullptr){
+        aExcSet(AEXC_system_error);
+    }else{
+        dev.fd = open(name, O_RDWR);
+        if(dev.fd < 0){
+            aExcSet(AEXC_system_error);
+        }else{
+            dev.stat = true;
+        }
+    }
+    return dev;
+}
+
+ADev aDevOpen_nb(const char* name){
+    ADev dev = A_INIT(ADev);
+    dev.name = AText_new(name);
+    dev.noblock = true;
     if(name == nullptr){
         aExcSet(AEXC_system_error);
     }else{

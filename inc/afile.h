@@ -122,6 +122,7 @@ AClass_Inherit(ADev);
 AClass_Struct(ADev,
     AText   name;           //设备名
     int32_t fd;             //设备描述符
+    bool    noblock;        //是否阻塞
     bool    stat;           //设备状态
 );
 AClass_Function(ADev,
@@ -144,7 +145,12 @@ __weak __visibility(protected) void A_OBJ_DEST(ADev)(ADev* self){
 }
 __weak __visibility(protected) void A_OBJ_COPY(ADev)(ADev* self, const ADev* that){
     self->name = A_COPY(AText, that->name);
-    self->fd = open(self->name.s, O_RDWR | O_NONBLOCK);
+    self->noblock = that->noblock;
+    if(self->noblock){
+        self->fd = open(self->name.s, O_RDWR | O_NONBLOCK);
+    }else{
+        self->fd = open(self->name.s, O_RDWR);
+    }
     if(self->fd < 0){
         aExcSet(AEXC_system_error);
         return;
@@ -158,7 +164,8 @@ __weak __visibility(protected) int  A_OBJ_CMPD(ADev)(const ADev* self, const ADe
 
 A_CLASS_REGISTER(ADev);
 
-ADev aDevOpen(const char* name);
+ADev aDevOpen(const char* name);    //阻塞模式打开
+ADev aDevOpen_nb(const char* name); //非阻塞模式打开
 
 #endif /* posix */
 
