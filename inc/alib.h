@@ -275,11 +275,16 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
 #define A_TYPE_REGISTER(T)                                                                                  \
     enum{ __A_IS_CLASS(T) = 0 };                                                                            \
                                                                                                             \
-    __weak void A_OBJ_DEST(T)(T* self);                                                                     \
-    __weak void A_OBJ_INIT(T)(T* self);                                                                     \
-    __weak void A_OBJ_COPY(T)(T* self, const T* that);                                                      \
-    __weak int  A_OBJ_CMPD(T)(const T* self, const T* that);                                                \
-    __weak uint32_t A_OBJ_HASH(T)(const T* self);                                                           \
+    void A_OBJ_DEST(T)(T* self);                                                                            \
+    void A_OBJ_INIT(T)(T* self);                                                                            \
+    void A_OBJ_COPY(T)(T* self, const T* that);                                                             \
+    int  A_OBJ_CMPD(T)(const T* self, const T* that);                                                       \
+    uint32_t A_OBJ_HASH(T)(const T* self);                                                                  \
+                                                                                                            \
+    __weakref(A_OBJ_DEST(T)) static void __A_OBJ_DEST(T)(T* self);                                          \
+    __weakref(A_OBJ_INIT(T)) static void __A_OBJ_INIT(T)(T* self);                                          \
+    __weakref(A_OBJ_COPY(T)) static void __A_OBJ_COPY(T)(T* self, const T* that);                           \
+    __weakref(A_OBJ_CMPD(T)) static int  __A_OBJ_CMPD(T)(const T* self, const T* that);                     \
                                                                                                             \
     __noused static inline void __A_OBJ_DEST_FUNC_SELF(T)(T* self){                                         \
         /* 空对象不析构 */                                                                                  \
@@ -288,21 +293,21 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
         T null_obj; memset(&null_obj, 0, sizeof(T));                                                        \
         if(memcmp(self, &null_obj, sizeof(T)) == 0){ return; }                                              \
                                                                                                             \
-        if(A_OBJ_DEST(T) != nullptr) A_OBJ_DEST(T)(self);                                                   \
+        if(__A_OBJ_DEST(T) != nullptr) __A_OBJ_DEST(T)(self);                                               \
         memset(self, 0, sizeof(T));                                                                         \
     }                                                                                                       \
     __noused static inline void __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                         \
         aExcClean();                                                                                        \
         if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
-        memset(self, 0, sizeof(T)); if(A_OBJ_INIT(T) != nullptr) A_OBJ_INIT(T)(self);                       \
+        memset(self, 0, sizeof(T)); if(__A_OBJ_INIT(T) != nullptr) __A_OBJ_INIT(T)(self);                   \
         if(aExcOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
     }                                                                                                       \
     __noused static inline void __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){                          \
         aExcClean();                                                                                        \
         if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
         if(__a_unlikely(that == nullptr)) { __A_OBJ_INIT_FUNC_SELF(T)(self); return; }                      \
-        memset(self, 0, sizeof(T)); if(A_OBJ_COPY(T) != nullptr){                                           \
-            A_OBJ_COPY(T)(self, that);                                                                      \
+        memset(self, 0, sizeof(T)); if(__A_OBJ_COPY(T) != nullptr){                                         \
+            __A_OBJ_COPY(T)(self, that);                                                                    \
         }else{                                                                                              \
             memcpy(self, that, sizeof(T));                                                                  \
         }                                                                                                   \
@@ -311,7 +316,7 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
     __noused static inline int __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){                     \
         if(self == that || (self == nullptr && that == nullptr)) return 0;                                  \
         if(self == nullptr){ return 1; } if(that == nullptr){ return -1; }                                  \
-        return A_OBJ_CMPD(T) != nullptr ? A_OBJ_CMPD(T)(self,that) : __A_OBJ_CMPD_AUTO(T,self,that);        \
+        return __A_OBJ_CMPD(T) != nullptr ? __A_OBJ_CMPD(T)(self,that) : __A_OBJ_CMPD_AUTO(T,self,that);    \
     }                                                                                                       \
 
 
@@ -327,7 +332,14 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
 #define A_OBJ_COPY(T) __A_Splice(T, _copy)
 #define A_OBJ_CMPD(T) __A_Splice(T, _cmpd)
 #define A_OBJ_HASH(T) __A_Splice(T, _hash)
-#define A_SET_VTAB(T) __A_Splice(T, _vftab)
+#define A_SET_VTAB(T) __A_Splice(T, _vtab)
+
+#define __A_OBJ_INIT(T) __A_Splice(T, _init_ref)
+#define __A_OBJ_DEST(T) __A_Splice(T, _dest_ref)
+#define __A_OBJ_COPY(T) __A_Splice(T, _copy_ref)
+#define __A_OBJ_CMPD(T) __A_Splice(T, _cmpd_ref)
+#define __A_OBJ_HASH(T) __A_Splice(T, _hash_ref)
+#define __A_SET_VTAB(T) __A_Splice(T, _vtab_ref)
 
 #define __A_OBJ_CMPD_X(T, self, that) ({                                            \
     const T* __a_p0 = (const void*)self;                                            \
@@ -447,9 +459,23 @@ __noused static inline uint32_t A_OBJ_HASH(void)(__noused const void* self){ ret
         if(self == nullptr){ return 1; } if(that == nullptr){ return -1; }                                  \
         return __A_OBJ_CMPD_AUTO(T,self,that);                                                              \
     }                                                                                                       \
-    __weak uint32_t A_OBJ_HASH(T)(const T* self);                                                           \
+    uint32_t A_OBJ_HASH(T)(const T* self);                                                                  \
 
 
+
+__noused static uint32_t A_OBJ_HASH(cstr_t)(const cstr_t* self){
+    if(__a_unlikely(self == nullptr || *self == nullptr)){
+        return 0;
+    }
+    return alib_hash_str(*self);
+}
+
+__noused static uint32_t A_OBJ_HASH(astr_t)(const astr_t* self){
+    if(__a_unlikely(self == nullptr || self->s == nullptr)){
+        return 0;
+    }
+    return alib_hash_str(self->s);
+}
 
 __A_PRIMITIVE_TYPE_REGISTER(int);
 __A_PRIMITIVE_TYPE_REGISTER(bool);
@@ -470,21 +496,6 @@ __A_PRIMITIVE_TYPE_REGISTER(uint32_t);
 __A_PRIMITIVE_TYPE_REGISTER(uint64_t);
 
 __A_PRIMITIVE_TYPE_REGISTER(cptr_t);
-
-__weak uint32_t A_OBJ_HASH(cstr_t)(const cstr_t* self){
-    if(__a_unlikely(self == nullptr || *self == nullptr)){
-        return 0;
-    }
-    return alib_hash_str(*self);
-}
-
-__weak uint32_t A_OBJ_HASH(astr_t)(const astr_t* self){
-    if(__a_unlikely(self == nullptr || self->s == nullptr)){
-        return 0;
-    }
-    return alib_hash_str(self->s);
-}
-
 __A_PRIMITIVE_TYPE_REGISTER(cstr_t);
 __A_PRIMITIVE_TYPE_REGISTER(astr_t);
 

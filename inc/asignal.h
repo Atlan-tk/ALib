@@ -28,7 +28,7 @@ AClass_Struct(ASignal,
 );
 AClass_Function(ASignal);
 AClass_Generate(ASignal);
-__weak __visibility(protected) int A_OBJ_CMPD(ASignal)(const ASignal* self, const ASignal* that){
+__noused static inline int A_OBJ_CMPD(ASignal)(const ASignal* self, const ASignal* that){
     int ret = A_CMPD(int64_t, self->id, that->id);
     if(ret == 0) ret = A_CMPD(int64_t, self->value, that->value);
     if(ret == 0) ret = A_CMPD(cptr_t, (void*)self->sender, (void*)that->sender);
@@ -70,17 +70,17 @@ AClass_Generate(AExcCollector,
     AExcCollector_empty,
     AExcCollector_getNumber,
 );
-__weak __visibility(protected) void A_OBJ_INIT(AExcCollector)(AExcCollector* self){
+__noused static inline void A_OBJ_INIT(AExcCollector)(AExcCollector* self){
     self->list = A_INIT(ALine(AExcEnd));
 }
-__weak __visibility(protected) void A_OBJ_DEST(AExcCollector)(AExcCollector* self){
+__noused static inline void A_OBJ_DEST(AExcCollector)(AExcCollector* self){
     A_DEST(ALine(AExcEnd), self->list);
 }
-__weak __visibility(protected) void A_OBJ_COPY(AExcCollector)(AExcCollector* self, const AExcCollector* that){
+__noused static inline void A_OBJ_COPY(AExcCollector)(AExcCollector* self, const AExcCollector* that){
     *self = *that;
     self->list = A_COPY(ALine(AExcEnd), that->list);
 }
-__weak __visibility(protected) int  A_OBJ_CMPD(AExcCollector)(const AExcCollector* self, const AExcCollector* that){
+__noused static inline int  A_OBJ_CMPD(AExcCollector)(const AExcCollector* self, const AExcCollector* that){
     int ret = A_CMPD(int64_t, self->id, that->id);
     if(ret == 0) ret = A_CMPD(int, (int)self->exc, (int)that->exc);
     if(ret == 0) ret = A_CMPD(ALine(AExcEnd), self->list, that->list);
@@ -174,7 +174,7 @@ __noused static inline void AReceEnd_disconnect(const AReceEnd* self, int64_t id
 }
 AClass_Generate(AReceEnd, AReceEnd_connection, AReceEnd_disconnect);
 
-__weak __visibility(protected) void A_OBJ_DEST(AReceEnd)(AReceEnd* self){
+__noused static inline void A_OBJ_DEST(AReceEnd)(AReceEnd* self){
     a_target_disconnect_all(self);
 }
 A_CLASS_REGISTER(AReceEnd);

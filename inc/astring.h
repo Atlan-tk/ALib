@@ -64,6 +64,55 @@ __noused static bool AString_empty(const AString* self){
     return self->number == 0;
 }
 
+static const A_FUNC(AString) A_FUNC_TAB(AString);
+
+static inline uint32_t A_OBJ_HASH(AString)(const AString* self){
+    if(__a_unlikely(self == nullptr || self->s == nullptr)){
+        return 0;
+    }
+    return alib_hash_str(self->s);
+}
+
+__noused static inline void A_OBJ_INIT(AString)(AString* self) {
+    self->f = &A_FUNC_TAB(AString);
+}
+
+__noused static inline void A_OBJ_DEST(AString)(AString* self) {
+    if (self->noLiteral) {
+        alib_free(self->s);
+    }
+}
+
+__noused static inline void A_OBJ_COPY(AString)(AString* self, const AString* that) {
+    self->f = that->f;
+    if (that->noLiteral) {
+        int ret = AString_reCap(self, that->number + 1);
+        if(ret != 0){
+            aExcSet(AEXC_init_failed);
+            return;
+        }
+        memcpy(self->s, that->s, that->number + 1);
+        self->number = that->number;
+    } else {
+        self->s = that->s;
+        self->capacity = 0;
+    }
+
+    self->number = that->number;
+    self->noLiteral = that->noLiteral;
+}
+
+__noused static inline int A_OBJ_CMPD(AString)(const AString* self, const AString* that) {
+    if(self->s == that->s) return 0;
+    if(self->s != nullptr && that->s != nullptr){
+        return strcmp(self->s, that->s);
+    }else if(self->s == nullptr){
+        return -1;
+    }else{
+        return 1;
+    }
+}
+
 A_TYPE_REGISTER(AString);
 
 static const A_FUNC(AString) A_FUNC_TAB(AString) = {
@@ -83,6 +132,8 @@ static const A_FUNC(AString) A_FUNC_TAB(AString) = {
     AString_empty,
 };
 
+
+
 /* 将字面量转换为AString */
 static inline AString AString_new(const char* s){
     return  (AString){
@@ -92,54 +143,6 @@ static inline AString AString_new(const char* s){
         .capacity = 0,
         .s = (char*)s,
     };
-}
-
-
-__weak __visibility(protected) void A_OBJ_INIT(AString)(AString* self) {
-    self->f = &A_FUNC_TAB(AString);
-}
-
-__weak __visibility(protected) void A_OBJ_DEST(AString)(AString* self) {
-    if (self->noLiteral) {
-        alib_free(self->s);
-    }
-}
-
-__weak __visibility(protected) void A_OBJ_COPY(AString)(AString* self, const AString* that) {
-    self->f = that->f;
-    if (that->noLiteral) {
-        int ret = AString_reCap(self, that->number + 1);
-        if(ret != 0){
-            aExcSet(AEXC_init_failed);
-            return;
-        }
-        memcpy(self->s, that->s, that->number + 1);
-        self->number = that->number;
-    } else {
-        self->s = that->s;
-        self->capacity = 0;
-    }
-
-    self->number = that->number;
-    self->noLiteral = that->noLiteral;
-}
-
-__weak __visibility(protected) int A_OBJ_CMPD(AString)(const AString* self, const AString* that) {
-    if(self->s == that->s) return 0;
-    if(self->s != nullptr && that->s != nullptr){
-        return strcmp(self->s, that->s);
-    }else if(self->s == nullptr){
-        return -1;
-    }else{
-        return 1;
-    }
-}
-
-__weak __visibility(protected) uint32_t A_OBJ_HASH(AString)(const AString* self){
-    if(__a_unlikely(self == nullptr || self->s == nullptr)){
-        return 0;
-    }
-    return alib_hash_str(self->s);
 }
 
 

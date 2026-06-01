@@ -187,27 +187,27 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
         return container_of(it.p,__Ahs_data(TK,TV),v)->k;                                       \
     }                                                                                           \
                                                                                                 \
-    static uint32_t (*const __Ahsf(TK,TV,Hash))(const TK*) = A_OBJ_HASH(TK);                    \
-    __weak __visibility(protected) void A_OBJ_INIT(AHash(TK,TV))(AHash(TK,TV)* self){           \
+    __weakref(A_OBJ_HASH(TK)) static uint32_t __A_OBJ_HASH(TK)(const TK* self);                 \
+    __noused static inline void A_OBJ_INIT(AHash(TK,TV))(AHash(TK,TV)* self){                   \
         self->f = &A_FUNC_TAB(AHash(TK,TV));                                                    \
         self->hash.size = sizeof(__Ahs_data(TK,TV));                                            \
         self->hash.size_k = sizeof(TK);                                                         \
-        self->hash.hash_func = (void*)__Ahsf(TK,TV,Hash);                                       \
+        self->hash.hash_func = (void*)__A_OBJ_HASH(TK);                                         \
         self->hash.copy = (void*)__Ahsf(TK,TV,data_copy);                                       \
         self->hash.dest = (void*)__Ahsf(TK,TV,data_dest);                                       \
         self->hash.cmpd_v = (void*)__Ahsf(TK,TV,data_cmpd);                                     \
         self->hash.cmpd_k = (void*)__A_OBJ_CMPD_FUNC_SELF(TK);                                  \
     }                                                                                           \
-    __weak __visibility(protected) void A_OBJ_DEST(AHash(TK,TV))(AHash(TK,TV)* self){           \
+    __noused static inline void A_OBJ_DEST(AHash(TK,TV))(AHash(TK,TV)* self){                   \
         __Ahash_dest(&self->hash);                                                              \
     }                                                                                           \
-    __weak __visibility(protected) void A_OBJ_COPY(AHash(TK,TV))                                \
+    __noused static inline void A_OBJ_COPY(AHash(TK,TV))                                        \
     (AHash(TK,TV)* self, const AHash(TK,TV)* that){                                             \
         self->f = that->f;                                                                      \
         int ret = __Ahash_copy(&self->hash, &that->hash);                                       \
         if(__a_unlikely(ret != 0)) aExcSet(ret);                                                \
     }                                                                                           \
-    __weak __visibility(protected) int  A_OBJ_CMPD(AHash(TK,TV))                                \
+    __noused static inline int  A_OBJ_CMPD(AHash(TK,TV))                                        \
     (const AHash(TK,TV)*self,const AHash(TK,TV)*that){                                          \
         return __Ahash_cmpd(&self->hash, &that->hash);                                          \
     }                                                                                           \

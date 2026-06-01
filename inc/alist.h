@@ -196,22 +196,22 @@ static inline void* __Alist_getObj(__AlsNode* node){
         it->i--;                                                                            \
     }                                                                                       \
                                                                                             \
-    __weak __visibility(protected) void A_OBJ_DEST(AList(T))(AList(T)* self){               \
+    __noused static inline void A_OBJ_DEST(AList(T))(AList(T)* self){                       \
         __Alist_dest(&self->list);                                                          \
     }                                                                                       \
-    __weak __visibility(protected) void A_OBJ_INIT(AList(T))(AList(T)* self){               \
+    __noused static inline void A_OBJ_INIT(AList(T))(AList(T)* self){                       \
         self->list.size = sizeof(T);                                                        \
         self->list.copy = (void*)__A_OBJ_COPY_FUNC_SELF(T);                                 \
         self->list.dest = (void*)__A_OBJ_DEST_FUNC_SELF(T);                                 \
         self->list.cmpd = (void*)__A_OBJ_CMPD_FUNC_SELF(T);                                 \
         self->f = &A_FUNC_TAB(AList(T));                                                    \
     }                                                                                       \
-    __weak __visibility(protected) void  A_OBJ_COPY(AList(T))                               \
+    __noused static inline void A_OBJ_COPY(AList(T))                                        \
     (AList(T)* self, const AList(T)* that){                                                 \
         self->f = that->f;                                                                  \
         __Alist_copy(&self->list, &that->list);                                             \
     }                                                                                       \
-    __weak __visibility(protected) int  A_OBJ_CMPD(AList(T))                                \
+    __noused static inline int  A_OBJ_CMPD(AList(T))                                        \
     (const AList(T)* self, const AList(T)* that){                                           \
         return __Alist_cmpd(&self->list, &that->list);                                      \
     }                                                                                       \

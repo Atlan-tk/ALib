@@ -90,6 +90,60 @@ __noused static inline bool AText_empty(const AText* self) {
     return self->char_num == 0;
 }
 
+static const A_FUNC(AText) A_FUNC_TAB(AText);
+
+static inline uint32_t A_OBJ_HASH(AText)(const AText* self) {
+    if (__a_unlikely(self == nullptr || self->s == nullptr)) {
+        return 0;
+    }
+    return alib_hash_str(self->s);
+}
+
+__noused static inline void A_OBJ_INIT(AText)(AText* self) {
+    self->f = &A_FUNC_TAB(AText);
+}
+
+__noused static inline void A_OBJ_DEST(AText)(AText* self) {
+    if (self->noLiteral) {
+        alib_free(self->s);
+    }
+}
+
+__noused static inline void A_OBJ_COPY(AText)(AText* self, const AText* that) {
+    self->f = that->f;
+    if (that->noLiteral) {
+        int ret = AText_reCap(self, that->byte_num + 1);
+        if (ret != 0) {
+            aExcSet(AEXC_init_failed);
+            return;
+        }
+        if (that->byte_num != 0) {
+            memcpy(self->s, that->s, that->byte_num);
+        }
+        self->s[that->byte_num] = '\0';
+    } else {
+        self->s = that->s;
+        self->capacity = 0;
+    }
+
+    self->byte_num = that->byte_num;
+    self->char_num = that->char_num;
+    self->noLiteral = that->noLiteral;
+}
+
+__noused static inline int A_OBJ_CMPD(AText)(const AText* self, const AText* that) {
+    if (self->s == that->s) {
+        return 0;
+    }
+    if (self->s != nullptr && that->s != nullptr) {
+        return strcmp(self->s, that->s);
+    }
+    if (self->s == nullptr) {
+        return -1;
+    }
+    return 1;
+}
+
 A_TYPE_REGISTER(AText);
 
 static const A_FUNC(AText) A_FUNC_TAB(AText) = {
@@ -108,6 +162,8 @@ static const A_FUNC(AText) A_FUNC_TAB(AText) = {
     AText_getCapacity,
     AText_empty,
 };
+
+
 
 /* 将字面量转换为 AText，必须是 UTF-8 字符串 */
 static inline AText AText_new(const char* s) {
@@ -131,59 +187,6 @@ void AText_toU32(const AText* self, char* buf, uint32_t buf_size);
 void AText_toU16(const AText* self, char* buf, uint32_t buf_size);
 void AText_toGBK(const AText* self, char* buf, uint32_t buf_size);
 
-
-
-__weak __visibility(protected) void A_OBJ_INIT(AText)(AText* self) {
-    self->f = &A_FUNC_TAB(AText);
-}
-
-__weak __visibility(protected) void A_OBJ_DEST(AText)(AText* self) {
-    if (self->noLiteral) {
-        alib_free(self->s);
-    }
-}
-
-__weak __visibility(protected) void A_OBJ_COPY(AText)(AText* self, const AText* that) {
-    self->f = that->f;
-    if (that->noLiteral) {
-        int ret = AText_reCap(self, that->byte_num + 1);
-        if (ret != 0) {
-            aExcSet(AEXC_init_failed);
-            return;
-        }
-        if (that->byte_num != 0) {
-            memcpy(self->s, that->s, that->byte_num);
-        }
-        self->s[that->byte_num] = '\0';
-    } else {
-        self->s = that->s;
-        self->capacity = 0;
-    }
-
-    self->byte_num = that->byte_num;
-    self->char_num = that->char_num;
-    self->noLiteral = that->noLiteral;
-}
-
-__weak __visibility(protected) int A_OBJ_CMPD(AText)(const AText* self, const AText* that) {
-    if (self->s == that->s) {
-        return 0;
-    }
-    if (self->s != nullptr && that->s != nullptr) {
-        return strcmp(self->s, that->s);
-    }
-    if (self->s == nullptr) {
-        return -1;
-    }
-    return 1;
-}
-
-__weak __visibility(protected) uint32_t A_OBJ_HASH(AText)(const AText* self) {
-    if (__a_unlikely(self == nullptr || self->s == nullptr)) {
-        return 0;
-    }
-    return alib_hash_str(self->s);
-}
 
 
 

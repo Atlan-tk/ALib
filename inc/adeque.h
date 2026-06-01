@@ -230,19 +230,19 @@ static inline void __Adeq_pop_front(__Adeq* deq){
         it->i--; it->p = __Adqf(T,at)(it->con, it->i);                              \
     }                                                                               \
                                                                                     \
-    __weak __visibility(protected) void A_OBJ_DEST(ADeque(T))                       \
+    __noused static inline void A_OBJ_DEST(ADeque(T))                               \
     (ADeque(T)* self){                                                              \
         for(uint32_t i = 0; i < self->deq.num; i++){                                \
             A_DEST(T, *(T*)__Adqf(T,at)(self, i));                                  \
         }                                                                           \
         __Adeq_dest(&self->deq);                                                    \
     }                                                                               \
-    __weak __visibility(protected) void A_OBJ_INIT(ADeque(T))                       \
+    __noused static inline void A_OBJ_INIT(ADeque(T))                               \
     (ADeque(T)* self){                                                              \
         __Adeq_init(&self->deq, sizeof(T));                                         \
         self->f = &A_FUNC_TAB(ADeque(T));                                           \
     }                                                                               \
-    __weak __visibility(protected) void A_OBJ_COPY(ADeque(T))                       \
+    __noused static inline void A_OBJ_COPY(ADeque(T))                               \
     (ADeque(T)* self, const ADeque(T)* that){                                       \
         self->f = that->f;                                                          \
         __Adeq_init(&self->deq, sizeof(T));                                         \
@@ -252,7 +252,7 @@ static inline void __Adeq_pop_front(__Adeq* deq){
             if(aExcOccur()) return;                                                 \
         }                                                                           \
     }                                                                               \
-    __weak __visibility(protected) int A_OBJ_CMPD(ADeque(T))                        \
+    __noused static inline int A_OBJ_CMPD(ADeque(T))                                \
     (const ADeque(T)*self,const ADeque(T)*that){                                    \
         int ret = 0;                                                                \
         uint32_t num = self->deq.num <= that->deq.num ? self->deq.num:that->deq.num;\

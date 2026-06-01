@@ -41,13 +41,13 @@ struct AAutoKey{
     ALock* lock;
     void(*unlock)(ALock*);
 };
-__weak __visibility(protected) void A_OBJ_DEST(AAutoKey)(AAutoKey* self){
+__noused static inline void A_OBJ_DEST(AAutoKey)(AAutoKey* self){
     if(self->lock != nullptr && self->unlock != nullptr){
         self->unlock(self->lock);
         memset(self, 0, sizeof(AAutoKey));
     }
 }
-__weak __visibility(protected) void A_OBJ_COPY(AAutoKey)(AAutoKey* self, __noused const AAutoKey* that){
+__noused static inline void A_OBJ_COPY(AAutoKey)(AAutoKey* self, __noused const AAutoKey* that){
     memset(self, 0, sizeof(AAutoKey));
 }
 A_TYPE_REGISTER(AAutoKey);
@@ -59,15 +59,15 @@ AClass_Inherit(AMtx, ALock);
 AClass_Struct(AMtx);
 AClass_Function(AMtx);
 AClass_Generate(AMtx);
-__weak __visibility(protected) void A_OBJ_INIT(AMtx)(AMtx* self){
+__noused static inline void A_OBJ_INIT(AMtx)(AMtx* self){
     if(mtx_init(&((ALock*)self)->mtx, mtx_plain) != thrd_success) {
         aExcSet(AEXC_system_error);
     }
 }
-__weak __visibility(protected) void A_OBJ_DEST(AMtx)(AMtx* self){
+__noused static inline void A_OBJ_DEST(AMtx)(AMtx* self){
     mtx_destroy(&((ALock*)self)->mtx);
 }
-__weak __visibility(protected) void A_OBJ_COPY(AMtx)(AMtx* self, __noused const AMtx* that){
+__noused static inline void A_OBJ_COPY(AMtx)(AMtx* self, __noused const AMtx* that){
     if(mtx_init(&((ALock*)self)->mtx, mtx_plain) != thrd_success) {
         aExcSet(AEXC_system_error);
     }
@@ -81,15 +81,15 @@ AClass_Inherit(ARecursion, ALock);
 AClass_Struct(ARecursion);
 AClass_Function(ARecursion);
 AClass_Generate(ARecursion);
-__weak __visibility(protected) void A_OBJ_INIT(ARecursion)(ARecursion* self){
+__noused static inline void A_OBJ_INIT(ARecursion)(ARecursion* self){
     if(mtx_init(&((ALock*)self)->mtx, mtx_plain | mtx_recursive) != thrd_success) {
         aExcSet(AEXC_system_error);
     }
 }
-__weak __visibility(protected) void A_OBJ_DEST(ARecursion)(ARecursion* self){
+__noused static inline void A_OBJ_DEST(ARecursion)(ARecursion* self){
     mtx_destroy(&((ALock*)self)->mtx);
 }
-__weak __visibility(protected) void A_OBJ_COPY(ARecursion)(ARecursion* self, __noused const ARecursion* that){
+__noused static inline void A_OBJ_COPY(ARecursion)(ARecursion* self, __noused const ARecursion* that){
     if(mtx_init(&((ALock*)self)->mtx, mtx_plain | mtx_recursive) != thrd_success) {
         aExcSet(AEXC_system_error);
     }
@@ -118,7 +118,7 @@ __noused static inline void __AMtxRW_reset(AMtxRW* self){
     self->read_cond_init = false;
     self->write_cond_init = false;
 }
-__weak __visibility(protected) void A_OBJ_INIT(AMtxRW)(AMtxRW* self){
+__noused static inline void A_OBJ_INIT(AMtxRW)(AMtxRW* self){
     __AMtxRW_reset(self);
 
     if(cnd_init(&self->read_cond) != thrd_success) {
@@ -135,7 +135,7 @@ __weak __visibility(protected) void A_OBJ_INIT(AMtxRW)(AMtxRW* self){
     }
     self->write_cond_init = true;
 }
-__weak __visibility(protected) void A_OBJ_DEST(AMtxRW)(AMtxRW* self){
+__noused static inline void A_OBJ_DEST(AMtxRW)(AMtxRW* self){
     if(self->write_cond_init){
         cnd_destroy(&self->write_cond);
     }
@@ -144,7 +144,7 @@ __weak __visibility(protected) void A_OBJ_DEST(AMtxRW)(AMtxRW* self){
     }
     __AMtxRW_reset(self);
 }
-__weak __visibility(protected) void A_OBJ_COPY(AMtxRW)(AMtxRW* self, __noused const AMtxRW* that){
+__noused static inline void A_OBJ_COPY(AMtxRW)(AMtxRW* self, __noused const AMtxRW* that){
     A_OBJ_INIT(AMtxRW)(self);
 }
 A_CLASS_REGISTER(AMtxRW);
@@ -161,7 +161,7 @@ AClass_Generate(AMtxCnd);
 __noused static inline void __AMtxCnd_reset(AMtxCnd* self){
     self->cnd_ready = false;
 }
-__weak __visibility(protected) void A_OBJ_INIT(AMtxCnd)(AMtxCnd* self){
+__noused static inline void A_OBJ_INIT(AMtxCnd)(AMtxCnd* self){
     __AMtxCnd_reset(self);
     if(cnd_init(&self->cnd) != thrd_success){
         aExcSet(AEXC_system_error);
@@ -169,13 +169,13 @@ __weak __visibility(protected) void A_OBJ_INIT(AMtxCnd)(AMtxCnd* self){
     }
     self->cnd_ready = true;
 }
-__weak __visibility(protected) void A_OBJ_DEST(AMtxCnd)(AMtxCnd* self){
+__noused static inline void A_OBJ_DEST(AMtxCnd)(AMtxCnd* self){
     if(self->cnd_ready){
         cnd_destroy(&self->cnd);
     }
     __AMtxCnd_reset(self);
 }
-__weak __visibility(protected) void A_OBJ_COPY(AMtxCnd)(AMtxCnd* self, __noused const AMtxCnd* that){
+__noused static inline void A_OBJ_COPY(AMtxCnd)(AMtxCnd* self, __noused const AMtxCnd* that){
     A_OBJ_INIT(AMtxCnd)(self);
 }
 A_CLASS_REGISTER(AMtxCnd);
@@ -232,7 +232,7 @@ AClass_Struct(ASemaphore,
 );
 AClass_Function(ASemaphore);
 AClass_Generate(ASemaphore);
-__weak __visibility(protected) void A_OBJ_COPY(ASemaphore)(ASemaphore* self, __noused const ASemaphore* that){
+__noused static inline void A_OBJ_COPY(ASemaphore)(ASemaphore* self, __noused const ASemaphore* that){
     self->count = self->max = 0;
 }
 A_CLASS_REGISTER(ASemaphore);

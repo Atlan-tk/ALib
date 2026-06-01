@@ -24,18 +24,18 @@ AClass_Struct(AFile,
 );
 AClass_Function(AFile);
 AClass_Generate(AFile);
-__weak __visibility(protected) void A_OBJ_INIT(AFile)(AFile* self){
+__noused static inline void A_OBJ_INIT(AFile)(AFile* self){
     self->name = A_INIT(AText);
 }
-__weak __visibility(protected) void A_OBJ_DEST(AFile)(AFile* self){
+__noused static inline void A_OBJ_DEST(AFile)(AFile* self){
     if(self->fp != nullptr) fclose(self->fp);
     A_DEST(AText, self->name);
 }
-__weak __visibility(protected) void A_OBJ_COPY(AFile)(AFile* self, const AFile* that){
+__noused static inline void A_OBJ_COPY(AFile)(AFile* self, const AFile* that){
     self->name = A_COPY(AText, that->name);
     if(AText_empty(&self->name)) self->name = AText_new("(null)");
 }
-__weak __visibility(protected) int A_OBJ_CMPD(AFile)(const AFile* self, const AFile* that){
+__noused static inline int A_OBJ_CMPD(AFile)(const AFile* self, const AFile* that){
     return A_CMPD(AText, self->name, that->name);
 }
 A_CLASS_REGISTER(AFile);
@@ -56,7 +56,7 @@ AClass_Function(ARFile,
 uint64_t ARFile_size(ARFile* self);
 uint32_t ARFile_read(ARFile* self, uint32_t size, void* target);
 AClass_Generate(ARFile, ARFile_size, ARFile_read);
-__weak __visibility(protected) void A_OBJ_COPY(ARFile)(ARFile* self, const ARFile* that){
+__noused static inline void A_OBJ_COPY(ARFile)(ARFile* self, const ARFile* that){
     self->mem = that->mem;
     if(self->mem == nullptr){
         __AFile_open((AFile*)self, "r");
@@ -80,7 +80,7 @@ AClass_Function(AWFile,
 uint64_t AWFile_size(AWFile* self);
 uint32_t AWFile_write(AWFile* self, uint32_t size, void* target);
 AClass_Generate(AWFile, AWFile_size, AWFile_write);
-__weak __visibility(protected) void A_OBJ_COPY(AWFile)(AWFile* self, __noused const AWFile* that){
+__noused static inline void A_OBJ_COPY(AWFile)(AWFile* self, __noused const AWFile* that){
     __AFile_open((AFile*)self, "w");
 }
 A_CLASS_REGISTER(AWFile);
@@ -99,7 +99,7 @@ AClass_Function(APFile,
 uint64_t APFile_size(APFile* self);
 uint32_t APFile_append(APFile* self, uint32_t size, void* target);
 AClass_Generate(APFile, APFile_size, APFile_append);
-__weak __visibility(protected) void A_OBJ_COPY(APFile)(APFile* self, __noused const APFile* that){
+__noused static inline void A_OBJ_COPY(APFile)(APFile* self, __noused const APFile* that){
     __AFile_open((AFile*)self, "a");
 }
 A_CLASS_REGISTER(APFile);
@@ -135,15 +135,15 @@ uint32_t ADev_read (ADev* self, uint32_t size, void* source);
 uint32_t ADev_write(ADev* self, uint32_t size, void* target);
 AClass_Generate(ADev, ADev_ioctl, ADev_read, ADev_write);
 
-__weak __visibility(protected) void A_OBJ_INIT(ADev)(ADev* self){
+__noused static inline void A_OBJ_INIT(ADev)(ADev* self){
     self->name = A_INIT(AText);
     self->fd = 0;
 }
-__weak __visibility(protected) void A_OBJ_DEST(ADev)(ADev* self){
+__noused static inline void A_OBJ_DEST(ADev)(ADev* self){
     close(self->fd);
     A_DEST(AText, self->name);
 }
-__weak __visibility(protected) void A_OBJ_COPY(ADev)(ADev* self, const ADev* that){
+__noused static inline void A_OBJ_COPY(ADev)(ADev* self, const ADev* that){
     self->name = A_COPY(AText, that->name);
     self->noblock = that->noblock;
     if(self->noblock){
@@ -157,7 +157,7 @@ __weak __visibility(protected) void A_OBJ_COPY(ADev)(ADev* self, const ADev* tha
     }
     self->stat = true;
 }
-__weak __visibility(protected) int  A_OBJ_CMPD(ADev)(const ADev* self, const ADev* that){
+__noused static inline int  A_OBJ_CMPD(ADev)(const ADev* self, const ADev* that){
     return A_CMPD(AText, self->name, that->name);
 }
 
@@ -202,15 +202,15 @@ uint32_t ADev_read (ADev* self, uint32_t size, void* source);
 uint32_t ADev_write(ADev* self, uint32_t size, void* target);
 AClass_Generate(ADev, ADev_ioctl, ADev_read, ADev_write);
 
-__weak __visibility(protected) void A_OBJ_INIT(ADev)(ADev* self){
+__noused static inline void A_OBJ_INIT(ADev)(ADev* self){
     self->name = A_INIT(AText);
     self->fd = INVALID_HANDLE_VALUE;
 }
-__weak __visibility(protected) void A_OBJ_DEST(ADev)(ADev* self){
+__noused static inline void A_OBJ_DEST(ADev)(ADev* self){
     if(self->fd != INVALID_HANDLE_VALUE) CloseHandle(self->fd);
     A_DEST(AText, self->name);
 }
-__weak __visibility(protected) void A_OBJ_COPY(ADev)(ADev* self, const ADev* that){
+__noused static inline void A_OBJ_COPY(ADev)(ADev* self, const ADev* that){
     self->name = A_COPY(AText, that->name);
     self->noblock = that->noblock;
 
@@ -226,7 +226,7 @@ __weak __visibility(protected) void A_OBJ_COPY(ADev)(ADev* self, const ADev* tha
     }
     self->stat = true;
 }
-__weak __visibility(protected) int  A_OBJ_CMPD(ADev)(const ADev* self, const ADev* that){
+__noused static inline int  A_OBJ_CMPD(ADev)(const ADev* self, const ADev* that){
     return A_CMPD(AText, self->name, that->name);
 }
 

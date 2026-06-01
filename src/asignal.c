@@ -64,43 +64,43 @@ typedef struct{
     void        (*call)(const ASignal* signal, void* addressee);
     uint32_t    call_num;
     bool        dis_request;
-}__ASignalLink;
-A_TYPE_REGISTER(__ASignalLink);
+}ASignalLink;
+A_TYPE_REGISTER(ASignalLink);
 
-typedef __ASignalLink* __ASignalLinkp;
-A_TYPE_REGISTER(__ASignalLinkp);
+typedef ASignalLink* ASignalLinkp;
+A_TYPE_REGISTER(ASignalLinkp);
 
-AList_Define(__ASignalLink);
-AList_Generate(__ASignalLink);
-A_TYPE_REGISTER(AList(__ASignalLink));
+AList_Define(ASignalLink);
+AList_Generate(ASignalLink);
+A_TYPE_REGISTER(AList(ASignalLink));
 
-ALine_Define(__ASignalLinkp);
-ALine_Generate(__ASignalLinkp);
-A_TYPE_REGISTER(ALine(__ASignalLinkp));
+ALine_Define(ASignalLinkp);
+ALine_Generate(ASignalLinkp);
+A_TYPE_REGISTER(ALine(ASignalLinkp));
 
 
 
 /* 信号连接体 */
 typedef struct{
     int64_t                 id;
-    ALine(__ASignalLinkp)   linkpList;
-}__ASignalTower;
-A_TYPE_REGISTER(__ASignalTower);
-__visibility(hidden) void A_OBJ_INIT(__ASignalTower)(__ASignalTower* self){
-    self->id = 0; self->linkpList = A_INIT(ALine(__ASignalLinkp));
+    ALine(ASignalLinkp)   linkpList;
+}ASignalTower;
+__noused static inline void A_OBJ_INIT(ASignalTower)(ASignalTower* self){
+    self->id = 0; self->linkpList = A_INIT(ALine(ASignalLinkp));
 }
-__visibility(hidden) void A_OBJ_DEST(__ASignalTower)(__ASignalTower* self){
-    self->id = 0; A_DEST(ALine(__ASignalLinkp), self->linkpList);
+__noused static inline void A_OBJ_DEST(ASignalTower)(ASignalTower* self){
+    self->id = 0; A_DEST(ALine(ASignalLinkp), self->linkpList);
 }
-__visibility(hidden) void A_OBJ_COPY(__ASignalTower)(__ASignalTower* self, const __ASignalTower* that){
-    self->id = that->id; self->linkpList = A_COPY(ALine(__ASignalLinkp), that->linkpList);
+__noused static inline void A_OBJ_COPY(ASignalTower)(ASignalTower* self, const ASignalTower* that){
+    self->id = that->id; self->linkpList = A_COPY(ALine(ASignalLinkp), that->linkpList);
 }
-__visibility(hidden) int A_OBJ_CMPD(__ASignalTower)(const __ASignalTower* self, const __ASignalTower* that){
+__noused static inline int A_OBJ_CMPD(ASignalTower)(const ASignalTower* self, const ASignalTower* that){
     int ret = A_CMPD(int64_t, self->id, that->id);
-    return ret != 0 ? ret : A_CMPD(ALine(__ASignalLinkp), self->linkpList, that->linkpList);
+    return ret != 0 ? ret : A_CMPD(ALine(ASignalLinkp), self->linkpList, that->linkpList);
 }
+A_TYPE_REGISTER(ASignalTower);
 
-static inline uint32_t __ASignalTower_find_i(const __ASignalTower* self, const void* addressee){
+static inline uint32_t ASignalTower_find_i(const ASignalTower* self, const void* addressee){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return 0xffffffff;
@@ -119,7 +119,7 @@ static inline uint32_t __ASignalTower_find_i(const __ASignalTower* self, const v
     }
     return 0xffffffff;
 }
-static inline void __ASignalTower_add(__ASignalTower* self, __ASignalLink* p){
+static inline void ASignalTower_add(ASignalTower* self, ASignalLink* p){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -129,13 +129,13 @@ static inline void __ASignalTower_add(__ASignalTower* self, __ASignalLink* p){
         return;
     }
 
-    uint32_t i = __ASignalTower_find_i(self, p->addressee);
+    uint32_t i = ASignalTower_find_i(self, p->addressee);
     auto list = &self->linkpList;
     if(i == 0xffffffff){
         list->f->pushBack(list, p);
     }
 }
-static inline void __ASignalTower_rm(__ASignalTower* self, const void* addressee){
+static inline void ASignalTower_rm(ASignalTower* self, const void* addressee){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -145,13 +145,13 @@ static inline void __ASignalTower_rm(__ASignalTower* self, const void* addressee
         return;
     }
 
-    uint32_t i = __ASignalTower_find_i(self, addressee);
+    uint32_t i = ASignalTower_find_i(self, addressee);
     auto list = &self->linkpList;
     if(i != 0xffffffff){
         list->f->rm(list, i);
     }
 }
-static inline __ASignalLink* __ASignalTower_find(const __ASignalTower* self, const void* addressee){
+static inline ASignalLink* ASignalTower_find(const ASignalTower* self, const void* addressee){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return nullptr;
@@ -161,7 +161,7 @@ static inline __ASignalLink* __ASignalTower_find(const __ASignalTower* self, con
         return nullptr;
     }
 
-    uint32_t i = __ASignalTower_find_i(self, addressee);
+    uint32_t i = ASignalTower_find_i(self, addressee);
     auto list = &self->linkpList;
     if(i != 0xffffffff){
         auto pp = list->f->at(list, i);
@@ -170,7 +170,7 @@ static inline __ASignalLink* __ASignalTower_find(const __ASignalTower* self, con
 
     return nullptr;
 }
-static inline bool __ASignalTower_exist(const __ASignalTower* self, const void* addressee){
+static inline bool ASignalTower_exist(const ASignalTower* self, const void* addressee){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return false;
@@ -180,14 +180,14 @@ static inline bool __ASignalTower_exist(const __ASignalTower* self, const void* 
         return false;
     }
 
-    uint32_t i = __ASignalTower_find_i(self, addressee);
+    uint32_t i = ASignalTower_find_i(self, addressee);
     if(i != 0xffffffff){
         return true;
     }
 
     return false;
 }
-static inline bool __ASignalTower_empty(const __ASignalTower* self){
+static inline bool ASignalTower_empty(const ASignalTower* self){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return false;
@@ -196,7 +196,7 @@ static inline bool __ASignalTower_empty(const __ASignalTower* self){
     auto list = &self->linkpList;
     return list->f->empty(list);
 }
-static inline int __ASignalTower_call(const __ASignalTower* self, const ASignal* signal, AExcCollector* collector){
+static inline int ASignalTower_call(const ASignalTower* self, const ASignal* signal, AExcCollector* collector){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return 0;
@@ -230,40 +230,33 @@ static inline int __ASignalTower_call(const __ASignalTower* self, const ASignal*
     return ret;
 }
 
-__visibility(hidden) uint32_t A_OBJ_HASH(int64_t)(const int64_t* self){
-    if(__a_unlikely(self == nullptr)){
-        return 0;
-    }
-    return alib_hash(self, sizeof(int64_t));
-}
-
-AHash_Define(int64_t,__ASignalTower);
-AHash_Generate(int64_t,__ASignalTower);
-A_TYPE_REGISTER(AHash(int64_t,__ASignalTower));
+AHash_Define(int64_t,ASignalTower);
+AHash_Generate(int64_t,ASignalTower);
+A_TYPE_REGISTER(AHash(int64_t,ASignalTower));
 
 
 
 /* 目标连接体 */
 typedef struct{
     const void*             addressee;
-    ALine(__ASignalLinkp)   linkpList;
-}__ASignalRadio;
-A_TYPE_REGISTER(__ASignalRadio);
-__visibility(hidden) void A_OBJ_INIT(__ASignalRadio)(__ASignalRadio* self){
-    self->addressee = nullptr; self->linkpList = A_INIT(ALine(__ASignalLinkp));
+    ALine(ASignalLinkp)   linkpList;
+}ASignalRadio;
+__noused static inline void A_OBJ_INIT(ASignalRadio)(ASignalRadio* self){
+    self->addressee = nullptr; self->linkpList = A_INIT(ALine(ASignalLinkp));
 }
-__visibility(hidden) void A_OBJ_DEST(__ASignalRadio)(__ASignalRadio* self){
-    self->addressee = nullptr; A_DEST(ALine(__ASignalLinkp), self->linkpList);
+__noused static inline void A_OBJ_DEST(ASignalRadio)(ASignalRadio* self){
+    self->addressee = nullptr; A_DEST(ALine(ASignalLinkp), self->linkpList);
 }
-__visibility(hidden) void A_OBJ_COPY(__ASignalRadio)(__ASignalRadio* self, const __ASignalRadio* that){
-    self->addressee = that->addressee; self->linkpList = A_COPY(ALine(__ASignalLinkp), that->linkpList);
+__noused static inline void A_OBJ_COPY(ASignalRadio)(ASignalRadio* self, const ASignalRadio* that){
+    self->addressee = that->addressee; self->linkpList = A_COPY(ALine(ASignalLinkp), that->linkpList);
 }
-__visibility(hidden) int A_OBJ_CMPD(__ASignalRadio)(const __ASignalRadio* self, const __ASignalRadio* that){
+__noused static inline int A_OBJ_CMPD(ASignalRadio)(const ASignalRadio* self, const ASignalRadio* that){
     int ret = A_CMPD(const_ptr_t, (const_ptr_t)(self->addressee), (const_ptr_t)(that->addressee));
-    return ret != 0 ? ret : A_CMPD(ALine(__ASignalLinkp), self->linkpList, that->linkpList);
+    return ret != 0 ? ret : A_CMPD(ALine(ASignalLinkp), self->linkpList, that->linkpList);
 }
+A_TYPE_REGISTER(ASignalRadio);
 
-static inline uint32_t __ASignalRadio_find_i(const __ASignalRadio* self, int64_t id){
+static inline uint32_t ASignalRadio_find_i(const ASignalRadio* self, int64_t id){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return 0xffffffff;
@@ -282,7 +275,7 @@ static inline uint32_t __ASignalRadio_find_i(const __ASignalRadio* self, int64_t
     }
     return 0xffffffff;
 }
-static inline void __ASignalRadio_add(__ASignalRadio* self, __ASignalLink* p){
+static inline void ASignalRadio_add(ASignalRadio* self, ASignalLink* p){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -292,13 +285,13 @@ static inline void __ASignalRadio_add(__ASignalRadio* self, __ASignalLink* p){
         return;
     }
 
-    uint32_t i = __ASignalRadio_find_i(self, p->id);
+    uint32_t i = ASignalRadio_find_i(self, p->id);
     auto list = &self->linkpList;
     if(i == 0xffffffff){
         list->f->pushBack(list, p);
     }
 }
-static inline void __ASignalRadio_rm(__ASignalRadio* self, int64_t id){
+static inline void ASignalRadio_rm(ASignalRadio* self, int64_t id){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -308,13 +301,13 @@ static inline void __ASignalRadio_rm(__ASignalRadio* self, int64_t id){
         return;
     }
 
-    uint32_t i = __ASignalRadio_find_i(self, id);
+    uint32_t i = ASignalRadio_find_i(self, id);
     auto list = &self->linkpList;
     if(i != 0xffffffff){
         list->f->rm(list, i);
     }
 }
-__noused static inline __ASignalLink* __ASignalRadio_find(const __ASignalRadio* self, int64_t id){
+__noused static inline ASignalLink* ASignalRadio_find(const ASignalRadio* self, int64_t id){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return nullptr;
@@ -324,7 +317,7 @@ __noused static inline __ASignalLink* __ASignalRadio_find(const __ASignalRadio* 
         return nullptr;
     }
 
-    uint32_t i = __ASignalRadio_find_i(self, id);
+    uint32_t i = ASignalRadio_find_i(self, id);
     auto list = &self->linkpList;
     if(i != 0xffffffff){
         auto pp = list->f->at(list, i);
@@ -333,7 +326,7 @@ __noused static inline __ASignalLink* __ASignalRadio_find(const __ASignalRadio* 
 
     return nullptr;
 }
-static inline bool __ASignalRadio_exist(const __ASignalRadio* self, int64_t id){
+static inline bool ASignalRadio_exist(const ASignalRadio* self, int64_t id){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return false;
@@ -343,14 +336,14 @@ static inline bool __ASignalRadio_exist(const __ASignalRadio* self, int64_t id){
         return false;
     }
 
-    uint32_t i = __ASignalRadio_find_i(self, id);
+    uint32_t i = ASignalRadio_find_i(self, id);
     if(i != 0xffffffff){
         return true;
     }
 
     return false;
 }
-static inline bool __ASignalRadio_empty(const __ASignalRadio* self){
+static inline bool ASignalRadio_empty(const ASignalRadio* self){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return false;
@@ -360,16 +353,9 @@ static inline bool __ASignalRadio_empty(const __ASignalRadio* self){
     return list->f->empty(list);
 }
 
-__visibility(hidden) uint32_t A_OBJ_HASH(const_ptr_t)(const const_ptr_t* self){
-    if(__a_unlikely(self == nullptr)){
-        return 0;
-    }
-    return alib_hash(self, sizeof(const_ptr_t));
-}
-
-AHash_Define(const_ptr_t,__ASignalRadio);
-AHash_Generate(const_ptr_t,__ASignalRadio);
-A_TYPE_REGISTER(AHash(const_ptr_t,__ASignalRadio));
+AHash_Define(const_ptr_t,ASignalRadio);
+AHash_Generate(const_ptr_t,ASignalRadio);
+A_TYPE_REGISTER(AHash(const_ptr_t,ASignalRadio));
 
 
 
@@ -380,45 +366,45 @@ typedef struct{
 #else
     atomic_long                         count;
 #endif /* 64 or 32 */
-    AList(__ASignalLink)                linkPool;
-    AHash(int64_t,__ASignalTower)       idMap;
-    AHash(const_ptr_t,__ASignalRadio)   adMap;
-}__ASignalSystem;
-A_TYPE_REGISTER(__ASignalSystem);
-__visibility(hidden) void A_OBJ_INIT(__ASignalSystem)(__ASignalSystem* self){
+    AList(ASignalLink)                linkPool;
+    AHash(int64_t,ASignalTower)       idMap;
+    AHash(const_ptr_t,ASignalRadio)   adMap;
+}ASignalSystem;
+__noused static inline void A_OBJ_INIT(ASignalSystem)(ASignalSystem* self){
     aExcClean();
     atomic_store_explicit(&self->count, 1, memory_order_relaxed);
-    self->linkPool = A_INIT(AList(__ASignalLink));
+    self->linkPool = A_INIT(AList(ASignalLink));
     if(aExcOccur()) return;
-    self->idMap = A_INIT(AHash(int64_t, __ASignalTower));
+    self->idMap = A_INIT(AHash(int64_t, ASignalTower));
     if(aExcOccur()) return;
-    self->adMap = A_INIT(AHash(const_ptr_t,__ASignalRadio));
+    self->adMap = A_INIT(AHash(const_ptr_t,ASignalRadio));
     if(aExcOccur()) return;
 }
-__visibility(hidden) void A_OBJ_DEST(__ASignalSystem)(__ASignalSystem* self){
+__noused static inline void A_OBJ_DEST(ASignalSystem)(ASignalSystem* self){
     atomic_store_explicit(&self->count, 0, memory_order_relaxed);
-    A_DEST(AList(__ASignalLink), self->linkPool);
-    A_DEST(AHash(int64_t,__ASignalTower), self->idMap);
-    A_DEST(AHash(const_ptr_t,__ASignalRadio), self->adMap);
+    A_DEST(AList(ASignalLink), self->linkPool);
+    A_DEST(AHash(int64_t,ASignalTower), self->idMap);
+    A_DEST(AHash(const_ptr_t,ASignalRadio), self->adMap);
 }
-__visibility(hidden) void A_OBJ_COPY(__ASignalSystem)(__ASignalSystem* self, __noused const __ASignalSystem* that){
-    memset(self, 0, sizeof(__ASignalSystem));
+__noused static inline void A_OBJ_COPY(ASignalSystem)(ASignalSystem* self, __noused const ASignalSystem* that){
+    memset(self, 0, sizeof(ASignalSystem));
 }
-__visibility(hidden) int A_OBJ_CMPD(__ASignalSystem)(const __ASignalSystem* self, const __ASignalSystem* that){
+__noused static inline int A_OBJ_CMPD(ASignalSystem)(const ASignalSystem* self, const ASignalSystem* that){
     int ret = A_CMPD(int64_t, (int64_t)self->count, (int64_t)that->count);
-    if(ret == 0) ret = A_CMPD(AList(__ASignalLink), self->linkPool, that->linkPool);
-    if(ret == 0) ret = A_CMPD(AHash(int64_t,__ASignalTower), self->idMap, that->idMap);
-    if(ret == 0) ret = A_CMPD(AHash(const_ptr_t,__ASignalRadio), self->adMap, that->adMap);
+    if(ret == 0) ret = A_CMPD(AList(ASignalLink), self->linkPool, that->linkPool);
+    if(ret == 0) ret = A_CMPD(AHash(int64_t,ASignalTower), self->idMap, that->idMap);
+    if(ret == 0) ret = A_CMPD(AHash(const_ptr_t,ASignalRadio), self->adMap, that->adMap);
     return ret;
 }
+A_TYPE_REGISTER(ASignalSystem);
 
-static inline int64_t __ASignalSystem_alloc(__ASignalSystem* self){
+static inline int64_t ASignalSystem_alloc(ASignalSystem* self){
     if(__a_unlikely(self == nullptr)){
         return -1;
     }
     return atomic_fetch_add(&self->count, 1);
 }
-static inline __ASignalRadio* __ASignalSystem_find_forad(const __ASignalSystem* self, const void* addressee){
+static inline ASignalRadio* ASignalSystem_find_forad(const ASignalSystem* self, const void* addressee){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return nullptr;
@@ -436,7 +422,7 @@ static inline __ASignalRadio* __ASignalSystem_find_forad(const __ASignalSystem* 
     }
     return radio;
 }
-static inline __ASignalTower* __ASignalSystem_find_forid(const __ASignalSystem* self, int64_t id){
+static inline ASignalTower* ASignalSystem_find_forid(const ASignalSystem* self, int64_t id){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return nullptr;
@@ -454,7 +440,7 @@ static inline __ASignalTower* __ASignalSystem_find_forid(const __ASignalSystem* 
     }
     return tower;
 }
-static inline __ASignalLink* __ASignalSystem_find(const __ASignalSystem* self, int64_t id, const void* addressee){
+static inline ASignalLink* ASignalSystem_find(const ASignalSystem* self, int64_t id, const void* addressee){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return nullptr;
@@ -465,13 +451,13 @@ static inline __ASignalLink* __ASignalSystem_find(const __ASignalSystem* self, i
         return nullptr;
     }
 
-    auto tower = __ASignalSystem_find_forid(self, id);
+    auto tower = ASignalSystem_find_forid(self, id);
     if(tower == nullptr){
         return nullptr;
     }
-    return __ASignalTower_find(tower, addressee);
+    return ASignalTower_find(tower, addressee);
 }
-static inline void __ASignalSystem_add(__ASignalSystem* self, int64_t id, const void* addressee, void(*call)(const ASignal*, void*)){
+static inline void ASignalSystem_add(ASignalSystem* self, int64_t id, const void* addressee, void(*call)(const ASignal*, void*)){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -482,7 +468,7 @@ static inline void __ASignalSystem_add(__ASignalSystem* self, int64_t id, const 
         return;
     }
 
-    __ASignalLink* link = __ASignalSystem_find(self, id, addressee);
+    ASignalLink* link = ASignalSystem_find(self, id, addressee);
     if(link != nullptr){
         link->call = call;
         if(link->dis_request){
@@ -498,7 +484,7 @@ static inline void __ASignalSystem_add(__ASignalSystem* self, int64_t id, const 
 
     auto tower = idmap->f->at(idmap, id);
     if(tower == nullptr){
-        RAII(__ASignalTower) x = A_INIT(__ASignalTower);
+        RAII(ASignalTower) x = A_INIT(ASignalTower);
         if(aExcOccur()){
             return;
         }
@@ -512,7 +498,7 @@ static inline void __ASignalSystem_add(__ASignalSystem* self, int64_t id, const 
     }
     auto radio = admap->f->at(admap, addressee);
     if(radio == nullptr){
-        RAII(__ASignalRadio) x = A_INIT(__ASignalRadio);
+        RAII(ASignalRadio) x = A_INIT(ASignalRadio);
         if(aExcOccur()){
             return;
         }
@@ -527,7 +513,7 @@ static inline void __ASignalSystem_add(__ASignalSystem* self, int64_t id, const 
 
     auto pool = &self->linkPool;
     {
-        pool->f->pushFront(pool, (__ASignalLink){ .id = id, .addressee = addressee, .call = call });
+        pool->f->pushFront(pool, (ASignalLink){ .id = id, .addressee = addressee, .call = call });
         if(aExcOccur()){
             return;
         }
@@ -536,23 +522,23 @@ static inline void __ASignalSystem_add(__ASignalSystem* self, int64_t id, const 
             return;
         }
     }
-    if(!__ASignalTower_exist(tower, addressee)){
-        __ASignalTower_add(tower, link);
+    if(!ASignalTower_exist(tower, addressee)){
+        ASignalTower_add(tower, link);
         if(aExcOccur()){
             pool->f->rm_p(pool, link);
             return;
         }
     }
-    if(!__ASignalRadio_exist(radio, id)){
-        __ASignalRadio_add(radio, link);
+    if(!ASignalRadio_exist(radio, id)){
+        ASignalRadio_add(radio, link);
         if(aExcOccur()){
-            __ASignalTower_rm(tower, addressee);
+            ASignalTower_rm(tower, addressee);
             pool->f->rm_p(pool, link);
             return;
         }
     }
 }
-static inline void __ASignalSystem_rm_link(__ASignalSystem* self, __ASignalLink* link){
+static inline void ASignalSystem_rm_link(ASignalSystem* self, ASignalLink* link){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -568,18 +554,18 @@ static inline void __ASignalSystem_rm_link(__ASignalSystem* self, __ASignalLink*
         return;
     }
 
-    auto tower = __ASignalSystem_find_forid(self, link->id);
+    auto tower = ASignalSystem_find_forid(self, link->id);
     if(tower != nullptr){
-        __ASignalTower_rm(tower, link->addressee);
-        if(__ASignalTower_empty(tower)){
+        ASignalTower_rm(tower, link->addressee);
+        if(ASignalTower_empty(tower)){
             auto map = &self->idMap;
             map->f->rm(map, link->id);
         }
     }
-    auto radio = __ASignalSystem_find_forad(self, link->addressee);
+    auto radio = ASignalSystem_find_forad(self, link->addressee);
     if(radio != nullptr){
-        __ASignalRadio_rm(radio, link->id);
-        if(__ASignalRadio_empty(radio)){
+        ASignalRadio_rm(radio, link->id);
+        if(ASignalRadio_empty(radio)){
             auto map = &self->adMap;
             map->f->rm(map, link->addressee);
         }
@@ -588,7 +574,7 @@ static inline void __ASignalSystem_rm_link(__ASignalSystem* self, __ASignalLink*
     auto pool = &self->linkPool;
     pool->f->rm_p(pool, link);
 }
-static inline void __ASignalSystem_rm_forid(__ASignalSystem* self, int64_t id){
+static inline void ASignalSystem_rm_forid(ASignalSystem* self, int64_t id){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -599,18 +585,18 @@ static inline void __ASignalSystem_rm_forid(__ASignalSystem* self, int64_t id){
         return;
     }
 
-    auto tower_p = __ASignalSystem_find_forid(self, id);
+    auto tower_p = ASignalSystem_find_forid(self, id);
     if(tower_p != nullptr){
-        RAII(__ASignalTower) tower = A_COPY(__ASignalTower, *tower_p);
+        RAII(ASignalTower) tower = A_COPY(ASignalTower, *tower_p);
         forEach(it, tower.linkpList){
             auto link = it.p != nullptr ? *it.p : nullptr;
             if(link != nullptr){
-                __ASignalSystem_rm_link(self, link);
+                ASignalSystem_rm_link(self, link);
             }
         }
     }
 }
-static inline void __ASignalSystem_rm_forad(__ASignalSystem* self, const void* addressee){
+static inline void ASignalSystem_rm_forad(ASignalSystem* self, const void* addressee){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -621,19 +607,19 @@ static inline void __ASignalSystem_rm_forad(__ASignalSystem* self, const void* a
         return;
     }
 
-    auto radio_p = __ASignalSystem_find_forad(self, addressee);
+    auto radio_p = ASignalSystem_find_forad(self, addressee);
     if(radio_p != nullptr){
-        RAII(__ASignalRadio) radio = A_COPY(__ASignalRadio, *radio_p);
+        RAII(ASignalRadio) radio = A_COPY(ASignalRadio, *radio_p);
         forEach(it, radio.linkpList){
             auto link = it.p != nullptr ? *it.p : nullptr;
             if(link != nullptr){
-                __ASignalSystem_rm_link(self, link);
+                ASignalSystem_rm_link(self, link);
             }
         }
     }
 }
-static inline __ASignalTower __ASignalSystem_get_tran_list(__ASignalSystem* self, const ASignal* signal){
-    __ASignalTower tower = {};
+static inline ASignalTower ASignalSystem_get_tran_list(ASignalSystem* self, const ASignal* signal){
+    ASignalTower tower = {};
 
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
@@ -646,21 +632,21 @@ static inline __ASignalTower __ASignalSystem_get_tran_list(__ASignalSystem* self
     }
 
     auto id = signal->id;
-    auto tower_p = __ASignalSystem_find_forid(self, id);
+    auto tower_p = ASignalSystem_find_forid(self, id);
     if(tower_p == nullptr){
         aExcSet(AEXC_outdomain);
         return tower;
     }
 
     aExcClean();
-    tower = A_COPY(__ASignalTower, *tower_p);
+    tower = A_COPY(ASignalTower, *tower_p);
     if(aExcOccur()){
         return tower;
     }
 
     return tower;
 }
-static void __ASignalSystem_set_call(__ASignalSystem* self, __ASignalTower tower){
+static void ASignalSystem_set_call(ASignalSystem* self, ASignalTower tower){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -673,7 +659,7 @@ static void __ASignalSystem_set_call(__ASignalSystem* self, __ASignalTower tower
         }
     }
 }
-static void __ASignalSystem_clean_call(__ASignalSystem* self, __ASignalTower tower){
+static void ASignalSystem_clean_call(ASignalSystem* self, ASignalTower tower){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -684,7 +670,7 @@ static void __ASignalSystem_clean_call(__ASignalSystem* self, __ASignalTower tow
             auto link = *it.p;
             link->call_num--;
             if(link->dis_request){
-                __ASignalSystem_rm_link(self, link);
+                ASignalSystem_rm_link(self, link);
             }
         }
     }
@@ -700,7 +686,7 @@ static bool a_system_flag = false;
 /* 防止同线程递归加锁 */
 static thread_local int  a_call_num = 0;
 
-static __ASignalSystem a_signal_system;
+static ASignalSystem a_signal_system;
 
 __attribute__((constructor)) static inline void a_signal_system_start(){
     aExcClean();
@@ -716,7 +702,7 @@ __attribute__((constructor)) static inline void a_signal_system_start(){
         return;
     }
 
-    a_signal_system = A_INIT(__ASignalSystem);
+    a_signal_system = A_INIT(ASignalSystem);
 
     if(aExcOccur()){
         A_DEST(AMtxRW, a_global_lock);
@@ -728,7 +714,7 @@ __attribute__((constructor)) static inline void a_signal_system_start(){
 }
 __attribute__((destructor)) static inline void a_signal_system_poweroff(){
     if(a_system_flag){
-        A_DEST(__ASignalSystem, a_signal_system);
+        A_DEST(ASignalSystem, a_signal_system);
         A_DEST(AMtxRW, a_global_lock);
         A_DEST(AMtxRW, a_call_lock);
         a_system_flag = false;
@@ -745,7 +731,7 @@ int64_t a_signal_alloc(void){
         return -1;
     }
 
-    return __ASignalSystem_alloc(&a_signal_system);
+    return ASignalSystem_alloc(&a_signal_system);
 }
 
 int __a_signal_transmit(const ASignal* signal, AExcCollector* collector){
@@ -775,7 +761,7 @@ int __a_signal_transmit(const ASignal* signal, AExcCollector* collector){
         return ret;
     }
 
-    RAII(__ASignalTower) tower = {};
+    RAII(ASignalTower) tower = {};
 
     {
         RAII(AAutoKey) autokey_g = AMtxRW_wlock(&a_global_lock);
@@ -783,12 +769,12 @@ int __a_signal_transmit(const ASignal* signal, AExcCollector* collector){
             return ret;
         }
 
-        tower = __ASignalSystem_get_tran_list(&a_signal_system, signal);
+        tower = ASignalSystem_get_tran_list(&a_signal_system, signal);
         if(aExcOccur()){
             return ret;
         }
 
-        __ASignalSystem_set_call(&a_signal_system, tower);
+        ASignalSystem_set_call(&a_signal_system, tower);
         if(aExcOccur()){
             return ret;
         }
@@ -797,7 +783,7 @@ int __a_signal_transmit(const ASignal* signal, AExcCollector* collector){
     a_call_num++;
     {
         aExcClean();
-        if(__ASignalTower_call(&tower, signal, collector) == AEXC_response_exc){
+        if(ASignalTower_call(&tower, signal, collector) == AEXC_response_exc){
             ret = AEXC_response_exc;
         }
         aExcClean();
@@ -809,7 +795,7 @@ int __a_signal_transmit(const ASignal* signal, AExcCollector* collector){
             break;
         }
 
-        __ASignalSystem_clean_call(&a_signal_system, tower);
+        ASignalSystem_clean_call(&a_signal_system, tower);
     }while(0);
 
     a_call_num--;
@@ -828,7 +814,7 @@ void a_signal_connection(int64_t id, const void* addressee, void(*call)(const AS
         return;
     }
 
-    __ASignalSystem_add(&a_signal_system, id, (void*)addressee, call);
+    ASignalSystem_add(&a_signal_system, id, (void*)addressee, call);
 }
 
 void a_signal_disconnect(int64_t id, const void* addressee){
@@ -847,12 +833,12 @@ void a_signal_disconnect(int64_t id, const void* addressee){
         return;
     }
 
-    auto link = __ASignalSystem_find(&a_signal_system, id, addressee);
+    auto link = ASignalSystem_find(&a_signal_system, id, addressee);
     if(link == nullptr){
         return;
     }
 
-    __ASignalSystem_rm_link(&a_signal_system, link);
+    ASignalSystem_rm_link(&a_signal_system, link);
 }
 
 void a_signal_disconnect_all(int64_t id){
@@ -871,7 +857,7 @@ void a_signal_disconnect_all(int64_t id){
         return;
     }
 
-    __ASignalSystem_rm_forid(&a_signal_system, id);
+    ASignalSystem_rm_forid(&a_signal_system, id);
 }
 
 void a_target_disconnect_all(const void* addressee){
@@ -890,6 +876,6 @@ void a_target_disconnect_all(const void* addressee){
         return;
     }
 
-    __ASignalSystem_rm_forad(&a_signal_system, addressee);
+    ASignalSystem_rm_forad(&a_signal_system, addressee);
 }
 
