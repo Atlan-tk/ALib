@@ -17,7 +17,7 @@ export TARLIB OUTDIR BUILD INCLUDE
 
 CFLAGS_AR := rcs
 CFLAGS_LD := -lpthread -L$(OUTDIR) -lalib
-CFLAGS_CC := -O0 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc -DGNU_SOURCE
+CFLAGS_CC := -O3 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc -DGNU_SOURCE
 CFLAGS_TEST := -g -O0 -Wall -Wextra -Werror -I$(INCLUDE) -DGNU_SOURCE
 export CFLAGS_CC CFLAGS_AR CFLAGS_LD CFLAGS_TEST
 

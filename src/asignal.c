@@ -230,6 +230,13 @@ static inline int __ASignalTower_call(const __ASignalTower* self, const ASignal*
     return ret;
 }
 
+__visibility(hidden) uint32_t A_OBJ_HASH(int64_t)(const int64_t* self){
+    if(__a_unlikely(self == nullptr)){
+        return 0;
+    }
+    return alib_hash(self, sizeof(int64_t));
+}
+
 AHash_Define(int64_t,__ASignalTower);
 AHash_Generate(int64_t,__ASignalTower);
 A_TYPE_REGISTER(AHash(int64_t,__ASignalTower));
@@ -351,6 +358,13 @@ static inline bool __ASignalRadio_empty(const __ASignalRadio* self){
 
     auto list = &self->linkpList;
     return list->f->empty(list);
+}
+
+__visibility(hidden) uint32_t A_OBJ_HASH(const_ptr_t)(const const_ptr_t* self){
+    if(__a_unlikely(self == nullptr)){
+        return 0;
+    }
+    return alib_hash(self, sizeof(const_ptr_t));
 }
 
 AHash_Define(const_ptr_t,__ASignalRadio);
