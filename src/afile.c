@@ -47,6 +47,164 @@ static inline uint64_t __AFile_size(AFile* self){
 #endif /* posix */
 
 #if defined(__C_WINDOWS__)
+static uint32_t __ADev_overlapped_result(ADev* self, OVERLAPPED* ov, BOOL ok, DWORD* bytes){
+    if(ok) return (uint32_t)*bytes;
+
+    DWORD err = GetLastError();
+    if(err == ERROR_IO_PENDING){
+        ok = GetOverlappedResult(self->fd, ov, bytes, FALSE);
+        if(ok) return (uint32_t)*bytes;
+
+        err = GetLastError();
+        if(err == ERROR_IO_INCOMPLETE){
+            CancelIo(self->fd);
+            return 0;
+        }
+    }
+
+    aExcSet(AEXC_system_error);
+    return 0;
+}
+
+static HANDLE __ADev_open(const char* name, bool noblock){
+    DWORD flags = FILE_ATTRIBUTE_NORMAL;
+    if(noblock) flags |= FILE_FLAG_OVERLAPPED;
+
+    return CreateFileA(name, GENERIC_READ | GENERIC_WRITE,
+                       FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                       OPEN_EXISTING, flags, nullptr);
+}
+
+int32_t ADev_ioctl(ADev* self, int32_t cmd, void* buf){
+    if(self == nullptr){
+        aExcSet(AEXC_nullptr);
+        return aExcGet();
+    }
+    if(!self->stat || self->fd == INVALID_HANDLE_VALUE){
+        aExcSet(AEXC_system_error);
+        return aExcGet();
+    }
+
+    ADevIoctl* param = (ADevIoctl*)buf;
+    DWORD bytes = 0;
+    BOOL ok;
+    if(param == nullptr){
+        ok = DeviceIoControl(self->fd, (DWORD)cmd, nullptr, 0, nullptr, 0,
+                             &bytes, nullptr);
+    }else if(self->noblock){
+        OVERLAPPED ov;
+        memset(&ov, 0, sizeof(ov));
+        ok = DeviceIoControl(self->fd, (DWORD)cmd, param->in, param->in_size,
+                             param->out, param->out_size, &bytes, &ov);
+        uint32_t ret = __ADev_overlapped_result(self, &ov, ok, &bytes);
+        param->bytes = bytes;
+        return aExcOccur() ? aExcGet() : (int32_t)ret;
+    }else{
+        ok = DeviceIoControl(self->fd, (DWORD)cmd, param->in, param->in_size,
+                             param->out, param->out_size, &bytes, nullptr);
+        param->bytes = bytes;
+    }
+
+    if(!ok){
+        aExcSet(AEXC_system_error);
+        return aExcGet();
+    }
+    return (int32_t)bytes;
+}
+
+uint32_t ADev_read(ADev* self, uint32_t size, void* source){
+    if(self == nullptr){
+        aExcSet(AEXC_nullptr);
+        return 0;
+    }
+    if(!self->stat || self->fd == INVALID_HANDLE_VALUE || source == nullptr){
+        aExcSet(AEXC_system_error);
+        return 0;
+    }
+    if(size == 0) return 0;
+
+    DWORD bytes = 0;
+    BOOL ok;
+    if(self->noblock){
+        OVERLAPPED ov;
+        memset(&ov, 0, sizeof(ov));
+        ok = ReadFile(self->fd, source, (DWORD)size, &bytes, &ov);
+        return __ADev_overlapped_result(self, &ov, ok, &bytes);
+    }
+
+    ok = ReadFile(self->fd, source, (DWORD)size, &bytes, nullptr);
+    if(!ok){
+        aExcSet(AEXC_system_error);
+        return 0;
+    }
+    return (uint32_t)bytes;
+}
+
+uint32_t ADev_write(ADev* self, uint32_t size, void* target){
+    if(self == nullptr){
+        aExcSet(AEXC_nullptr);
+        return 0;
+    }
+    if(!self->stat || self->fd == INVALID_HANDLE_VALUE || target == nullptr){
+        aExcSet(AEXC_system_error);
+        return 0;
+    }
+    if(size == 0) return 0;
+
+    DWORD bytes = 0;
+    BOOL ok;
+    if(self->noblock){
+        OVERLAPPED ov;
+        memset(&ov, 0, sizeof(ov));
+        ok = WriteFile(self->fd, target, (DWORD)size, &bytes, &ov);
+        return __ADev_overlapped_result(self, &ov, ok, &bytes);
+    }
+
+    ok = WriteFile(self->fd, target, (DWORD)size, &bytes, nullptr);
+    if(!ok){
+        aExcSet(AEXC_system_error);
+        return 0;
+    }
+    return (uint32_t)bytes;
+}
+
+ADev aDevOpen(const char* name){
+    ADev dev = A_INIT(ADev);
+    dev.name = AText_new(name);
+    dev.noblock = false;
+    if(name == nullptr){
+        aExcSet(AEXC_system_error);
+    }else{
+        dev.fd = __ADev_open(name, dev.noblock);
+        if(dev.fd == INVALID_HANDLE_VALUE){
+            aExcSet(AEXC_system_error);
+        }else{
+            dev.stat = true;
+        }
+    }
+    return dev;
+}
+
+ADev aDevOpen_nb(const char* name){
+    ADev dev = A_INIT(ADev);
+    dev.name = AText_new(name);
+    dev.noblock = true;
+    if(name == nullptr){
+        aExcSet(AEXC_system_error);
+    }else{
+        dev.fd = __ADev_open(name, dev.noblock);
+        if(dev.fd == INVALID_HANDLE_VALUE){
+            aExcSet(AEXC_system_error);
+        }else{
+            dev.stat = true;
+        }
+    }
+    return dev;
+}
+
+#endif /* windows */
+
+#if defined(__C_WINDOWS__)
 #include <windows.h>
 static inline uint64_t __AFile_size(AFile* self){
     HANDLE hFile = CreateFileA(self->name.s, GENERIC_READ,
@@ -257,4 +415,3 @@ ADev aDevOpen_nb(const char* name){
 }
 
 #endif /* posix */
-

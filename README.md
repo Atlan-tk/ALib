@@ -259,12 +259,16 @@ out.f->write(&out, n, buf);
 - `aFileCreate(name)`：以写入模式创建或截断文件，返回 `AWFile`。
 - `aFileAppend(name)`：以追加模式打开文件，返回 `APFile`。
 - `aMemoryOpen(mem, size)`：把一段已有内存包装成只读 `ARFile`。
+- `aDevOpen(name)` / `aDevOpen_nb(name)`：以阻塞 / 非阻塞模式打开设备，返回 `ADev`；POSIX 下包装 `open/read/write/ioctl`，Windows 下包装 `CreateFileA/ReadFile/WriteFile/DeviceIoControl`。
+
+Windows 下 `ADev_ioctl()` 的第三个参数应传 `ADevIoctl*`，用于提供 `DeviceIoControl` 的输入缓冲、输出缓冲和返回字节数；POSIX 下则保持传统 `ioctl(fd, cmd, buf)` 语义。
 
 ## 需要特别注意的语义
 
 - `AString_new()` 和 `AText_new()` 都只是“包装已有 `char*`”，不会立刻拷贝；传入栈缓冲区或临时内存时，必须在其失效前复制到一个真正拥有内存的对象。
 - `aFileOpen()` / `aFileCreate()` / `aFileAppend()` 失败时会设置 `AEXC_file_noexist`；使用前应检查 `aExcOccur()`。
 - `aMemoryOpen()` 只借用传入内存，不复制；调用方必须保证 `mem` 在 `ARFile` 使用期间有效。
+- `aDevOpen()` / `aDevOpen_nb()` 失败时会设置 `AEXC_system_error`；Windows 非阻塞模式使用 overlapped I/O，当前实现遇到未完成的异步操作会返回 `0`。
 - 顺序容器的 `at(index)` 在“容器非空但 index 越界”时，通常会截断到尾元素；只有空容器访问才会设置 `AEXC_overstep`。
 - `AHash(K,V)` 和 `ATree(K,V)` 的 `ins()` 是 upsert 语义：同键再次插入会替换已有值。
 - `a_signal_connection(id, addressee, call)` 对同一个 `(id, addressee)` 重复连接时，会覆盖原有回调，而不是忽略此次连接。

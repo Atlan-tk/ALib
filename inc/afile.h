@@ -172,7 +172,68 @@ ADev aDevOpen_nb(const char* name); //非阻塞模式打开
 
 
 #if defined(__C_WINDOWS__)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN 1
+#endif /* WIN32_LEAN_AND_MEAN */
 #include <windows.h>
+
+typedef struct{
+    void*    in;
+    uint32_t in_size;
+    void*    out;
+    uint32_t out_size;
+    uint32_t bytes;
+}ADevIoctl;
+
+AClass_Inherit(ADev);
+AClass_Struct(ADev,
+    AText   name;           //设备名
+    HANDLE  fd;             //设备句柄
+    bool    noblock;        //是否阻塞
+    bool    stat;           //设备状态
+);
+AClass_Function(ADev,
+    int32_t (*ioctl)(ADev* self, int32_t cmd, void* buf);
+    uint32_t(*read) (ADev* self, uint32_t size, void* source);
+    uint32_t(*write)(ADev* self, uint32_t size, void* target);
+);
+int32_t  ADev_ioctl(ADev* self, int32_t cmd, void* buf);
+uint32_t ADev_read (ADev* self, uint32_t size, void* source);
+uint32_t ADev_write(ADev* self, uint32_t size, void* target);
+AClass_Generate(ADev, ADev_ioctl, ADev_read, ADev_write);
+
+__weak __visibility(protected) void A_OBJ_INIT(ADev)(ADev* self){
+    self->name = A_INIT(AText);
+    self->fd = INVALID_HANDLE_VALUE;
+}
+__weak __visibility(protected) void A_OBJ_DEST(ADev)(ADev* self){
+    if(self->fd != INVALID_HANDLE_VALUE) CloseHandle(self->fd);
+    A_DEST(AText, self->name);
+}
+__weak __visibility(protected) void A_OBJ_COPY(ADev)(ADev* self, const ADev* that){
+    self->name = A_COPY(AText, that->name);
+    self->noblock = that->noblock;
+
+    DWORD flags = FILE_ATTRIBUTE_NORMAL;
+    if(self->noblock) flags |= FILE_FLAG_OVERLAPPED;
+
+    self->fd = CreateFileA(self->name.s, GENERIC_READ | GENERIC_WRITE,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                           OPEN_EXISTING, flags, nullptr);
+    if(self->fd == INVALID_HANDLE_VALUE){
+        aExcSet(AEXC_system_error);
+        return;
+    }
+    self->stat = true;
+}
+__weak __visibility(protected) int  A_OBJ_CMPD(ADev)(const ADev* self, const ADev* that){
+    return A_CMPD(AText, self->name, that->name);
+}
+
+A_CLASS_REGISTER(ADev);
+
+ADev aDevOpen(const char* name);    //阻塞模式打开
+ADev aDevOpen_nb(const char* name); //非阻塞模式打开
 
 #endif /* windows */
 
@@ -183,4 +244,3 @@ ADev aDevOpen_nb(const char* name); //非阻塞模式打开
 #endif /* __cplusplus */
 
 #endif /*__afile_h__*/
-

@@ -731,7 +731,8 @@ A_TYPE_REGISTER(AHash(TK, TV));
 
 - `AHash` 的迭代顺序不保证稳定；不要依赖“插入顺序”或“键排序顺序”。
 - `getk(it)` 同样只是按 C 的值返回语义取键；对拥有型键应把它视作临时借用别名，若要长期保存请立刻显式 `A_COPY(TK, key)`。
-- `A_CMPD(AHash(...), lhs, rhs)` 比较的是当前迭代顺序下的键值序列，不等价于“集合意义上的相等”。
+- `A_CMPD(AHash(...), lhs, rhs)` 不依赖插入顺序；比较时会遍历 `lhs` 的键，并在 `rhs` 中按键查找对应项，再用键值对比较函数比较。
+- 对“是否相等”而言，两个 `AHash` 只要键集合相同、对应值相等、元素数量相同，比较结果就是 `0`；非零结果的正负号仍可能受内部桶遍历顺序影响，不应作为稳定排序依据。
 - `ins()` 是 upsert，而不是“拒绝重复键”。
 
 ### 5.12 `astring.h` — `AString`
@@ -1415,7 +1416,8 @@ a_signal_transmit(signal, &collector);
 | `ARFile` | `AFile` | 读取器；可从文件或一段外部内存读取 |
 | `AWFile` | `AFile` | 写入器；以写入模式创建 / 截断文件 |
 | `APFile` | `AFile` | 追加器；以追加模式打开文件 |
-| `ADev` | `Atlan` | 设备对象雏形；POSIX 下保存 `int32_t fd`，Windows 下保存 `HANDLE fd` |
+| `ADev` | `Atlan` | 设备对象；POSIX 下保存 `int32_t fd`，Windows 下保存 `HANDLE fd` |
+| `ADevIoctl` | - | 仅 Windows 分支可见；用于向 `ADev_ioctl()` 传递 `DeviceIoControl` 的输入 / 输出缓冲 |
 
 #### 5.19.2 打开入口
 
@@ -1425,6 +1427,8 @@ a_signal_transmit(signal, &collector);
 | `aFileCreate(const char* name)` | 文件名；`nullptr` 会转为 `"(null)"` | `AWFile` | `AEXC_file_noexist` | 以 `"w"` 模式创建或截断文件 |
 | `aFileAppend(const char* name)` | 文件名；`nullptr` 会转为 `"(null)"` | `APFile` | `AEXC_file_noexist` | 以 `"a"` 模式打开文件并追加写入 |
 | `aMemoryOpen(const void* mem, uint64_t size)` | 外部内存地址和可读长度 | `ARFile` | 通常无 | 把一段已有内存包装成只读读取器 |
+| `aDevOpen(const char* name)` | 设备路径 | `ADev` | `AEXC_system_error` | 以阻塞模式打开设备 |
+| `aDevOpen_nb(const char* name)` | 设备路径 | `ADev` | `AEXC_system_error` | 以非阻塞模式打开设备；Windows 下使用 overlapped I/O |
 
 注意：这些入口返回的是值对象，推荐配合 `RAII(ARFile)` / `RAII(AWFile)` / `RAII(APFile)` 使用，避免忘记析构关闭文件。
 
@@ -1468,7 +1472,57 @@ a_signal_transmit(signal, &collector);
 
 `aFileAppend(name)` 使用 `"a"` 模式；写入总是追加到文件末尾。
 
-#### 5.19.6 使用示例
+#### 5.19.6 `ADev`
+
+公共方法：
+
+| API | 参数 | 返回值 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `ADev_ioctl(ADev* self, int32_t cmd, void* buf)` | 设备对象、控制码、平台相关参数 | POSIX 下返回 `ioctl()` 结果；Windows 下返回输出字节数 | `AEXC_nullptr`、`AEXC_system_error` | POSIX 直接把 `buf` 传给 `ioctl()`；Windows 把 `buf` 解释为 `ADevIoctl*` |
+| `ADev_read(ADev* self, uint32_t size, void* source)` | 设备对象、读取大小、目标缓冲区 | 实际读取字节数 | `AEXC_nullptr`、`AEXC_system_error` | POSIX 使用 `read()`；Windows 使用 `ReadFile()` |
+| `ADev_write(ADev* self, uint32_t size, void* target)` | 设备对象、写入大小、源缓冲区 | 实际写入字节数 | `AEXC_nullptr`、`AEXC_system_error` | POSIX 使用 `write()`；Windows 使用 `WriteFile()` |
+| `A_CALL(obj, ADev).ioctl(...)` / `read(...)` / `write(...)` | 方法表调用 | 同上 | 同上 | 也可直接使用 `obj.f->read(&obj, ...)` |
+
+平台差异：
+
+- POSIX：`aDevOpen()` 使用 `open(name, O_RDWR)`，`aDevOpen_nb()` 使用 `open(name, O_RDWR | O_NONBLOCK)`，析构时自动 `close(fd)`。
+- Windows：`aDevOpen()` 使用 `CreateFileA()` 打开 `GENERIC_READ | GENERIC_WRITE` 句柄，析构时自动 `CloseHandle(fd)`。
+- Windows 非阻塞：`aDevOpen_nb()` 会带上 `FILE_FLAG_OVERLAPPED`；如果异步操作尚未完成，当前实现会取消本次 I/O 并返回 `0`，不会等待完成。
+- `size == 0` 的读写直接返回 `0`；Windows 下读写缓冲区为 `nullptr` 会设置 `AEXC_system_error`。
+- 打开失败、句柄无效或系统调用失败时会设置 `AEXC_system_error`；使用设备对象前应检查 `aExcOccur()`。
+
+Windows `ADevIoctl`：
+
+```c
+typedef struct{
+    void*    in;       // 输入缓冲区，可为 nullptr
+    uint32_t in_size;  // 输入缓冲区大小
+    void*    out;      // 输出缓冲区，可为 nullptr
+    uint32_t out_size; // 输出缓冲区大小
+    uint32_t bytes;    // 实际返回字节数，由 ADev_ioctl 写入
+}ADevIoctl;
+```
+
+Windows 调用示例：
+
+```c
+RAII(ADev) dev = aDevOpen("\\\\.\\ExampleDevice");
+if (aExcOccur()) return 1;
+
+char out[256];
+ADevIoctl ctl = {
+    .in = nullptr,
+    .in_size = 0,
+    .out = out,
+    .out_size = sizeof(out),
+};
+
+int32_t n = dev.f->ioctl(&dev, MY_IOCTL_CODE, &ctl);
+if (aExcOccur()) return 1;
+/* n == ctl.bytes */
+```
+
+#### 5.19.7 使用示例
 
 ```c
 #include <alib/afile.h>
@@ -1487,7 +1541,7 @@ int main(void) {
 }
 ```
 
-#### 5.19.7 命名变更
+#### 5.19.8 命名变更
 
 当前文件 API 使用新命名：
 
@@ -1538,7 +1592,7 @@ make CONFIG=linux
 
 - `AString_new()` 只是借用，不是复制。
 - `APtr(T)` 复制后不会转移所有权，只会得到弱别名。
-- `AHash(K,V)` 的比较结果不等价于“无序集合相等”。
+- `AHash(K,V)` 的相等性比较不依赖插入顺序；但非零比较结果的正负号不适合作为稳定排序依据。
 - 顺序容器的 `at(index)` 普遍是“空容器报错，非空越界截断到尾元素”。
 - `take` / `pop` 把元素写到 `tar` 后，后续由调用方负责析构该元素。
 - 迭代时一旦改容器结构，就应重新获取迭代器。
