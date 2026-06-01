@@ -2,7 +2,7 @@
 
 本文以 `inc/` 中的公共头文件为准，系统说明 ALib 当前提供的模块、类型、宏和函数，以及它们的参数、返回值、异常语义与使用约定。
 
-当前版本支持 Linux / Unix 本机构建、Linux 主机交叉编译 Windows / Linux 目标，以及 Windows 本地 clang-cl + Visual Studio 项目文件构建。构建配置由顶层 CMake 扫描 `cmake/*.cmake` 自动发现。
+当前版本使用仓库内 GNU Makefile 构建，支持 Linux / Unix 本机构建、Linux 主机交叉编译 AArch64 / MIPS / Windows 目标。构建配置由顶层 `Makefile` 读取 `config/*.mk`。
 
 文档范围约定：
 
@@ -26,12 +26,12 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，核心目标不是复�
 
 ```text
 ALib/
-├── cmake/     # 构建配置文件，每个 <name>.cmake 对应 CONFIG=<name>
-├── CMakeLists.txt
+├── config/    # 构建配置文件，每个 <name>.mk 对应 CONFIG=<name>
 ├── inc/       # 公共头文件
-├── src/       # 非模板实现与库目标 CMakeLists.txt
-├── sample/    # 示例程序与示例目标 CMakeLists.txt
-├── test/      # 回归测试与测试目标 CMakeLists.txt
+├── src/       # 非模板实现与库目标 Makefile
+├── sample/    # 示例程序与示例目标 Makefile
+├── test/      # 回归测试与测试目标 Makefile
+├── Makefile
 ├── README.md
 └── DOC.md
 ```
@@ -39,78 +39,68 @@ ALib/
 常用本机构建命令：
 
 ```bash
-cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-gcc-make
-cmake --build build
-ctest --test-dir build --output-on-failure
+make CONFIG=linux
 ```
 
 默认约定：
 
-- Linux 未指定 `CONFIG` 时自动选择 `linux-gcc-make`。
-- 其他 Unix 未指定 `CONFIG` 时自动选择 `unix-gcc-make`。
-- Windows 未指定 `CONFIG` 时自动选择 `windows-clang-cl-vs`。
-- 其他非 Linux/Unix/Windows 目标平台：配置阶段直接提示无法编译。
-- 不支持 C11 或 GNU 扩展（如 `__auto_type`、`typeof`、`cleanup`、`weakref`）的编译器：配置阶段直接提示无法编译。
+- 顶层 `Makefile` 会优先使用显式传入的 `CONFIG=<name>`。
+- 如果未传入 `CONFIG`，但仓库根目录存在 `.config`，会继续沿用 `.config`。
+- 如果没有 `.config`，Linux 默认使用 `config/linux.mk`。
+- 其他 Unix / Windows 本地构建尚未提供默认配置文件；可按需在 `config/` 下新增配置。
+- 不支持 C11 或 GNU 扩展（如 `__auto_type`、`typeof`、`cleanup`、`weakref`）的编译器不属于当前支持范围。
 
 当前内置配置：
 
-- `linux-gcc-make`：Linux / Unix 本地 GCC，Makefile。
-- `unix-gcc-make`：Unix 本地 GCC 别名，Makefile。
-- `linux-clang-make`：Linux / Unix 本地 Clang，GCC 风格命令行参数，Makefile。
-- `unix-clang-make`：Unix 本地 Clang 别名，GCC 风格命令行参数，Makefile。
-- `windows-clang-cl-vs`：Windows 本地 `clang-cl`，Visual Studio 项目文件，VS 风格命令行参数。
-- `linux-windows-mingw64-make`：Linux 到 Windows 的 UCRT MinGW-w64 交叉编译，Makefile。
-- `linux-windows-clang-cl-make`：Linux 到 Windows 的 `clang-cl` 交叉编译，Makefile。
-- `linux-linux-gcc-cross-make`：Linux 到 Linux 的 GCC 交叉编译，Makefile；需要设置 `ALIB_LINUX_GCC_TRIPLET`。
+- `linux`：Linux / Unix 本地默认构建，使用 `cc` 和 `ar`。
+- `linux-clang`：Linux / Unix 本地 Clang 构建，使用 `clang` 和 `llvm-ar`。
+- `linux-arm`：Linux 到 AArch64 的交叉编译，使用 `aarch64-linux-gnu-gcc`。
+- `linux-mips`：Linux 到 MIPS 的交叉编译，使用 `mips-linux-uclibc-gnu-gcc`。
+- `mingw64`：Linux 到 Windows x86_64 的 MinGW-w64 交叉编译。
 
-顶层 `CMakeLists.txt` 会自动扫描 `cmake/*.cmake`。新增配置时，只需添加新的 `cmake/<name>.cmake`，之后使用 `-DCONFIG=<name>` 即可。切换不同 generator、编译器或目标平台时建议使用 `cmake --fresh`，或清理 `build/` 后重新配置。
+新增配置时，只需添加新的 `config/<name>.mk`，之后使用 `make CONFIG=<name>` 即可。切换不同配置时建议显式传入 `CONFIG`，或执行 `make disclean` 删除旧 `.config` 后重新构建。
 
 默认产物：
 
-- 中间文件目录：`build/obj`
-- 编译期头文件目录：`build/inc/alib`
-- 库输出目录：`build/lib`
-- 示例输出目录：`build/sample`
-- 测试输出目录：`build/test`
-- Linux / Unix 本地静态库：`build/lib/libatlan.a`
-- Windows 目标静态库：`build/lib/atlan.lib`
+- 中间文件目录：`build/`
+- 编译期头文件链接：`build/.include/alib`
+- 库输出目录：`build/out/`
+- Linux / Unix 本地静态库：`build/out/libalib.a`
+- Windows 目标静态库：`build/out/alib.lib`
+- 示例程序：`build/out/sample_*.<out|exe>`
+- 测试程序：`build/out/test_*.<out|exe>`
 
 默认会同时构建库本身、`sample/` 下的示例程序和 `test/` 下的测试程序。
 
 常用变体：
 
 ```bash
-# Clang，本地 Unix / Linux，GCC 风格命令行参数
-cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-clang-make
-cmake --build build
+# Clang，本地 Unix / Linux
+make CONFIG=linux-clang
+
+# Linux -> AArch64
+make CONFIG=linux-arm
+
+# Linux -> MIPS
+make CONFIG=linux-mips
 
 # Linux -> Windows，MinGW-w64
-cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-windows-mingw64-make
-cmake --build build
-
-# Linux -> Linux，GCC 交叉编译器
-cmake --fresh -S . -B build -G "Unix Makefiles" \
-  -DCONFIG=linux-linux-gcc-cross-make \
-  -DALIB_LINUX_GCC_TRIPLET=aarch64-linux-gnu
-cmake --build build
+make CONFIG=mingw64
 ```
 
-Windows 本地构建示例：
-
-```powershell
-cmake --fresh -S . -B build -G "Visual Studio 17 2022" -T ClangCL -DCONFIG=windows-clang-cl-vs
-cmake --build build --config Release
-```
-
-MinGW-w64 构建要求目标运行时默认提供 `timespec_get` / `TIME_UTC`，因此需要 UCRT MinGW-w64 或 llvm-mingw 工具链。不要使用 MSVCRT 版 `x86_64-w64-mingw32-gcc` 再手动链接 `ucrtbase`；CMake 会在对应配置中检测该能力。在 Linux / WSL2 中只能完成编译和链接验证；如果要直接执行生成的 Windows `.exe` 测试，需要额外安装 Wine，或者复制到 Windows 环境运行。
+交叉编译通常只能验证目标程序已经生成；如果要直接执行生成的 Windows `.exe` 测试，需要额外安装 Wine，或者复制到 Windows 环境运行。
 
 安装规则：
 
-- Linux / Unix 本地编译：头文件安装到 `/usr/local/include/alib`，静态库安装到 `/usr/local/lib`。
-- Linux 交叉编译：头文件安装到 `$HOME/.alib/inc/alib`，静态库安装到 `$HOME/.alib/lib`。
-- Windows 本地编译：不安装。
+- `linux` / `linux-clang`：头文件安装到 `/usr/local/include/alib/`，静态库安装到 `/usr/local/lib/`。
+- `linux-arm` / `linux-mips` / `mingw64`：头文件安装到 `$HOME/.alib/include/alib/`，静态库安装到 `$HOME/.alib/lib/`。
 
-使用 Makefile 配置时，可在 `build` 下执行 `make install`；也可使用 `cmake --build build --target install`。
+安装和卸载命令：
+
+```bash
+make install
+make uninstall
+```
 
 ## 3. 先读这些通用约定
 
@@ -122,7 +112,7 @@ ALib 依赖：
 - GNU 扩展（`__auto_type`、`typeof`、`cleanup`、`weakref` 等）
 - C11 线程 / 时间接口；优先复用系统 `<threads.h>`，缺失时由 `athrd.h` 在 POSIX / Win32 上补齐
 
-因此推荐直接使用仓库内的 CMake 构建，并在仓库根目录执行 `cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=<name>` 与 `cmake --build build`。默认本地安装前缀为 `/usr/local`，Linux 交叉编译默认安装到 `$HOME/.alib`。如果目标平台不是 Linux/Unix/Windows，或者编译器缺少 C11 / GNU 扩展支持，CMake 会在配置阶段直接终止并提示无法编译。
+因此推荐直接使用仓库内的 Makefile 构建，并在仓库根目录执行 `make CONFIG=<name>`。默认本地安装位置为 `/usr/local/include/alib/` 和 `/usr/local/lib/`，Linux 交叉编译默认安装到 `$HOME/.alib/include/alib/` 和 `$HOME/.alib/lib/`。如果目标平台或工具链不在内置配置中，请在 `config/` 下新增配置文件。
 
 ### 3.2 类型协议：所有容器都依赖 `A_TYPE_REGISTER`
 
@@ -254,6 +244,7 @@ A_TYPE_REGISTER(ATree(KeyType, ValueType));
 | `athrd.h` | C11 线程兼容层；线程、互斥锁、条件变量、TSS、`call_once` |
 | `alock.h` | 互斥锁、递归锁、读写锁、自动解锁 token |
 | `asignal.h` | 信号系统、接收者基类、异常收集器 |
+| `afile.h` | 文件读写器、追加器、内存读取器、设备对象雏形 |
 
 ## 5. 完整模块与 API 参考
 
@@ -1412,6 +1403,103 @@ a_signal_transmit(signal, &collector);
 4. 回调里不要析构任何仍处于连接表中的接收者对象，否则会制造悬空指针。  
 5. 回调里不要等待其他线程执行信号连接 / 断开操作，否则可能形成锁等待。  
 
+### 5.19 `afile.h` — 文件读写器与设备对象
+
+`afile.h` 提供基于 ALib 类系统的基础文件读写包装。文件对象持有 `FILE*`，析构时自动关闭；内存读取器只借用外部内存，不负责释放。
+
+#### 5.19.1 类型
+
+| 类型 | 父类 | 说明 |
+| --- | --- | --- |
+| `AFile` | `Atlan` | 文件基类，字段包括 `FILE* fp`、`AText name`、`uint64_t size` |
+| `ARFile` | `AFile` | 读取器；可从文件或一段外部内存读取 |
+| `AWFile` | `AFile` | 写入器；以写入模式创建 / 截断文件 |
+| `APFile` | `AFile` | 追加器；以追加模式打开文件 |
+| `ADev` | `Atlan` | 设备对象雏形；POSIX 下保存 `int32_t fd`，Windows 下保存 `HANDLE fd` |
+
+#### 5.19.2 打开入口
+
+| API | 参数 | 返回值 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `aFileOpen(const char* name)` | 文件名；`nullptr` 会转为 `"(null)"` | `ARFile` | `AEXC_file_noexist` | 以 `"r"` 模式打开已有文件 |
+| `aFileCreate(const char* name)` | 文件名；`nullptr` 会转为 `"(null)"` | `AWFile` | `AEXC_file_noexist` | 以 `"w"` 模式创建或截断文件 |
+| `aFileAppend(const char* name)` | 文件名；`nullptr` 会转为 `"(null)"` | `APFile` | `AEXC_file_noexist` | 以 `"a"` 模式打开文件并追加写入 |
+| `aMemoryOpen(const void* mem, uint64_t size)` | 外部内存地址和可读长度 | `ARFile` | 通常无 | 把一段已有内存包装成只读读取器 |
+
+注意：这些入口返回的是值对象，推荐配合 `RAII(ARFile)` / `RAII(AWFile)` / `RAII(APFile)` 使用，避免忘记析构关闭文件。
+
+#### 5.19.3 `ARFile`
+
+公共方法：
+
+| API | 参数 | 返回值 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `ARFile_size(ARFile* self)` | 读取器 | 剩余未读大小 | `AEXC_nullptr` | 返回 `文件大小 - offset`；内存读取器返回 `size - offset` |
+| `ARFile_read(ARFile* self, uint32_t size, void* target)` | 读取器、期望大小、目标缓冲区 | 实际读取结果 | `AEXC_nullptr`、`AEXC_file_noexist` | `size == 0` 或 `target == nullptr` 时返回 0 |
+| `A_CALL(obj, ARFile).size(...)` / `read(...)` | 方法表调用 | 同上 | 同上 | 也可直接使用 `obj.f->read(&obj, ...)` |
+
+内存读取器语义：
+
+- `aMemoryOpen(mem, size)` 不复制 `mem`，调用方必须保证其生命周期覆盖读取器使用期。
+- 读取会推进 `offset`，最多读取剩余大小。
+- 从外部内存读取时不依赖 `FILE*`，析构时也不会释放 `mem`。
+
+#### 5.19.4 `AWFile`
+
+公共方法：
+
+| API | 参数 | 返回值 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AWFile_size(AWFile* self)` | 写入器 | 当前对象累计写入量 | `AEXC_nullptr` | 返回 `addsize` |
+| `AWFile_write(AWFile* self, uint32_t size, void* target)` | 写入器、写入大小、源缓冲区 | 实际写入结果 | `AEXC_nullptr`、`AEXC_file_noexist` | `size == 0` 或 `target == nullptr` 时返回 0 |
+| `A_CALL(obj, AWFile).size(...)` / `write(...)` | 方法表调用 | 同上 | 同上 | 也可直接使用 `obj.f->write(&obj, ...)` |
+
+`aFileCreate(name)` 使用 `"w"` 模式；如果目标文件已存在，会先截断。
+
+#### 5.19.5 `APFile`
+
+公共方法：
+
+| API | 参数 | 返回值 | 异常 | 说明 |
+| --- | --- | --- | --- | --- |
+| `APFile_size(APFile* self)` | 追加器 | 打开时文件大小 + 当前累计追加量 | `AEXC_nullptr` | 返回 `AFile.size + addsize` |
+| `APFile_append(APFile* self, uint32_t size, void* target)` | 追加器、写入大小、源缓冲区 | 实际写入结果 | `AEXC_nullptr`、`AEXC_file_noexist` | `size == 0` 或 `target == nullptr` 时返回 0 |
+| `A_CALL(obj, APFile).size(...)` / `append(...)` | 方法表调用 | 同上 | 同上 | 也可直接使用 `obj.f->append(&obj, ...)` |
+
+`aFileAppend(name)` 使用 `"a"` 模式；写入总是追加到文件末尾。
+
+#### 5.19.6 使用示例
+
+```c
+#include <alib/afile.h>
+
+int main(void) {
+    RAII(ARFile) in = aFileOpen("input.bin");
+    if (aExcOccur()) return 1;
+
+    RAII(AWFile) out = aFileCreate("output.bin");
+    if (aExcOccur()) return 1;
+
+    char buf[256];
+    uint32_t n = in.f->read(&in, sizeof(buf), buf);
+    out.f->write(&out, n, buf);
+    return aExcOccur() ? 1 : 0;
+}
+```
+
+#### 5.19.7 命名变更
+
+当前文件 API 使用新命名：
+
+| 新 API | 旧 API |
+| --- | --- |
+| `aFileOpen` | `aReadFile` |
+| `aFileCreate` | `aWriteFile` |
+| `aFileAppend` | `aAppendFile` |
+| `aMemoryOpen` | `aReadFileMem` |
+
+如果外部项目还在使用旧名称，需要同步迁移或自行加兼容包装。
+
 ## 6. 示例与测试入口
 
 示例程序：
@@ -1437,15 +1525,13 @@ a_signal_transmit(signal, &collector);
 推荐最少验证命令：
 
 ```bash
-cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-gcc-make
-cmake --build build
-ctest --test-dir build --output-on-failure
+make CONFIG=linux
 ```
 
 如果修改了示例相关接口，再补：
 
 ```bash
-cmake --build build --target samples
+make CONFIG=linux
 ```
 
 ## 7. 常见误区速记

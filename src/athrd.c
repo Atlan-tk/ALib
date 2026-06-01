@@ -45,7 +45,6 @@ static inline struct timespec __athrd_timespec_sub(const struct timespec* end,
 }
 
 #if defined(__C_POSIX__)
-
 #include <sched.h>
 
 typedef struct{
@@ -73,11 +72,11 @@ static void* __athrd_posix_start(void* arg){
 }
 
 static int __athrd_posix_now_utc(struct timespec* now){
-#if defined(CLOCK_REALTIME)
+    #if defined(CLOCK_REALTIME)
         return clock_gettime(CLOCK_REALTIME, now);
-#else
+    #else
         return timespec_get(now, TIME_UTC) == TIME_UTC ? 0 : -1;
-#endif /* CLOCK_REALTIME */
+    #endif /* CLOCK_REALTIME */
 }
 
 int thrd_create(thrd_t* thr, thrd_start_t func, void* arg){
@@ -261,11 +260,11 @@ int tss_set(tss_t key, void* val){
 void tss_delete(tss_t key){
     pthread_key_delete(key);
 }
+#endif /* posix */
 
 
 
-#elif defined(__C_WINDOWS__)
-
+#if defined(__C_WINDOWS__)
 #include <process.h>
 
 typedef struct{
@@ -688,5 +687,6 @@ void tss_delete(tss_t key){
     FlsFree(key.slot);
 }
 
-#endif /* __C_POSIX__ || __C_WINDOWS__ */
+#endif /* __C_WINDOWS__ */
+
 #endif /* !A_THRD_USE_SYSTEM_THREADS */

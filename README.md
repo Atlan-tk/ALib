@@ -1,9 +1,9 @@
 # ALib
 
 ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib，但设计路线并不相同：
-它把“泛型容器、对象生命周期、轻量类系统、进程内信号、线程兼容层、锁封装”组合进一套偏编译期驱动的接口里，目标是在纯 C 中获得比传统 `void*` 工具库更强的类型约束和更统一的值语义体验。
+它把“泛型容器、对象生命周期、轻量类系统、进程内信号、线程兼容层、锁封装、简单文件读写”组合进一套偏编译期驱动的接口里，目标是在纯 C 中获得比传统 `void*` 工具库更强的类型约束和更统一的值语义体验。
 
-当前仓库产物为静态库：Linux/Unix 下默认生成 `libatlan.a`，MinGW-w64 交叉编译 Windows 目标时生成 `atlan.lib`。公共头文件位于 `inc/`，安装后按 `<alib/...>` 方式引用。
+当前仓库产物为静态库：Linux/Unix 下默认生成 `libalib.a`，MinGW-w64 交叉编译 Windows 目标时生成 `alib.lib`。公共头文件位于 `inc/`，安装后按 `<alib/...>` 方式引用。
 
 ## 项目定位
 
@@ -27,7 +27,7 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib�
 | 对象系统 | 轻量单继承 + 虚函数表，无属性系统、无反射 | GObject 提供更完整的类型系统、信号、属性和 introspection |
 | 字符串能力 | `AString` 处理字节串，`AText` 处理 UTF-8 文本与基础编码转换 | GLib 提供 `GString`、更完整的 UTF-8/Unicode、路径和文本工具 |
 | 并发能力 | `athrd.h` 提供兼容 C11 `<threads.h>` 的线程原语，`alock.h` 再封装锁对象 | GLib 线程、主循环、异步设施更成熟 |
-| 功能边界 | 容器、指针、类、信号、线程兼容层、锁 | 还覆盖主循环、IO、文件路径、模块装载、字符集等 |
+| 功能边界 | 容器、指针、类、信号、线程兼容层、锁、基础文件读写 | 还覆盖主循环、IO、文件路径、模块装载、字符集等 |
 
 这意味着：
 
@@ -55,127 +55,97 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib�
 - `asignal.h`：进程内信号连接/派发系统
 - `athrd.h`：兼容 C11 `<threads.h>` 的线程原语入口；优先复用系统实现，缺失时回退到 POSIX/Win32
 - `alock.h`：基于 `athrd.h` 的互斥锁、递归锁、读写锁、条件变量锁、信号量及自动解锁辅助对象
+- `afile.h`：文件读写器、追加器、内存读取器，以及设备对象雏形
 
 其中 `athrd.h` 适合直接做线程创建、条件变量等待和线程局部存储；如果只是想在 ALib 风格代码里管理临界区、等待条件或限制并发配额，通常直接使用 `alock.h` 的 `AAutoKey`、`AMtxCnd`、`ASemaphore` 更顺手。
 
 ## 构建、测试与安装
 
-ALib 使用 CMake 构建。推荐固定使用仓库根目录下的 `build/` 作为编译目录，配置文件放在 `cmake/`；顶层 `CMakeLists.txt` 会扫描 `cmake/*.cmake`，每个 `<name>.cmake` 都自动成为一个可用的 `CONFIG=<name>` 构建配置。
+ALib 当前使用仓库内的 GNU Makefile 构建。顶层 `Makefile` 会读取 `config/*.mk` 中的配置，默认在 Linux 上使用 `config/linux.mk`，也可以通过 `CONFIG=<name>` 显式指定。
 
 ### 常用本机构建
 
-Linux / Unix 默认配置会优先选择 `linux-gcc-make`（Linux）或 `unix-gcc-make`（其他 Unix）：
-
 ```bash
-cmake --fresh -S . -B build -G "Unix Makefiles"
-cmake --build build
+make
 ```
 
-也可以显式指定配置：
+使用 Clang：
 
 ```bash
-cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-gcc-make
-cmake --build build
+make CONFIG=linux-clang
 ```
 
-使用 Clang（GCC 风格命令行参数、Makefile）：
+清理构建产物：
 
 ```bash
-cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-clang-make
-cmake --build build
+make clean
+```
+
+清理已保存的 `.config`：
+
+```bash
+make disclean
 ```
 
 ### 可用 CONFIG
 
-当前仓库内置配置文件位于 `cmake/`：
+当前仓库内置配置文件位于 `config/`：
 
-- `linux-gcc-make`：Linux / Unix 本地 GCC，Makefile。
-- `unix-gcc-make`：Unix 本地 GCC 别名，Makefile。
-- `linux-clang-make`：Linux / Unix 本地 Clang，GCC 风格命令行参数，Makefile。
-- `unix-clang-make`：Unix 本地 Clang 别名，GCC 风格命令行参数，Makefile。
-- `windows-clang-cl-vs`：Windows 本地 `clang-cl`，Visual Studio 项目文件，VS 风格命令行参数；使用 `-T ClangCL`。
-- `linux-windows-mingw64-make`：Linux 到 Windows 的 UCRT MinGW-w64 交叉编译，Makefile。
-- `linux-windows-clang-cl-make`：Linux 到 Windows 的 `clang-cl` 交叉编译，Makefile。
-- `linux-linux-gcc-cross-make`：Linux 到 Linux 的 GCC 交叉编译，Makefile；需要设置 `ALIB_LINUX_GCC_TRIPLET`。
+- `linux`：Linux / Unix 本地默认构建，使用 `cc` 和 `ar`。
+- `linux-clang`：Linux / Unix 本地 Clang 构建，使用 `clang` 和 `llvm-ar`。
+- `linux-arm`：Linux 到 AArch64 的交叉编译，使用 `aarch64-linux-gnu-gcc`。
+- `linux-mips`：Linux 到 MIPS 的交叉编译，使用 `mips-linux-uclibc-gnu-gcc`。
+- `mingw64`：Linux 到 Windows x86_64 的 MinGW-w64 交叉编译。
 
-新增编译配置时，只需在 `cmake/` 下增加新的 `<name>.cmake`，之后使用 `-DCONFIG=<name>` 即可。切换不同 generator、编译器或目标平台时建议使用 `cmake --fresh`，或清理 `build/` 后重新配置。
+新增编译配置时，只需在 `config/` 下增加新的 `<name>.mk`，之后使用 `make CONFIG=<name>` 即可。顶层构建会把本次配置复制到 `.config`，之后未显式传入 `CONFIG` 时会继续沿用它。
 
 ### 输出目录
 
 默认会同时构建库、`sample/` 示例和 `test/` 测试。构建输出固定在：
 
-- 中间文件：`build/obj`
-- 编译期头文件：`build/inc/alib/*.h`
-- 静态库：`build/lib`
-- 示例程序：`build/sample`
-- 测试程序：`build/test`
-
-Linux / Unix 本地构建通常生成 `build/lib/libatlan.a`。Windows 目标构建通常生成 `build/lib/atlan.lib` 和 `.exe` 程序。
+- 中间文件：`build/*.o`
+- 临时头文件链接：`build/.include/alib`
+- 静态库：`build/out/libalib.a` 或 `build/out/alib.lib`
+- 示例程序：`build/out/sample_*.<out|exe>`
+- 测试程序：`build/out/test_*.<out|exe>`
 
 ### 交叉编译
 
-UCRT MinGW-w64 交叉编译 Windows x86_64 目标：
+AArch64 示例：
 
 ```bash
-cmake --fresh -S . -B build -G "Unix Makefiles" \
-  -DCONFIG=linux-windows-mingw64-make
-cmake --build build
+make CONFIG=linux-arm
 ```
 
-MinGW-w64 构建要求目标运行时默认提供 `timespec_get` / `TIME_UTC`。请使用 UCRT MinGW-w64 或 llvm-mingw 工具链；不要使用 MSVCRT 版 `x86_64-w64-mingw32-gcc` 再手动链接 `ucrtbase`。CMake 会在对应配置中检测该能力。
-
-Linux 到 Linux 的 GCC 交叉编译示例：
+MIPS 示例：
 
 ```bash
-cmake --fresh -S . -B build -G "Unix Makefiles" \
-  -DCONFIG=linux-linux-gcc-cross-make \
-  -DALIB_LINUX_GCC_TRIPLET=aarch64-linux-gnu
-cmake --build build
+make CONFIG=linux-mips
+```
+
+MinGW-w64 Windows x86_64 示例：
+
+```bash
+make CONFIG=mingw64
 ```
 
 交叉编译通常只能验证目标程序已经生成；若要在 Linux / WSL2 中运行 Windows `.exe` 测试，需要额外安装 Wine，或复制到 Windows 环境运行。
 
-### Windows 本机构建
-
-Windows 本地配置使用 `clang-cl` 和 Visual Studio 项目文件：
-
-```powershell
-cmake --fresh -S . -B build -G "Visual Studio 17 2022" -T ClangCL -DCONFIG=windows-clang-cl-vs
-cmake --build build --config Release
-```
-
-Windows 本地配置不生成安装规则。
-
-### 编译示例和测试
-
-```bash
-cmake --build build --target samples
-cmake --build build --target tests
-ctest --test-dir build --output-on-failure
-```
-
 ### 安装
 
-使用 Makefile 配置时，可在 `build` 下执行 `make install`，或使用通用命令：
-
 ```bash
-cmake --build build --target install
+make install
 ```
 
 默认安装位置：
 
-- Linux / Unix 本地编译：头文件安装到 `/usr/local/include/alib`，静态库安装到 `/usr/local/lib`。
-- Linux 交叉编译：头文件安装到 `$HOME/.alib/inc/alib`，静态库安装到 `$HOME/.alib/lib`。
-- Windows 本地编译：不安装。
+- `linux` / `linux-clang`：头文件安装到 `/usr/local/include/alib/`，静态库安装到 `/usr/local/lib/`。
+- `linux-arm` / `linux-mips` / `mingw64`：头文件安装到 `$HOME/.alib/include/alib/`，静态库安装到 `$HOME/.alib/lib/`。
 
-如需覆盖默认安装前缀：
+卸载：
 
 ```bash
-cmake --fresh -S . -B build -G "Unix Makefiles" \
-  -DCONFIG=linux-gcc-make \
-  -DCMAKE_INSTALL_PREFIX=<your-prefix>
-cmake --build build
-cmake --build build --target install
+make uninstall
 ```
 
 ## 快速开始
@@ -215,16 +185,15 @@ int main(void) {
 安装后可直接编译（Linux / GCC）：
 
 ```bash
-gcc -std=gnu11 -Wall -Wextra -O2 example.c -latlan -pthread -o example
+gcc -std=gnu11 -Wall -Wextra -O2 example.c -lalib -lpthread -latomic -o example
 ```
 
 如果只是想在仓库目录里临时编译（Linux / GCC）：
 
 ```bash
-cmake --fresh -S . -B build -G "Unix Makefiles" -DCONFIG=linux-gcc-make
-cmake --build build
+make CONFIG=linux
 
-gcc -std=gnu11 -Wall -Wextra -O2 -Ibuild/inc example.c build/lib/libatlan.a -pthread -o example
+gcc -std=gnu11 -Wall -Wextra -O2 -Ibuild/.include example.c build/out/libalib.a -lpthread -latomic -o example
 ```
 
 ## 使用模式
@@ -272,9 +241,30 @@ A_TYPE_REGISTER(ATree(int, AString));
 - `AMtxCnd` 把互斥锁和条件变量绑在一起：先 `AMtxCnd_lock()`，在谓词不满足时循环 `AMtxCnd_wait()`，状态更新后再 `AMtxCnd_awake()` 或 `AMtxCnd_awake_all()`。
 - `ASemaphore` 把“占用一个名额 / 归还一个名额”封装进 `ASemaphore_lock()` 返回的 `AAutoKey`；首次使用前需要先 `ASemaphore_setMax()` 设置上限，之后可以按需动态调整容量。
 
+### 5. 文件读取与写入
+
+`afile.h` 提供面向对象风格的文件读写包装：
+
+```c
+RAII(ARFile) in = aFileOpen("input.bin");
+RAII(AWFile) out = aFileCreate("output.bin");
+char buf[256];
+uint32_t n = in.f->read(&in, sizeof(buf), buf);
+out.f->write(&out, n, buf);
+```
+
+常用入口：
+
+- `aFileOpen(name)`：以读取模式打开文件，返回 `ARFile`。
+- `aFileCreate(name)`：以写入模式创建或截断文件，返回 `AWFile`。
+- `aFileAppend(name)`：以追加模式打开文件，返回 `APFile`。
+- `aMemoryOpen(mem, size)`：把一段已有内存包装成只读 `ARFile`。
+
 ## 需要特别注意的语义
 
 - `AString_new()` 和 `AText_new()` 都只是“包装已有 `char*`”，不会立刻拷贝；传入栈缓冲区或临时内存时，必须在其失效前复制到一个真正拥有内存的对象。
+- `aFileOpen()` / `aFileCreate()` / `aFileAppend()` 失败时会设置 `AEXC_file_noexist`；使用前应检查 `aExcOccur()`。
+- `aMemoryOpen()` 只借用传入内存，不复制；调用方必须保证 `mem` 在 `ARFile` 使用期间有效。
 - 顺序容器的 `at(index)` 在“容器非空但 index 越界”时，通常会截断到尾元素；只有空容器访问才会设置 `AEXC_overstep`。
 - `AHash(K,V)` 和 `ATree(K,V)` 的 `ins()` 是 upsert 语义：同键再次插入会替换已有值。
 - `a_signal_connection(id, addressee, call)` 对同一个 `(id, addressee)` 重复连接时，会覆盖原有回调，而不是忽略此次连接。

@@ -44,7 +44,9 @@ static inline uint64_t __AFile_size(AFile* self){
     }
     return (uint64_t)st.st_size;
 }
-#elif defined(__C_WINDOWS__)
+#endif /* posix */
+
+#if defined(__C_WINDOWS__)
 #include <windows.h>
 static inline uint64_t __AFile_size(AFile* self){
     HANDLE hFile = CreateFileA(self->name.s, GENERIC_READ,
@@ -58,7 +60,7 @@ static inline uint64_t __AFile_size(AFile* self){
     if (!ok) return 0;
     return (uint64_t)size.QuadPart;
 }
-#endif
+#endif /* windows */
 void __AFile_open(AFile* self, const char* mode){
     if(self == nullptr){
         aExcSet(AEXC_nullptr);
@@ -81,26 +83,26 @@ static inline uint64_t __AFile_getsize(AFile* self){
 
 
 
-ARFile aReadFile(const char* name){
+ARFile aFileOpen(const char* name){
     auto file = A_INIT(ARFile);
     __AFile_setname((AFile*)&file, name);
     __AFile_open((AFile*)&file, "r");
     return file;
 }
-AWFile aWriteFile(const char* name){
+AWFile aFileCreate(const char* name){
     auto file = A_INIT(AWFile);
     __AFile_setname((AFile*)&file, name);
     __AFile_open((AFile*)&file, "w");
     return file;
 }
-APFile aAppendFile(const char* name){
+APFile aFileAppend(const char* name){
     auto file = A_INIT(APFile);
     __AFile_setname((AFile*)&file, name);
     __AFile_open((AFile*)&file, "a");
     return file;
 }
 
-ARFile aReadFileMem(const void* mem, uint64_t size){
+ARFile aMemoryOpen(const void* mem, uint64_t size){
     const char* name = "(tmpfile)";
     auto file = A_INIT(ARFile);
     __AFile_setname((AFile*)&file, name);

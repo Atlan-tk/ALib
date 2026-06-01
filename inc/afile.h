@@ -106,11 +106,45 @@ A_CLASS_REGISTER(APFile);
 
 
 
-ARFile aReadFile(const char* name);
-AWFile aWriteFile(const char* name);
-APFile aAppendFile(const char* name);
+ARFile aFileOpen(const char* name);
+AWFile aFileCreate(const char* name);
+APFile aFileAppend(const char* name);
+ARFile aMemoryOpen(const void* mem, uint64_t size);
 
-ARFile aReadFileMem(const void* mem, uint64_t size);
+
+
+#if defined(__C_POSIX__)
+    #include <sys/ioctl.h>
+#endif /* posix */
+
+#if defined(__C_WINDOWS__)
+    #include <windows.h>
+#endif /* windows */
+
+AClass_Inherit(ADev);
+#if defined(__C_POSIX__)
+AClass_Struct(ADev,
+    AText   name;   //设备名
+    int32_t fd;     //设备描述符
+    bool    stat;   //设备状态
+);
+#endif /* posix */
+#if defined(__C_WINDOWS__)
+AClass_Struct(ADev,
+    AText       name;       //设备名
+    HANDLE      fd;         //设备句柄
+    bool        stat;       //设备状态
+    void*       buf;        //缓冲区
+    uint32_t    buf_size;   //缓冲区大小(字节)
+);
+#endif /* windows */
+AClass_Function(ADev,
+    int32_t (*ioctl)(ADev* self, int32_t cmd, void* buf);
+    uint32_t(*read) (ADev* self, uint32_t size, void* target);
+    uint32_t(*write)(ADev* self, uint32_t size, void* target);
+);
+AClass_Generate(ADev);
+A_CLASS_REGISTER(ADev);
 
 
 

@@ -101,19 +101,21 @@ extern "C" {
 #endif /* __noreturn */
 
 #ifndef __visibility
+    #if defined(__C_WINDOWS__)
+        #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
+            #define __visibility(mode) [[gnu::visibility(__A_Str(default))]]
+        #else
+            #define __visibility(mode) __attribute__((visibility(__A_Str(default))))
+        #endif
+    #endif /* windows */
+
     #if defined(__C_POSIX__)
         #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
             #define __visibility(mode) [[gnu::visibility(__A_Str(mode))]]
         #else
             #define __visibility(mode) __attribute__((visibility(__A_Str(mode))))
         #endif
-    #else
-        #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
-            #define __visibility(mode) [[gnu::visibility(__A_Str(default))]]
-        #else
-            #define __visibility(mode) __attribute__((visibility(__A_Str(default))))
-        #endif
-    #endif /* posix or windows */
+    #endif /* posix */
 #endif /* __visibility */
 
 #include <string.h>
@@ -154,6 +156,15 @@ extern "C" {
 
 
 /* alloc and free */
+#if defined(__C_WINDOWS__)
+extern void  (*const alib_free)(void* p);
+extern void* (*const alib_alloc)(uint32_t size);
+extern void* (*const alib_realloc)(void* p, uint32_t size);
+extern void* (*const alib_new)(uint32_t size, void(*init_func)(void*));
+extern void* (*const alib_cpnew)(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
+extern void  (*const alib_delete)(void* p, void(*dest_func)(void*));
+#endif /* windows */
+
 #if defined(__C_POSIX__)
 void  alib_free(void* p);
 void* alib_alloc(uint32_t size);
@@ -161,14 +172,7 @@ void* alib_realloc(void* p, uint32_t size);
 void* alib_new(uint32_t size, void(*init_func)(void*));
 void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
 void  alib_delete(void* p, void(*dest_func)(void*));
-#else
-extern void  (*const alib_free)(void* p);
-extern void* (*const alib_alloc)(uint32_t size);
-extern void* (*const alib_realloc)(void* p, uint32_t size);
-extern void* (*const alib_new)(uint32_t size, void(*init_func)(void*));
-extern void* (*const alib_cpnew)(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
-extern void  (*const alib_delete)(void* p, void(*dest_func)(void*));
-#endif /* posix or windows */
+#endif /* posix */
 
 
 
