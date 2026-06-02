@@ -187,6 +187,7 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
         return container_of(it.p,__Ahs_data(TK,TV),v)->k;                                       \
     }                                                                                           \
                                                                                                 \
+    uint32_t A_OBJ_HASH(TK)(const TK* self);                                                    \
     __weakref(A_OBJ_HASH(TK)) static uint32_t __A_OBJ_HASH(TK)(const TK* self);                 \
     __noused static inline void A_OBJ_INIT(AHash(TK,TV))(AHash(TK,TV)* self){                   \
         self->f = &A_FUNC_TAB(AHash(TK,TV));                                                    \

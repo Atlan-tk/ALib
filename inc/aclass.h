@@ -50,7 +50,6 @@ extern "C" {
     void A_OBJ_INIT(T)(T* self);                                                                            \
     void A_OBJ_COPY(T)(T* self, const T* that);                                                             \
     int  A_OBJ_CMPD(T)(const T* self, const T* that);                                                       \
-    uint32_t A_OBJ_HASH(T)(const T* self);                                                                  \
                                                                                                             \
     __weakref(A_SET_VTAB(T)) static void __A_SET_VTAB(T)(T* self);                                          \
     __weakref(A_OBJ_DEST(T)) static void __A_OBJ_DEST(T)(T* self);                                          \

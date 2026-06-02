@@ -113,6 +113,40 @@ ARFile aMemoryOpen(const void* mem, uint64_t size);
 
 
 
+/* 创建目录, 等同mkdir mkdir -p*/
+void a_mkdir(const char* name);
+void a_mkdir_p(const char* name);
+
+/* 删除文件或目录, 等同rm rm -r*/
+void a_remove(const char* name);
+void a_remove_r(const char* name);
+
+/* 移动文件或目录, 等同mv */
+void a_rename(const char* name);
+
+/* 创建空文件, 不打开 */
+void a_touch(const char* name);
+
+/* 修改当前用户下文件权限 */ /* p=0|1|2|4 */
+void a_chmod(const char* name, char p);
+void a_chmod_r(const char* name, char p);
+
+/* 目标是文件 */
+bool a_isfile(const char* name);
+/* 目标是目录 */
+bool a_isdir(const char* name);
+
+/* 提取目录 */
+/* 如果是目录则提取其上级目录 */
+/* 如果是根目录则返回根目录 */
+AText aDirExtract(const char* name);
+
+/* 获取绝对路径 */
+/* 若name为空则获取当前路径的绝对路径 */
+AText aDirAbsolute(const char* name);
+
+
+
 #if defined(__C_POSIX__)
 #include <fcntl.h>          // open
 #include <unistd.h>         // read, write, close
@@ -161,15 +195,9 @@ __noused static inline int  A_OBJ_CMPD(ADev)(const ADev* self, const ADev* that)
     return A_CMPD(AText, self->name, that->name);
 }
 
-
 A_CLASS_REGISTER(ADev);
 
-ADev aDevOpen(const char* name);    //阻塞模式打开
-ADev aDevOpen_nb(const char* name); //非阻塞模式打开
-
 #endif /* posix */
-
-
 
 #if defined(__C_WINDOWS__)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -232,10 +260,10 @@ __noused static inline int  A_OBJ_CMPD(ADev)(const ADev* self, const ADev* that)
 
 A_CLASS_REGISTER(ADev);
 
+#endif /* windows */
+
 ADev aDevOpen(const char* name);    //阻塞模式打开
 ADev aDevOpen_nb(const char* name); //非阻塞模式打开
-
-#endif /* windows */
 
 
 

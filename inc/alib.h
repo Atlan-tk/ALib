@@ -279,7 +279,6 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
     void A_OBJ_INIT(T)(T* self);                                                                            \
     void A_OBJ_COPY(T)(T* self, const T* that);                                                             \
     int  A_OBJ_CMPD(T)(const T* self, const T* that);                                                       \
-    uint32_t A_OBJ_HASH(T)(const T* self);                                                                  \
                                                                                                             \
     __weakref(A_OBJ_DEST(T)) static void __A_OBJ_DEST(T)(T* self);                                          \
     __weakref(A_OBJ_INIT(T)) static void __A_OBJ_INIT(T)(T* self);                                          \
@@ -459,7 +458,6 @@ __noused static inline uint32_t A_OBJ_HASH(void)(__noused const void* self){ ret
         if(self == nullptr){ return 1; } if(that == nullptr){ return -1; }                                  \
         return __A_OBJ_CMPD_AUTO(T,self,that);                                                              \
     }                                                                                                       \
-    uint32_t A_OBJ_HASH(T)(const T* self);                                                                  \
 
 
 
