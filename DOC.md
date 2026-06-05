@@ -241,7 +241,7 @@ A_TYPE_REGISTER(ATree(KeyType, ValueType));
 | `athrd.h` | C11 线程兼容层；线程、互斥锁、条件变量、TSS、`call_once` |
 | `alock.h` | 互斥锁、递归锁、读写锁、自动解锁 token |
 | `asignal.h` | 信号系统、接收者基类、异常收集器 |
-| `afile.h` | 文件读写器、追加器、内存读取器、设备对象雏形 |
+| `afile.h` | POSIX 文件工具函数，以及统一的 `AFile` 文件/设备读写对象 |
 
 ## 5. 完整模块与 API 参考
 
@@ -1401,134 +1401,80 @@ a_signal_transmit(signal, &collector);
 4. 回调里不要析构任何仍处于连接表中的接收者对象，否则会制造悬空指针。
 5. 回调里不要等待其他线程执行信号连接 / 断开操作，否则可能形成锁等待。
 
-### 5.19 `afile.h` — 文件读写器与设备对象
+### 5.19 `afile.h` — 文件工具与 `AFile`
 
-`afile.h` 提供基于 ALib 类系统的基础文件读写包装。文件对象持有 `FILE*`，析构时自动关闭；内存读取器只借用外部内存，不负责释放。
+`afile.h` 当前提供 POSIX 文件系统工具函数，以及基于文件描述符的 `AFile` 值对象。`AFile` 析构时自动关闭实例 fd，并通过内部 `AFileSystem` 管理同一路径的共享节点、进程内读写锁和 POSIX `fcntl` 文件锁。
 
-#### 5.19.1 类型
+#### 5.19.1 文件系统工具函数
 
-| 类型 | 父类 | 说明 |
-| --- | --- | --- |
-| `AFile` | `Atlan` | 文件基类，字段包括 `FILE* fp`、`AText name`、`uint64_t size` |
-| `ARFile` | `AFile` | 读取器；可从文件或一段外部内存读取 |
-| `AWFile` | `AFile` | 写入器；以写入模式创建 / 截断文件 |
-| `APFile` | `AFile` | 追加器；以追加模式打开文件 |
-| `ADev` | `Atlan` | 设备对象；POSIX 下保存 `int32_t fd`，Windows 下保存 `HANDLE fd` |
-| `ADevIoctl` | - | 仅 Windows 分支可见；用于向 `ADev_ioctl()` 传递 `DeviceIoControl` 的输入 / 输出缓冲 |
+| API | 说明 |
+| --- | --- |
+| `af_mkdir(name)` / `af_mkdir_p(name)` | 创建单级目录 / 递归创建目录 |
+| `af_rm(name)` / `af_rm_r(name)` | 删除文件或空目录 / 递归删除 |
+| `af_cp(name, target)` / `af_cp_r(name, target)` | 复制普通文件 / 递归复制目录 |
+| `af_mv(name, new_name)` | 移动或重命名 |
+| `af_touch(name)` | 创建空文件；已存在时保留内容 |
+| `af_chmod(name, p)` / `af_chmod_r(name, p)` | 修改当前用户权限位；`p` 使用 `4/2/1` 表示读/写/执行 |
+| `af_isfile(name)` / `af_isdir(name)` / `af_isdev(name)` | 判断目标类型 |
+| `af_dir_extract(name)` | 提取目录；目录本身直接返回；空值返回 `"."` |
+| `af_path_absolute(name)` | 返回绝对路径；空值使用当前目录 |
+| `af_ls(dir)` / `af_ls_a(dir)` / `af_ls_A(dir)` | 列目录；分别对应隐藏项过滤、包含所有项、排除 `.` 和 `..` |
+| `af_get_info(name)` | 返回 `AFileInfo`，包含设备、inode、权限、大小和时间信息 |
 
-#### 5.19.2 打开入口
+这些函数失败时设置 `AEXC_nullptr`、`AEXC_outdomain`、`AEXC_system_error` 或 `AEXC_invalid_function`。
 
-| API | 参数 | 返回值 | 异常 | 说明 |
-| --- | --- | --- | --- | --- |
-| `aFileOpen(const char* name)` | 文件名；`nullptr` 会转为 `"(null)"` | `ARFile` | `AEXC_file_noexist` | 以 `"r"` 模式打开已有文件 |
-| `aFileCreate(const char* name)` | 文件名；`nullptr` 会转为 `"(null)"` | `AWFile` | `AEXC_file_noexist` | 以 `"w"` 模式创建或截断文件 |
-| `aFileAppend(const char* name)` | 文件名；`nullptr` 会转为 `"(null)"` | `APFile` | `AEXC_file_noexist` | 以 `"a"` 模式打开文件并追加写入 |
-| `aMemoryOpen(const void* mem, uint64_t size)` | 外部内存地址和可读长度 | `ARFile` | 通常无 | 把一段已有内存包装成只读读取器 |
-| `aDevOpen(const char* name)` | 设备路径 | `ADev` | `AEXC_system_error` | 以阻塞模式打开设备 |
-| `aDevOpen_nb(const char* name)` | 设备路径 | `ADev` | `AEXC_system_error` | 以非阻塞模式打开设备；Windows 下使用 overlapped I/O |
+#### 5.19.2 `AFile` 类型
 
-注意：这些入口返回的是值对象，推荐配合 `RAII(ARFile)` / `RAII(AWFile)` / `RAII(APFile)` 使用，避免忘记析构关闭文件。
+| 类型 | 说明 |
+| --- | --- |
+| `AFileNode` | 内部共享节点，保存绝对路径、进程内读写锁、文件锁、模式、引用数和主 fd |
+| `AFile` | 对外文件对象，保存实例 fd、路径和共享节点引用 |
 
-#### 5.19.3 `ARFile`
+`AFile` 方法：
 
-公共方法：
+| API | 说明 |
+| --- | --- |
+| `AFile_read(self, size, target)` | 从当前位置读取，返回字节数；失败返回 `0` 并设置异常 |
+| `AFile_write(self, size, source)` | 从当前位置写入 |
+| `AFile_read_pos(self, offset, size, target)` | 使用 `pread` 按位置读取，不改变当前偏移 |
+| `AFile_write_pos(self, offset, size, source)` | 使用 `pwrite` 按位置写入 |
+| `AFile_ioctl(self, cmd, buf)` | 仅 `rw` 模式允许，封装 POSIX `ioctl` |
+| `AFile_close(self)` | 幂等关闭；`RAII(AFile)` 会自动调用 |
+| `AFile_open(mod, noblock, exclusive, name)` | 低层打开入口，`name` 使用 `AText` 绝对路径，返回 `AFile` |
+| `AFile_open_copy(name)` | 复制同一路径现有打开节点，返回新的 `AFile` 实例 fd |
 
-| API | 参数 | 返回值 | 异常 | 说明 |
-| --- | --- | --- | --- | --- |
-| `ARFile_size(ARFile* self)` | 读取器 | 剩余未读大小 | `AEXC_nullptr` | 返回 `文件大小 - offset`；内存读取器返回 `size - offset` |
-| `ARFile_read(ARFile* self, uint32_t size, void* target)` | 读取器、期望大小、目标缓冲区 | 实际读取结果 | `AEXC_nullptr`、`AEXC_file_noexist` | `size == 0` 或 `target == nullptr` 时返回 0 |
-| `A_CALL(obj, ARFile).size(...)` / `read(...)` | 方法表调用 | 同上 | 同上 | 也可直接使用 `obj.f->read(&obj, ...)` |
+#### 5.19.3 打开入口
 
-内存读取器语义：
+| API | 说明 |
+| --- | --- |
+| `aFileInOpen(name)` | 只读打开已有文件；不存在时失败，不创建文件 |
+| `aFileOutOpen(name)` | 写入打开普通文件，创建并截断；始终保持独占文件锁直到关闭 |
+| `aFileEnOpen(name)` | 追加打开普通文件，创建但不截断 |
+| `aDevInOpen(name, noblock)` | 只读打开设备或路径；设备可启用 `O_NONBLOCK` |
+| `aDevOutOpen(name, exclusive)` | 写入打开设备或路径 |
+| `aDevInOutOpen(name, noblock, exclusive)` | 读写打开设备或路径；可用于 `ioctl` 和位置读写 |
 
-- `aMemoryOpen(mem, size)` 不复制 `mem`，调用方必须保证其生命周期覆盖读取器使用期。
-- 读取会推进 `offset`，最多读取剩余大小。
-- 从外部内存读取时不依赖 `FILE*`，析构时也不会释放 `mem`。
+同一路径在进程内按模式互斥：已用一种模式打开后，再用另一种模式打开会失败并设置异常。推荐把返回值写成 `RAII(AFile)`，并在使用前检查 `aExcOccur()`。
 
-#### 5.19.4 `AWFile`
+打开模式：
 
-公共方法：
+| 模式 | 行为 |
+| --- | --- |
+| `__afmod_r` | `O_RDONLY`；读操作持有共享文件锁 |
+| `__afmod_w` | `O_WRONLY`；普通文件会 `O_CREAT | O_TRUNC`，并以独占写锁方式打开 |
+| `__afmod_rw` | `O_RDWR`；允许 `read/write/pread/pwrite/ioctl` |
+| `__afmod_aw` | `O_WRONLY | O_APPEND`；创建但不截断，写入追加 |
 
-| API | 参数 | 返回值 | 异常 | 说明 |
-| --- | --- | --- | --- | --- |
-| `AWFile_size(AWFile* self)` | 写入器 | 当前对象累计写入量 | `AEXC_nullptr` | 返回 `addsize` |
-| `AWFile_write(AWFile* self, uint32_t size, void* target)` | 写入器、写入大小、源缓冲区 | 实际写入结果 | `AEXC_nullptr`、`AEXC_file_noexist` | `size == 0` 或 `target == nullptr` 时返回 0 |
-| `A_CALL(obj, AWFile).size(...)` / `write(...)` | 方法表调用 | 同上 | 同上 | 也可直接使用 `obj.f->write(&obj, ...)` |
-
-`aFileCreate(name)` 使用 `"w"` 模式；如果目标文件已存在，会先截断。
-
-#### 5.19.5 `APFile`
-
-公共方法：
-
-| API | 参数 | 返回值 | 异常 | 说明 |
-| --- | --- | --- | --- | --- |
-| `APFile_size(APFile* self)` | 追加器 | 打开时文件大小 + 当前累计追加量 | `AEXC_nullptr` | 返回 `AFile.size + addsize` |
-| `APFile_append(APFile* self, uint32_t size, void* target)` | 追加器、写入大小、源缓冲区 | 实际写入结果 | `AEXC_nullptr`、`AEXC_file_noexist` | `size == 0` 或 `target == nullptr` 时返回 0 |
-| `A_CALL(obj, APFile).size(...)` / `append(...)` | 方法表调用 | 同上 | 同上 | 也可直接使用 `obj.f->append(&obj, ...)` |
-
-`aFileAppend(name)` 使用 `"a"` 模式；写入总是追加到文件末尾。
-
-#### 5.19.6 `ADev`
-
-公共方法：
-
-| API | 参数 | 返回值 | 异常 | 说明 |
-| --- | --- | --- | --- | --- |
-| `ADev_ioctl(ADev* self, int32_t cmd, void* buf)` | 设备对象、控制码、平台相关参数 | POSIX 下返回 `ioctl()` 结果；Windows 下返回输出字节数 | `AEXC_nullptr`、`AEXC_system_error` | POSIX 直接把 `buf` 传给 `ioctl()`；Windows 把 `buf` 解释为 `ADevIoctl*` |
-| `ADev_read(ADev* self, uint32_t size, void* source)` | 设备对象、读取大小、目标缓冲区 | 实际读取字节数 | `AEXC_nullptr`、`AEXC_system_error` | POSIX 使用 `read()`；Windows 使用 `ReadFile()` |
-| `ADev_write(ADev* self, uint32_t size, void* target)` | 设备对象、写入大小、源缓冲区 | 实际写入字节数 | `AEXC_nullptr`、`AEXC_system_error` | POSIX 使用 `write()`；Windows 使用 `WriteFile()` |
-| `A_CALL(obj, ADev).ioctl(...)` / `read(...)` / `write(...)` | 方法表调用 | 同上 | 同上 | 也可直接使用 `obj.f->read(&obj, ...)` |
-
-平台差异：
-
-- POSIX：`aDevOpen()` 使用 `open(name, O_RDWR)`，`aDevOpen_nb()` 使用 `open(name, O_RDWR | O_NONBLOCK)`，析构时自动 `close(fd)`。
-- Windows：`aDevOpen()` 使用 `CreateFileA()` 打开 `GENERIC_READ | GENERIC_WRITE` 句柄，析构时自动 `CloseHandle(fd)`。
-- Windows 非阻塞：`aDevOpen_nb()` 会带上 `FILE_FLAG_OVERLAPPED`；如果异步操作尚未完成，当前实现会取消本次 I/O 并返回 `0`，不会等待完成。
-- `size == 0` 的读写直接返回 `0`；Windows 下读写缓冲区为 `nullptr` 会设置 `AEXC_system_error`。
-- 打开失败、句柄无效或系统调用失败时会设置 `AEXC_system_error`；使用设备对象前应检查 `aExcOccur()`。
-
-Windows `ADevIoctl`：
-
-```c
-typedef struct{
-    void*    in;       // 输入缓冲区，可为 nullptr
-    uint32_t in_size;  // 输入缓冲区大小
-    void*    out;      // 输出缓冲区，可为 nullptr
-    uint32_t out_size; // 输出缓冲区大小
-    uint32_t bytes;    // 实际返回字节数，由 ADev_ioctl 写入
-}ADevIoctl;
-```
-
-Windows 调用示例：
-
-```c
-RAII(ADev) dev = aDevOpen("\\\\.\\ExampleDevice");
-if (aExcOccur()) return 1;
-
-char out[256];
-ADevIoctl ctl = {
-    .in = nullptr,
-    .in_size = 0,
-    .out = out,
-    .out_size = sizeof(out),
-};
-
-int32_t n = dev.f->ioctl(&dev, MY_IOCTL_CODE, &ctl);
-if (aExcOccur()) return 1;
-/* n == ctl.bytes */
-```
-
-#### 5.19.7 使用示例
+#### 5.19.4 使用示例
 
 ```c
 #include <alib/afile.h>
 
 int main(void) {
-    RAII(ARFile) in = aFileOpen("input.bin");
+    RAII(AFile) in = aFileInOpen("input.bin");
     if (aExcOccur()) return 1;
 
-    RAII(AWFile) out = aFileCreate("output.bin");
+    RAII(AFile) out = aFileOutOpen("output.bin");
     if (aExcOccur()) return 1;
 
     char buf[256];
@@ -1538,18 +1484,14 @@ int main(void) {
 }
 ```
 
-#### 5.19.8 命名变更
+#### 5.19.5 使用约束
 
-当前文件 API 使用新命名：
-
-| 新 API | 旧 API |
-| --- | --- |
-| `aFileOpen` | `aReadFile` |
-| `aFileCreate` | `aWriteFile` |
-| `aFileAppend` | `aAppendFile` |
-| `aMemoryOpen` | `aReadFileMem` |
-
-如果外部项目还在使用旧名称，需要同步迁移或自行加兼容包装。
+- 同一个 `AFile*` 不应和 `AFile_close()` 并发使用；需要并发时应复制/重新打开独立对象。
+- `AFile` 当前只在 POSIX 分支定义；Windows 旧设备对象接口已不再是本节描述的 API。
+- 独占打开会延迟关闭相关 fd，以维持 POSIX 进程级文件锁语义。跨进程文件锁使用 `F_SETLKW`，遇到其他进程持锁时可能阻塞等待；进程内同路径模式冲突会直接失败。
+- `aFileOutOpen()` 会截断普通文件；追加写请使用 `aFileEnOpen()`。
+- `aFileInOpen()` 不创建不存在的文件。
+- 路径 key 来自 `af_path_absolute()`；已存在路径优先使用 `realpath()`，不存在路径会基于当前目录拼接。
 
 ## 6. 示例与测试入口
 

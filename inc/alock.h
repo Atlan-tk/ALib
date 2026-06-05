@@ -249,6 +249,22 @@ AAutoKey ASemaphore_lock(ASemaphore* self);
 
 
 
+void AMtx_uplock(AMtx* self);
+void ARecursion_uplock(ARecursion* self);
+void AMtxRW_uplock_read(AMtxRW* self);
+void AMtxRW_uplock_write(AMtxRW* self);
+void AMtxCnd_uplock(AMtxCnd* self);
+void ASemaphore_uplock(ASemaphore* self);
+
+void AMtx_unlock(AMtx* self);
+void ARecursion_unlock(ARecursion* self);
+void AMtxRW_unlock_read(AMtxRW* self);
+void AMtxRW_unlock_write(AMtxRW* self);
+void AMtxCnd_unlock(AMtxCnd* self);
+void ASemaphore_unlock(ASemaphore* self);
+
+
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

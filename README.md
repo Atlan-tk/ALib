@@ -55,7 +55,7 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib�
 - `asignal.h`：进程内信号连接/派发系统
 - `athrd.h`：兼容 C11 `<threads.h>` 的线程原语入口；优先复用系统实现，缺失时回退到 POSIX/Win32
 - `alock.h`：基于 `athrd.h` 的互斥锁、递归锁、读写锁、条件变量锁、信号量及自动解锁辅助对象
-- `afile.h`：文件读写器、追加器、内存读取器，以及设备对象雏形
+- `afile.h`：POSIX 文件工具函数，以及统一的 `AFile` 文件/设备读写对象
 
 其中 `athrd.h` 适合直接做线程创建、条件变量等待和线程局部存储；如果只是想在 ALib 风格代码里管理临界区、等待条件或限制并发配额，通常直接使用 `alock.h` 的 `AAutoKey`、`AMtxCnd`、`ASemaphore` 更顺手。
 
@@ -234,13 +234,13 @@ A_TYPE_REGISTER(ATree(int, AString));
 - `AMtxCnd` 把互斥锁和条件变量绑在一起：先 `AMtxCnd_lock()`，在谓词不满足时循环 `AMtxCnd_wait()`，状态更新后再 `AMtxCnd_awake()` 或 `AMtxCnd_awake_all()`。
 - `ASemaphore` 把“占用一个名额 / 归还一个名额”封装进 `ASemaphore_lock()` 返回的 `AAutoKey`；首次使用前需要先 `ASemaphore_setMax()` 设置上限，之后可以按需动态调整容量。
 
-### 5. 文件读取与写入
+### 5. 文件与设备读写
 
-`afile.h` 提供面向对象风格的文件读写包装：
+`afile.h` 提供 POSIX 文件工具函数和统一的 `AFile` 读写对象。`AFile` 基于文件描述符工作，析构时自动关闭当前对象持有的 fd；同一路径还会挂到进程内共享节点，用于模式互斥、进程内读写锁和 POSIX 文件锁管理。
 
 ```c
-RAII(ARFile) in = aFileOpen("input.bin");
-RAII(AWFile) out = aFileCreate("output.bin");
+RAII(AFile) in = aFileInOpen("input.bin");
+RAII(AFile) out = aFileOutOpen("output.bin");
 char buf[256];
 uint32_t n = in.f->read(&in, sizeof(buf), buf);
 out.f->write(&out, n, buf);
@@ -248,20 +248,19 @@ out.f->write(&out, n, buf);
 
 常用入口：
 
-- `aFileOpen(name)`：以读取模式打开文件，返回 `ARFile`。
-- `aFileCreate(name)`：以写入模式创建或截断文件，返回 `AWFile`。
-- `aFileAppend(name)`：以追加模式打开文件，返回 `APFile`。
-- `aMemoryOpen(mem, size)`：把一段已有内存包装成只读 `ARFile`。
-- `aDevOpen(name)` / `aDevOpen_nb(name)`：以阻塞 / 非阻塞模式打开设备，返回 `ADev`；POSIX 下包装 `open/read/write/ioctl`，Windows 下包装 `CreateFileA/ReadFile/WriteFile/DeviceIoControl`。
-
-Windows 下 `ADev_ioctl()` 的第三个参数应传 `ADevIoctl*`，用于提供 `DeviceIoControl` 的输入缓冲、输出缓冲和返回字节数；POSIX 下则保持传统 `ioctl(fd, cmd, buf)` 语义。
+- `aFileInOpen(name)`：以只读模式打开已有文件。
+- `aFileOutOpen(name)`：以写入模式创建或截断普通文件，并保持独占文件锁直到关闭。
+- `aFileEnOpen(name)`：以追加模式创建或打开文件，不截断旧内容。
+- `aDevInOpen(name, noblock)` / `aDevOutOpen(name, exclusive)` / `aDevInOutOpen(name, noblock, exclusive)`：按设备或读写需求打开 `AFile`；设备写打开可显式选择是否独占。
+- `AFile_read/write/read_pos/write_pos/ioctl`：封装 `read/write/pread/pwrite/ioctl`，失败时设置异常并返回 `0`。
+- `af_mkdir(_p)`、`af_rm(_r)`、`af_cp(_r)`、`af_mv`、`af_touch`、`af_chmod(_r)`、`af_ls/a/A`、`af_get_info`：基础文件系统工具函数。
 
 ## 需要特别注意的语义
 
 - `AString_new()` 和 `AText_new()` 都只是“包装已有 `char*`”，不会立刻拷贝；传入栈缓冲区或临时内存时，必须在其失效前复制到一个真正拥有内存的对象。
-- `aFileOpen()` / `aFileCreate()` / `aFileAppend()` 失败时会设置 `AEXC_file_noexist`；使用前应检查 `aExcOccur()`。
-- `aMemoryOpen()` 只借用传入内存，不复制；调用方必须保证 `mem` 在 `ARFile` 使用期间有效。
-- `aDevOpen()` / `aDevOpen_nb()` 失败时会设置 `AEXC_system_error`；Windows 非阻塞模式使用 overlapped I/O，当前实现遇到未完成的异步操作会返回 `0`。
+- `AFile` 是 POSIX-only 值对象，推荐配合 `RAII(AFile)` 使用；同一个 `AFile*` 不应和 `AFile_close()` 并发使用。
+- 同一路径在进程内按打开模式互斥；例如已只读打开时，再以写入模式打开会失败并设置异常。跨进程文件锁使用 POSIX `fcntl`，遇到其他进程持锁时可能阻塞等待。
+- `aFileInOpen()` 不创建不存在的文件；`aFileOutOpen()` 会截断普通文件；`aFileEnOpen()` 只追加。
 - 顺序容器的 `at(index)` 在“容器非空但 index 越界”时，通常会截断到尾元素；只有空容器访问才会设置 `AEXC_overstep`。
 - `AHash(K,V)` 和 `ATree(K,V)` 的 `ins()` 是 upsert 语义：同键再次插入会替换已有值。
 - `a_signal_connection(id, addressee, call)` 对同一个 `(id, addressee)` 重复连接时，会覆盖原有回调，而不是忽略此次连接。

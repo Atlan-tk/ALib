@@ -6,14 +6,14 @@
 #include <alock.h>
 
 /* 解锁 */
-static inline void AMtx_unlock(AMtx* self){
+void AMtx_unlock(AMtx* self){
     if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }
     if(mtx_unlock(&((ALock*)self)->mtx) != thrd_success) {
         aExcSet(AEXC_system_error);
     }
 }
 /* 加锁 */
-static inline void AMtx_uplock(AMtx* self){
+void AMtx_uplock(AMtx* self){
     if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }
     if(mtx_lock(&((ALock*)self)->mtx) != thrd_success) {
         aExcSet(AEXC_system_error);
@@ -31,14 +31,14 @@ AAutoKey AMtx_lock(AMtx* self){
 
 
 /* 解锁 */
-static inline void ARecursion_unlock(ARecursion* self){
+void ARecursion_unlock(ARecursion* self){
     if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }
     if(mtx_unlock(&((ALock*)self)->mtx) != thrd_success) {
         aExcSet(AEXC_system_error);
     }
 }
 /* 加锁 */
-static inline void ARecursion_uplock(ARecursion* self){
+void ARecursion_uplock(ARecursion* self){
     if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }
     if(mtx_lock(&((ALock*)self)->mtx) != thrd_success) {
         aExcSet(AEXC_system_error);
@@ -56,7 +56,7 @@ AAutoKey ARecursion_lock(ARecursion* self){
 
 
 /* read解锁 */
-static inline void AMtxRW_unlock_read(AMtxRW* self){
+void AMtxRW_unlock_read(AMtxRW* self){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -88,7 +88,7 @@ static inline void AMtxRW_unlock_read(AMtxRW* self){
     }
 }
 /* read加锁 */
-static inline void AMtxRW_uplock_read(AMtxRW* self){
+void AMtxRW_uplock_read(AMtxRW* self){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -124,7 +124,7 @@ AAutoKey AMtxRW_rlock(AMtxRW* self){
 }
 
 /* write解锁 */
-static inline void AMtxRW_unlock_write(AMtxRW* self){
+void AMtxRW_unlock_write(AMtxRW* self){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -162,7 +162,7 @@ static inline void AMtxRW_unlock_write(AMtxRW* self){
     }
 }
 /* write加锁 */
-static inline void AMtxRW_uplock_write(AMtxRW* self){
+void AMtxRW_uplock_write(AMtxRW* self){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -202,14 +202,14 @@ AAutoKey AMtxRW_wlock(AMtxRW* self){
 
 
 /* 解锁 */
-static inline void AMtxCnd_unlock(AMtxCnd* self){
+void AMtxCnd_unlock(AMtxCnd* self){
     if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }
     if(mtx_unlock(&((ALock*)self)->mtx) != thrd_success) {
         aExcSet(AEXC_system_error);
     }
 }
 /* 加锁 */
-static inline void AMtxCnd_uplock(AMtxCnd* self){
+void AMtxCnd_uplock(AMtxCnd* self){
     if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }
     if(mtx_lock(&((ALock*)self)->mtx) != thrd_success) {
         aExcSet(AEXC_system_error);
@@ -254,7 +254,7 @@ void ASemaphore_setMax(ASemaphore* self, uint32_t max){
 }
 
 /* 解锁 */
-static inline void ASemaphore_unlock(ASemaphore* self){
+void ASemaphore_unlock(ASemaphore* self){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
@@ -286,7 +286,7 @@ static inline void ASemaphore_unlock(ASemaphore* self){
     }
 }
 /* 加锁 */
-static inline void ASemaphore_uplock(ASemaphore* self){
+void ASemaphore_uplock(ASemaphore* self){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;

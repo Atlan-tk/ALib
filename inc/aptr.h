@@ -16,6 +16,8 @@ extern "C" {
 
 #define APtr(T) __A_Splice(__A_Generic_Ptr_$__, T)
 
+#define __Apf(T, name) __A_Splice(__A_Splice(__A_Splice(__A_Generic_ptr_$__, T), __func_$__), name)
+
 #define APtr_Define(T)                                                                  \
     typedef struct APtr(T) APtr(T);                                                     \
     struct APtr(T){                                                                     \
@@ -32,7 +34,7 @@ extern "C" {
         }                                                                               \
     }                                                                                   \
     __noused static inline void A_OBJ_INIT(APtr(T))(APtr(T)* self){                     \
-        self->p = A_NEW(T); if(self->p != nullptr) self->strong_flag = true;            \
+        self->p = nullptr, self->strong_flag = false;                                   \
         self->dest = (__A_IS_CLASS(T) != 0) ?                                           \
             (void*)a_class_dest : (void*)__A_OBJ_DEST_FUNC_SELF(T);                     \
     }                                                                                   \
@@ -47,28 +49,28 @@ extern "C" {
         if(that->p == nullptr) return 1;                                                \
         return A_CMPD(T, *self->p, *that->p);                                           \
     }                                                                                   \
+    __noused static inline APtr(T) __Apf(T,newobj)(void){                               \
+        APtr(T) ptr; A_OBJ_INIT(APtr(T))(&ptr);                                         \
+        ptr.p = A_NEW(T); if(ptr.p != nullptr) ptr.strong_flag = true;                  \
+        return ptr;                                                                     \
+    }                                                                                   \
+    __noused static inline APtr(T) __Apf(T,cpnewobj)(T thatobj){                        \
+        APtr(T) ptr; A_OBJ_INIT(APtr(T))(&ptr);                                         \
+        ptr.p = A_CPNEW(T, thatobj); if(ptr.p != nullptr) ptr.strong_flag = true;       \
+        return ptr;                                                                     \
+    }                                                                                   \
 
-#define APtrNew(T) A_INIT(APtr(T))                                                      \
 
-#define APtrCPNew(T, obj) ({                                                            \
-    auto __a_aptr_obj = (obj); __a_type_assert(T, __a_aptr_obj);                        \
-    (APtr(T)){ .p = A_CPNEW(T, __a_aptr_obj), .strong_flag = true,                      \
-        .dest = (__A_IS_CLASS(T) != 0) ?                                                \
-            (void*)a_class_dest : (void*)__A_OBJ_DEST_FUNC_SELF(T)                      \
-    };                                                                                  \
-})                                                                                      \
+#define APtrNew(T) __Apf(T, newobj)()
 
-#define APtrCvs(T, ap)({                                                                \
-    auto __a_aptr = &(ap); APtr(T) __a_aptr_new;                                        \
-    memcpy(&__a_aptr_new, (const void*)__a_aptr, sizeof(APtr(T)));                      \
-    memset(__a_aptr, 0, sizeof(APtr(T)));                                               \
-    __a_aptr_new;                                                                       \
-})                                                                                      \
+#define APtrCPNew(T, obj) __Apf(T, cpnewobj)((obj))
+
+#define APtrCvs(T, ap) A_MOVE(*(APtr(T)*)&(ap))
 
 
 
 /* 初始化计数为1 */
-static inline void __a_ref_count_init(atomic_uint* ref_count){
+__noused static inline void __a_ref_count_init(atomic_uint* ref_count){
     atomic_store_explicit(ref_count, 1, memory_order_relaxed);
 }
 __noused static inline bool __a_ref_count_valid(atomic_uint* ref_count){
@@ -96,6 +98,8 @@ static inline bool __a_ref_count_sub(atomic_uint* ref_count){
 
 #define AShPtr(T) __A_Splice(__A_Generic_ShPtr_$__, T)
 
+#define __Aspf(T, name) __A_Splice(__A_Splice(__A_Splice(__A_Generic_shptr_$__, T), __func_$__), name)
+
 #define __AShPtr_cpnew(T) __A_Splice(__A_Splice(AShPtr(T), __func_$__), cpnew)
 
 #define AShPtr_Define(T)                                                                \
@@ -116,20 +120,13 @@ static inline bool __a_ref_count_sub(atomic_uint* ref_count){
         }                                                                               \
     }                                                                                   \
     __noused static inline void A_OBJ_INIT(AShPtr(T))(AShPtr(T)* self){                 \
-        self->ref_count = alib_alloc(sizeof(atomic_uint));                              \
-        if(__a_unlikely(self->ref_count == nullptr)){                                   \
-            aExcSet(AEXC_alloc_failed); return;                                         \
-        }                                                                               \
-        self->p = A_NEW(T); if(__a_unlikely(self->p == nullptr)){                       \
-            alib_free(self->ref_count);                                                 \
-            memset(self, 0, sizeof(AShPtr(T))); return;                                 \
-        }                                                                               \
-        atomic_store_explicit(self->ref_count, 1, memory_order_relaxed);                \
+        self->p = nullptr, self->ref_count = nullptr;                                   \
         self->dest = (__A_IS_CLASS(T) != 0) ?                                           \
             (void*)a_class_dest : (void*)__A_OBJ_DEST_FUNC_SELF(T);                     \
     }                                                                                   \
     __noused static inline void A_OBJ_COPY(AShPtr(T))                                   \
     (AShPtr(T)* self, const AShPtr(T)* that){                                           \
+        self->dest = that->dest;                                                        \
         if(__a_likely(that->p != nullptr)){                                             \
             if(__a_likely(__a_ref_count_add(that->ref_count))){                         \
                 *self = *that;                                                          \
@@ -145,35 +142,38 @@ static inline bool __a_ref_count_sub(atomic_uint* ref_count){
         if(that->p == nullptr) return 1;                                                \
         return A_CMPD(T, *self->p, *that->p);                                           \
     }                                                                                   \
-    __noused static inline AShPtr(T) __AShPtr_cpnew(T)(T* obj){                         \
-        AShPtr(T) sh = {};                                                              \
-        sh.ref_count = alib_alloc(sizeof(atomic_uint));                                 \
-        if(__a_unlikely(sh.ref_count == nullptr)){                                      \
-            aExcSet(AEXC_alloc_failed); return sh;                                      \
+    __noused static inline AShPtr(T) __Aspf(T, newobj)(void){                           \
+        AShPtr(T) ptr; A_OBJ_INIT(AShPtr(T))(&ptr);                                     \
+        ptr.ref_count = alib_alloc(sizeof(atomic_uint));                                \
+        if(__a_unlikely(ptr.ref_count == nullptr)){                                     \
+            aExcSet(AEXC_alloc_failed); return ptr;                                     \
         }                                                                               \
-        sh.p = A_CPNEW(T, *obj); if(__a_unlikely(sh.p == nullptr)){                     \
-            alib_free(sh.ref_count);                                                    \
-            memset(&sh, 0, sizeof(AShPtr(T))); return sh;                               \
+        ptr.p = A_NEW(T); if(__a_unlikely(ptr.p == nullptr)){                           \
+            alib_free(ptr.ref_count);                                                   \
+            memset(&ptr, 0, sizeof(AShPtr(T))); return ptr;                             \
         }                                                                               \
-        atomic_store_explicit(sh.ref_count, 1, memory_order_relaxed);                   \
-        sh.dest = (__A_IS_CLASS(T) != 0) ?                                              \
-            (void*)a_class_dest : (void*)__A_OBJ_DEST_FUNC_SELF(T);                     \
-        return sh;                                                                      \
+        __a_ref_count_init(ptr.ref_count);                                              \
+        return ptr;                                                                     \
+    }                                                                                   \
+    __noused static inline AShPtr(T) __Aspf(T, cpnewobj)(T obj){                        \
+        AShPtr(T) ptr; A_OBJ_INIT(AShPtr(T))(&ptr);                                     \
+        ptr.ref_count = alib_alloc(sizeof(atomic_uint));                                \
+        if(__a_unlikely(ptr.ref_count == nullptr)){                                     \
+            aExcSet(AEXC_alloc_failed); return ptr;                                     \
+        }                                                                               \
+        ptr.p = A_CPNEW(T, obj); if(__a_unlikely(ptr.p == nullptr)){                    \
+            alib_free(ptr.ref_count);                                                   \
+            memset(&ptr, 0, sizeof(AShPtr(T))); return ptr;                             \
+        }                                                                               \
+        __a_ref_count_init(ptr.ref_count);                                              \
+        return ptr;                                                                     \
     }                                                                                   \
 
-#define AShPtrNew(T) A_INIT(AShPtr(T))                                                  \
+#define AShPtrNew(T) __Aspf(T, newobj)()
 
-#define AShPtrCPNew(T, obj) ({                                                          \
-    auto __a_ashptr_obj = (obj); __a_type_assert(T, __a_ashptr_obj);                    \
-    __AShPtr_cpnew(T)(&__a_ashptr_obj);                                                 \
-})                                                                                      \
+#define AShPtrCPNew(T, obj) __Aspf(T, cpnewobj)((obj))
 
-#define AShPtrCvs(T, sh)({                                                              \
-    auto __a_ashptr = &(sh); AShPtr(T) __a_ashptr_new;                                  \
-    memcpy(&__a_ashptr_new, (const void*)__a_ashptr, sizeof(AShPtr(T)));                \
-    memset(__a_ashptr, 0, sizeof(AShPtr(T)));                                           \
-    __a_ashptr_new;                                                                     \
-})                                                                                      \
+#define AShPtrCvs(T, ap) A_MOVE(*(AShPtr(T)*)&(ap))
 
 
 #ifdef __cplusplus

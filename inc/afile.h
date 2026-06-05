@@ -11,259 +11,269 @@ extern "C" {
 #endif /* __cplusplus */
 
 #include "alib.h"
+#include "aptr.h"
+#include "aline.h"
+#include "alock.h"
 #include "atext.h"
 #include "aclass.h"
 #include <stdio.h>
+#include <stdatomic.h>
+
+/* 创建目录 */
+void af_mkdir(const char* name);
+void af_mkdir_p(const char* name);
+
+/* 删除文件或目录 */
+void af_rm(const char* name);
+void af_rm_r(const char* name);
+
+/* 复制文件或目录 */
+void af_cp(const char* name, const char* target);
+void af_cp_r(const char* name, const char* target);
+
+/* 移动文件或目录 */
+void af_mv(const char* name, const char* new_name);
+
+/* 创建空文件 */
+void af_touch(const char* name);
+
+/* 修改当前用户文件权限 */ /* p=0|1|2|4 */
+void af_chmod(const char* name, char p);
+void af_chmod_r(const char* name, char p);
+
+/* 目标是文件 */
+bool af_isfile(const char* name);
+/* 目标是目录 */
+bool af_isdir(const char* name);
+/* 目标是设备 */
+bool af_isdev(const char* name);
+
+/* 提取目录 */
+/* 若为目录则直接返回 */
+/* 若为空则返回当前目录"." */
+AText af_dir_extract(const char* name);
+
+/* 获取绝对路径 */
+/* 若为空则返回当前目录的绝对路径 */
+AText af_path_absolute(const char* name);
+
+/* ls */
+ALine_Define(AText);
+ALine_Generate(AText);
+A_TYPE_REGISTER(ALine(AText));
+ALine(AText) af_ls(const char* dir);
+ALine(AText) af_ls_a(const char* dir);
+ALine(AText) af_ls_A(const char* dir);
+
+/* file info */
+typedef int64_t stat_time_t;
+typedef struct{
+    uint64_t    st_dev;     /* 设备 ID  */
+    uint64_t    st_ino;     /* 文件索引 */
+    uint32_t    st_mode;    /* 文件类型 + 权限位 */
+    uint32_t    st_nlink;   /* 硬链接数 */
+    uint32_t    st_uid;     /* 所有者用户 ID */
+    uint32_t    st_gid;     /* 所有者组 ID */
+    uint64_t    st_rdev;    /* 设备 ID */
+    uint64_t    st_size;    /* 文件大小（字节） */
+    stat_time_t st_atime;   /* 最后访问时间 */
+    stat_time_t st_mtime;   /* 最后修改时间 */
+    stat_time_t st_ctime;   /* 最后状态更改时间（近似为写入时间） */
+}AFileInfo;
+A_TYPE_REGISTER(AFileInfo);
+AFileInfo af_get_info(const char* name);
+
+
+
+#if defined(__C_POSIX__)
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/ioctl.h>      // ioctl
+
+ALine_Define(int);
+ALine_Generate(int);
+A_TYPE_REGISTER(ALine(int));
+
+typedef struct{
+    AText           name;       //绝对路径
+    struct flock    fl;         //文件锁
+    AMtx            fl_lock;    //文件锁保护锁
+    AMtxRW          lock;       //进程内读写锁
+    int             fd;         //文件描述符
+    int32_t         mod;        //0只读, 1只写, 2读写, 3追加
+    uint32_t        num;        //连接数量
+    uint64_t        size;       //文件体积
+    pid_t           pid;        //pid
+    bool            fl_stat;    //读写者数量
+    bool            noblock;    //是否非阻塞
+    bool            exclusive;  //是否独占
+    uint32_t        rnum;       //读者数
+    ALine(int)      fd_list;    //废弃的fd, 析构时统一释放
+}AFileNode;
+enum{
+    __afmod_r = 0,
+    __afmod_w = 1,
+    __afmod_rw = 2,
+    __afmod_aw = 3,
+};
+__noused static inline void A_OBJ_INIT(AFileNode)(AFileNode* self){
+    memset(self, 0, sizeof(AFileNode));
+
+    self->fl = (struct flock){
+        .l_type   = F_UNLCK,
+        .l_whence = SEEK_SET,
+        .l_start  = 0,
+        .l_len    = 0,          // 整个文件
+        .l_pid    = 0,          // 不用设置
+    };
+    self->fd = -1;
+    self->pid = getpid();
+    self->name = A_INIT(AText);
+    self->lock = A_INIT(AMtxRW);
+    self->fl_lock = A_INIT(AMtx);
+    self->fd_list = A_INIT(ALine(int));
+}
+__noused static inline void A_OBJ_DEST(AFileNode)(AFileNode* self){
+    if(self->fl_stat){
+        self->fl.l_type = F_UNLCK;
+        fcntl(self->fd, F_SETLKW, &self->fl);
+        self->fl_stat = false;
+    }
+    if(self->fd >= 0) close(self->fd);
+    forEach(it, self->fd_list){
+        auto fd = *it.p;
+        if(fd >= 0) close(fd);
+    }
+    A_DEST(AMtx, self->fl_lock);
+    A_DEST(ALine(int), self->fd_list);
+    A_DEST(AText, self->name);
+    A_DEST(AMtxRW, self->lock);
+}
+__noused static inline void A_OBJ_COPY(AFileNode)(__noused AFileNode* self, __noused const AFileNode* that){
+    //不可复制
+    aExcSet(AEXC_init_failed);
+}
+__noused static inline int A_OBJ_CMPD(AFileNode)(const AFileNode* self, const AFileNode* that){
+    return A_CMPD(AText, self->name, that->name);
+}
+A_TYPE_REGISTER(AFileNode);
+/*
+ * 文件模式(r|w|rw|aw)完全互斥，即以不同模式重复打开同一文件时会直接失败
+ * 独占仅在(w|rw|)模式下可用，处于独占模式时直到文件关闭，期间始终持有写锁，其他任何打开操作都会直接失败
+ * r模式下自动使用共享方法，即持有读锁
+ * aw模式下自动使用抢占方法，即持有写锁
+ */
+
+
+
+AShPtr_Define(AFileNode);
+AShPtr_Generate(AFileNode);
+A_TYPE_REGISTER(AShPtr(AFileNode));
+
+
 
 /* file基类 */
 AClass_Inherit(AFile);
 AClass_Struct(AFile,
-    FILE*       fp;
-    AText       name;
-    uint64_t    size;
+    int                 fd;
+    AText               name;
+    AShPtr(AFileNode)   node;
 );
-AClass_Function(AFile);
-AClass_Generate(AFile);
+AClass_Function(AFile,
+    int32_t (*ioctl)(AFile* self, int32_t cmd, void* buf);
+    uint32_t(*read) (AFile* self, size_t size, void* target);
+    uint32_t(*write)(AFile* self, size_t size, void* source);
+    uint32_t(*read_pos)(AFile* self, uint64_t offset, size_t size, void* target);
+    uint32_t(*write_pos)(AFile* self, uint64_t offset, size_t size, void* source);
+);
+int32_t  AFile_ioctl(AFile* self, int32_t cmd, void* buf);
+uint32_t AFile_read (AFile* self, size_t size, void* target);
+uint32_t AFile_write(AFile* self, size_t size, void* source);
+uint32_t AFile_read_pos(AFile* self, uint64_t offset, size_t size, void* target);
+uint32_t AFile_write_pos(AFile* self, uint64_t offset, size_t size, void* source);
+AClass_Generate(AFile, AFile_ioctl, AFile_read, AFile_write, AFile_read_pos, AFile_write_pos);
+
+void AFile_close(AFile* self);
+AFile AFile_open_copy(AText name);
+AFile AFile_open(int mod, bool noblock, bool exclusive, AText name);
+
 __noused static inline void A_OBJ_INIT(AFile)(AFile* self){
+    self->node = A_INIT(AShPtr(AFileNode));
     self->name = A_INIT(AText);
+    self->fd = -1;
 }
 __noused static inline void A_OBJ_DEST(AFile)(AFile* self){
-    if(self->fp != nullptr) fclose(self->fp);
-    A_DEST(AText, self->name);
+    AFile_close(self);
+    aExcClean();
 }
 __noused static inline void A_OBJ_COPY(AFile)(AFile* self, const AFile* that){
-    self->name = A_COPY(AText, that->name);
-    if(AText_empty(&self->name)) self->name = AText_new("(null)");
+    *self = AFile_open_copy(that->name);
 }
 __noused static inline int A_OBJ_CMPD(AFile)(const AFile* self, const AFile* that){
     return A_CMPD(AText, self->name, that->name);
 }
 A_CLASS_REGISTER(AFile);
-void __AFile_open(AFile* self, const char* mode);
-
-
-
-/* file读取器 */
-AClass_Inherit(ARFile, AFile);
-AClass_Struct(ARFile,
-    const void* mem;    //以文件的形式处理mem
-    uint64_t offset;
-);
-AClass_Function(ARFile,
-    uint64_t(*size)(ARFile* self); //剩余未读的大小
-    uint32_t(*read)(ARFile* self, uint32_t size, void* target);
-);
-uint64_t ARFile_size(ARFile* self);
-uint32_t ARFile_read(ARFile* self, uint32_t size, void* target);
-AClass_Generate(ARFile, ARFile_size, ARFile_read);
-__noused static inline void A_OBJ_COPY(ARFile)(ARFile* self, const ARFile* that){
-    self->mem = that->mem;
-    if(self->mem == nullptr){
-        __AFile_open((AFile*)self, "r");
-    }else{
-        ((AFile*)self)->size = ((AFile*)that)->size;
-    }
-}
-A_CLASS_REGISTER(ARFile);
-
-
-
-/* file写入器 */
-AClass_Inherit(AWFile, AFile);
-AClass_Struct(AWFile,
-    uint64_t addsize;
-);
-AClass_Function(AWFile,
-    uint64_t(*size)(AWFile* self);  //已写入的大小
-    uint32_t(*write)(AWFile* self, uint32_t size, void* target);
-);
-uint64_t AWFile_size(AWFile* self);
-uint32_t AWFile_write(AWFile* self, uint32_t size, void* target);
-AClass_Generate(AWFile, AWFile_size, AWFile_write);
-__noused static inline void A_OBJ_COPY(AWFile)(AWFile* self, __noused const AWFile* that){
-    __AFile_open((AFile*)self, "w");
-}
-A_CLASS_REGISTER(AWFile);
-
-
-
-/* file追加器 */
-AClass_Inherit(APFile, AFile);
-AClass_Struct(APFile,
-    uint64_t addsize;
-);
-AClass_Function(APFile,
-    uint64_t(*size)(APFile* self); //文件大小+追加的大小
-    uint32_t(*append)(APFile* self, uint32_t size, void* target);
-);
-uint64_t APFile_size(APFile* self);
-uint32_t APFile_append(APFile* self, uint32_t size, void* target);
-AClass_Generate(APFile, APFile_size, APFile_append);
-__noused static inline void A_OBJ_COPY(APFile)(APFile* self, __noused const APFile* that){
-    __AFile_open((AFile*)self, "a");
-}
-A_CLASS_REGISTER(APFile);
-
-
-
-ARFile aFileOpen(const char* name);
-AWFile aFileCreate(const char* name);
-APFile aFileAppend(const char* name);
-ARFile aMemoryOpen(const void* mem, uint64_t size);
-
-
-
-/* 创建目录, 等同mkdir mkdir -p*/
-void a_mkdir(const char* name);
-void a_mkdir_p(const char* name);
-
-/* 删除文件或目录, 等同rm rm -r*/
-void a_remove(const char* name);
-void a_remove_r(const char* name);
-
-/* 移动文件或目录, 等同mv */
-void a_rename(const char* name);
-
-/* 创建空文件, 不打开 */
-void a_touch(const char* name);
-
-/* 修改当前用户下文件权限 */ /* p=0|1|2|4 */
-void a_chmod(const char* name, char p);
-void a_chmod_r(const char* name, char p);
-
-/* 目标是文件 */
-bool a_isfile(const char* name);
-/* 目标是目录 */
-bool a_isdir(const char* name);
-
-/* 提取目录 */
-/* 如果是目录则提取其上级目录 */
-/* 如果是根目录则返回根目录 */
-AText aDirExtract(const char* name);
-
-/* 获取绝对路径 */
-/* 若name为空则获取当前路径的绝对路径 */
-AText aDirAbsolute(const char* name);
-
-
-
-#if defined(__C_POSIX__)
-#include <fcntl.h>          // open
-#include <unistd.h>         // read, write, close
-#include <sys/ioctl.h>      // ioctl
-
-AClass_Inherit(ADev);
-AClass_Struct(ADev,
-    AText   name;           //设备名
-    int32_t fd;             //设备描述符
-    bool    noblock;        //是否非阻塞
-    bool    stat;           //设备状态
-);
-AClass_Function(ADev,
-    int32_t (*ioctl)(ADev* self, int32_t cmd, void* buf);
-    uint32_t(*read) (ADev* self, uint32_t size, void* source);
-    uint32_t(*write)(ADev* self, uint32_t size, void* target);
-);
-int32_t  ADev_ioctl(ADev* self, int32_t cmd, void* buf);
-uint32_t ADev_read (ADev* self, uint32_t size, void* source);
-uint32_t ADev_write(ADev* self, uint32_t size, void* target);
-AClass_Generate(ADev, ADev_ioctl, ADev_read, ADev_write);
-
-__noused static inline void A_OBJ_INIT(ADev)(ADev* self){
-    self->name = A_INIT(AText);
-    self->fd = 0;
-}
-__noused static inline void A_OBJ_DEST(ADev)(ADev* self){
-    close(self->fd);
-    A_DEST(AText, self->name);
-}
-__noused static inline void A_OBJ_COPY(ADev)(ADev* self, const ADev* that){
-    self->name = A_COPY(AText, that->name);
-    self->noblock = that->noblock;
-    if(self->noblock){
-        self->fd = open(self->name.s, O_RDWR | O_NONBLOCK);
-    }else{
-        self->fd = open(self->name.s, O_RDWR);
-    }
-    if(self->fd < 0){
-        aExcSet(AEXC_system_error);
-        return;
-    }
-    self->stat = true;
-}
-__noused static inline int  A_OBJ_CMPD(ADev)(const ADev* self, const ADev* that){
-    return A_CMPD(AText, self->name, that->name);
-}
-
-A_CLASS_REGISTER(ADev);
 
 #endif /* posix */
 
-#if defined(__C_WINDOWS__)
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN 1
-#endif /* WIN32_LEAN_AND_MEAN */
-#include <windows.h>
 
-typedef struct{
-    void*    in;
-    uint32_t in_size;
-    void*    out;
-    uint32_t out_size;
-    uint32_t bytes;
-}ADevIoctl;
 
-AClass_Inherit(ADev);
-AClass_Struct(ADev,
-    AText   name;           //设备名
-    HANDLE  fd;             //设备句柄
-    bool    noblock;        //是否非阻塞
-    bool    stat;           //设备状态
-);
-AClass_Function(ADev,
-    int32_t (*ioctl)(ADev* self, int32_t cmd, void* buf);
-    uint32_t(*read) (ADev* self, uint32_t size, void* source);
-    uint32_t(*write)(ADev* self, uint32_t size, void* target);
-);
-int32_t  ADev_ioctl(ADev* self, int32_t cmd, void* buf);
-uint32_t ADev_read (ADev* self, uint32_t size, void* source);
-uint32_t ADev_write(ADev* self, uint32_t size, void* target);
-AClass_Generate(ADev, ADev_ioctl, ADev_read, ADev_write);
-
-__noused static inline void A_OBJ_INIT(ADev)(ADev* self){
-    self->name = A_INIT(AText);
-    self->fd = INVALID_HANDLE_VALUE;
-}
-__noused static inline void A_OBJ_DEST(ADev)(ADev* self){
-    if(self->fd != INVALID_HANDLE_VALUE) CloseHandle(self->fd);
-    A_DEST(AText, self->name);
-}
-__noused static inline void A_OBJ_COPY(ADev)(ADev* self, const ADev* that){
-    self->name = A_COPY(AText, that->name);
-    self->noblock = that->noblock;
-
-    DWORD flags = FILE_ATTRIBUTE_NORMAL;
-    if(self->noblock) flags |= FILE_FLAG_OVERLAPPED;
-
-    self->fd = CreateFileA(self->name.s, GENERIC_READ | GENERIC_WRITE,
-                           FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-                           OPEN_EXISTING, flags, nullptr);
-    if(self->fd == INVALID_HANDLE_VALUE){
-        aExcSet(AEXC_system_error);
-        return;
+static inline AFile  aFileInOpen(const char* name){
+    if(name == nullptr){
+        aExcSet(AEXC_outdomain);
+        return (AFile){};
     }
-    self->stat = true;
-}
-__noused static inline int  A_OBJ_CMPD(ADev)(const ADev* self, const ADev* that){
-    return A_CMPD(AText, self->name, that->name);
+
+    return AFile_open(__afmod_r, false, false, af_path_absolute(name));
 }
 
-A_CLASS_REGISTER(ADev);
+static inline AFile  aFileEnOpen(const char* name){
+    if(name == nullptr){
+        aExcSet(AEXC_outdomain);
+        return (AFile){};
+    }
 
-#endif /* windows */
+    return AFile_open(__afmod_aw, false, false, af_path_absolute(name));
+}
 
-ADev aDevOpen(const char* name);    //阻塞模式打开
-ADev aDevOpen_nb(const char* name); //非阻塞模式打开
+/* 强制独占 */
+static inline AFile aFileOutOpen(const char* name){
+    if(name == nullptr){
+        aExcSet(AEXC_outdomain);
+        return (AFile){};
+    }
+
+    return AFile_open(__afmod_w, false, true, af_path_absolute(name));
+}
+
+
+
+static inline AFile  aDevInOpen(const char* name, bool noblock){
+    if(name == nullptr){
+        aExcSet(AEXC_outdomain);
+        return (AFile){};
+    }
+
+    return AFile_open(__afmod_r, noblock, false, af_path_absolute(name));
+}
+
+static inline AFile aDevOutOpen(const char* name, bool exclusive){
+    if(name == nullptr){
+        aExcSet(AEXC_outdomain);
+        return (AFile){};
+    }
+
+    return AFile_open(__afmod_w, false, exclusive, af_path_absolute(name));
+}
+
+static inline AFile aDevInOutOpen(const char* name, bool noblock, bool exclusive){
+    if(name == nullptr){
+        aExcSet(AEXC_outdomain);
+        return (AFile){};
+    }
+
+    return AFile_open(__afmod_rw, noblock, exclusive, af_path_absolute(name));
+}
 
 
 
