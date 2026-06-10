@@ -74,6 +74,7 @@ static inline uint32_t A_OBJ_HASH(AString)(const AString* self){
 }
 
 __noused static inline void A_OBJ_INIT(AString)(AString* self) {
+    memset(self, 0, sizeof(AString));
     self->f = &A_FUNC_TAB(AString);
 }
 
@@ -152,4 +153,3 @@ static inline AString AString_new(const char* s){
 #endif /* __cplusplus */
 
 #endif
-

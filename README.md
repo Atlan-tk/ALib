@@ -55,7 +55,7 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib�
 - `asignal.h`：进程内信号连接/派发系统
 - `athrd.h`：兼容 C11 `<threads.h>` 的线程原语入口；优先复用系统实现，缺失时回退到 POSIX/Win32
 - `alock.h`：基于 `athrd.h` 的互斥锁、递归锁、读写锁、条件变量锁、信号量及自动解锁辅助对象
-- `afile.h`：POSIX 文件工具函数，以及统一的 `AFile` 文件/设备读写对象
+- `afile.h`：POSIX 文件工具函数，以及统一的 `AFile` 文件/设备/socket 读写对象
 
 其中 `athrd.h` 适合直接做线程创建、条件变量等待和线程局部存储；如果只是想在 ALib 风格代码里管理临界区、等待条件或限制并发配额，通常直接使用 `alock.h` 的 `AAutoKey`、`AMtxCnd`、`ASemaphore` 更顺手。
 
@@ -234,9 +234,9 @@ A_TYPE_REGISTER(ATree(int, AString));
 - `AMtxCnd` 把互斥锁和条件变量绑在一起：先 `AMtxCnd_lock()`，在谓词不满足时循环 `AMtxCnd_wait()`，状态更新后再 `AMtxCnd_awake()` 或 `AMtxCnd_awake_all()`。
 - `ASemaphore` 把“占用一个名额 / 归还一个名额”封装进 `ASemaphore_lock()` 返回的 `AAutoKey`；首次使用前需要先 `ASemaphore_setMax()` 设置上限，之后可以按需动态调整容量。
 
-### 5. 文件与设备读写
+### 5. 文件、设备与 socket 读写
 
-`afile.h` 提供 POSIX 文件工具函数和统一的 `AFile` 读写对象。`AFile` 基于文件描述符工作，析构时自动关闭当前对象持有的 fd；同一路径还会挂到进程内共享节点，用于模式互斥、进程内读写锁和 POSIX 文件锁管理。
+`afile.h` 提供 POSIX 文件工具函数和统一的 `AFile` 读写对象。`AFile` 基于文件描述符工作，析构时自动关闭当前对象持有的 fd；同一路径还会挂到进程内共享节点，用于模式互斥、进程内读写锁和 POSIX 文件锁管理。socket 也通过 `AFile` 暴露为 `read/write` 风格接口。
 
 ```c
 RAII(AFile) in = aFileInOpen("input.bin");
@@ -250,17 +250,23 @@ out.f->write(&out, n, buf);
 
 - `aFileInOpen(name)`：以只读模式打开已有文件。
 - `aFileOutOpen(name)`：以写入模式创建或截断普通文件，并保持独占文件锁直到关闭。
-- `aFileEnOpen(name)`：以追加模式创建或打开文件，不截断旧内容。
+- `aFileEndOpen(name)`：以追加模式创建或打开文件，不截断旧内容。
 - `aDevInOpen(name, noblock)` / `aDevOutOpen(name, exclusive)` / `aDevInOutOpen(name, noblock, exclusive)`：按设备或读写需求打开 `AFile`；设备写打开可显式选择是否独占。
+- `aSocketTcpServerOpen(name)` / `aSocketTcpClientOpen(name)`：打开 TCP 服务端或客户端，`name` 形如 `"127.0.0.1|8290"`；TCP 服务端使用 `aSocketTcpAccept(server)` 接收连接。
+- `aSocketUdpServerOpen(name)` / `aSocketUdpClientOpen(name)` / `aSocketUnixServerOpen(name)` / `aSocketUnixClientOpen(name)` / `aSocketRawServerOpen(name)` / `aSocketRawClientOpen(name)`：打开 UDP、Unix domain 或 raw socket。IP socket 只接受数字地址，不做域名解析。
 - `AFile_read/write/read_pos/write_pos/ioctl`：封装 `read/write/pread/pwrite/ioctl`，失败时设置异常并返回 `0`。
-- `af_mkdir(_p)`、`af_rm(_r)`、`af_cp(_r)`、`af_mv`、`af_touch`、`af_chmod(_r)`、`af_ls/a/A`、`af_get_info`：基础文件系统工具函数。
+- `af_mkdir`、`af_rm(_r)`、`af_cp(_r)`、`af_mv`、`af_touch`、`af_chmod(_r)`、`af_path_exist`、`af_isfile/isdir/isdev`、`af_dir_extract`、`af_name_extract`、`af_path_absolute`、`af_ls`、`af_get_info`：基础文件系统工具函数。`af_mkdir` 等价于递归创建目录；`af_ls` 返回不含 `.` 和 `..` 的绝对路径列表。
 
 ## 需要特别注意的语义
 
 - `AString_new()` 和 `AText_new()` 都只是“包装已有 `char*`”，不会立刻拷贝；传入栈缓冲区或临时内存时，必须在其失效前复制到一个真正拥有内存的对象。
 - `AFile` 是 POSIX-only 值对象，推荐配合 `RAII(AFile)` 使用；同一个 `AFile*` 不应和 `AFile_close()` 并发使用。
+- `AFile` 的 IO 线程安全/进程安全语义建立在所有参与方都通过 ALib 的 `AFile` API 打开和读写同一路径的前提上；绕过 ALib 直接使用 POSIX fd、`FILE*` 或其他库访问同一文件时，ALib 无法协调这些外部操作。
+- `af_*` 文件系统工具函数只在当前进程内使用全局锁串行化调用，不保证跨进程安全；如果其他进程同时移动、删除、复制或 chmod 同一路径，调用方需要自行协调。
 - 同一路径在进程内按打开模式互斥；例如已只读打开时，再以写入模式打开会失败并设置异常。跨进程文件锁使用 POSIX `fcntl`，遇到其他进程持锁时可能阻塞等待。
-- `aFileInOpen()` 不创建不存在的文件；`aFileOutOpen()` 会截断普通文件；`aFileEnOpen()` 只追加。
+- `aFileInOpen()` 不创建不存在的文件；`aFileOutOpen()` 会截断普通文件；`aFileEndOpen()` 只追加。
+- `AFile_open(self, type, name, mod)` 是低层入口：`type` 使用 `__aftype_file`、`__aftype_device` 或 `__aftype_socket`，`mod` 使用 `__afmod_read/write/creat/appent/truncate/noblock/exclusive` 位组合。
+- `sample/sample_afile_socket.c` 是长期运行的 TCP 回显示例，服务端和客户端会循环收发 `hello` / `yes`，需要手动停止；它不是自动退出型测试。
 - 顺序容器的 `at(index)` 在“容器非空但 index 越界”时，通常会截断到尾元素；只有空容器访问才会设置 `AEXC_overstep`。
 - `AHash(K,V)` 和 `ATree(K,V)` 的 `ins()` 是 upsert 语义：同键再次插入会替换已有值。
 - `a_signal_connection(id, addressee, call)` 对同一个 `(id, addressee)` 重复连接时，会覆盖原有回调，而不是忽略此次连接。

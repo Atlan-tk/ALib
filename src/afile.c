@@ -6,6 +6,7 @@
 #include <afile.h>
 #include <ahash.h>
 #include <alock.h>
+#include <athrd.h>
 
 #if defined(__C_POSIX__)
 #include <dirent.h>
@@ -15,6 +16,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 
 #ifdef st_atime
 #undef st_atime
@@ -26,473 +28,236 @@
 #undef st_ctime
 #endif
 
-static inline AText __af_text_owned(const char* s){
-    AText text = A_INIT(AText);
-    if(s != nullptr){
-        text.f->addBack(&text, AText_new(s));
-    }
-    return text;
-}
 
-static inline AText __af_join_path(const char* dir, const char* name){
-    AText path = __af_text_owned(dir != nullptr && dir[0] != '\0' ? dir : ".");
-    if(name == nullptr || name[0] == '\0'){
-        return path;
-    }
-    if(path.byte_num != 0 && path.s[path.byte_num - 1] != '/'){
-        path.f->pushBack(&path, Achar_new("/"));
-    }
-    path.f->addBack(&path, AText_new(name));
-    return path;
-}
 
-static inline int __af_copy_file(const char* name, const char* target){
-    int in = open(name, O_RDONLY);
-    if(in < 0){
-        return -1;
-    }
+/*************************************************************************/
+static void __af_mkdir(const char* name);
+static void __af_rm(const char* name);
+static void __af_rm_r(const char* name);
+static void __af_cp(const char* name, const char* target);
+static void __af_cp_r(const char* name, const char* target);
+static void __af_mv(const char* name, const char* new_name);
+static void __af_touch(const char* name);
+static void __af_chmod(const char* name, int p);
+static void __af_chmod_r(const char* name, int p);
+static bool __af_path_exist(const char* name);
+static bool __af_isfile(const char* name);
+static bool __af_isdir(const char* name);
+static bool __af_isdev(const char* name);
+static AString __af_dir_extract(const char* name);
+static AString __af_name_extract(const char* name);
+static AString __af_path_absolute(const char* name);
+static AFileInfo __af_get_info(const char* name);
+static ALine(AString) __af_ls(const char* dir);
 
-    int out = open(target, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if(out < 0){
-        close(in);
-        return -1;
-    }
 
-    char buf[8192];
-    int ret = 0;
-    for(;;){
-        ssize_t n = read(in, buf, sizeof(buf));
-        if(n == 0){
-            break;
-        }
-        if(n < 0){
-            ret = -1;
-            break;
-        }
-        ssize_t off = 0;
-        while(off < n){
-            ssize_t w = write(out, buf + off, (size_t)(n - off));
-            if(w < 0){
-                ret = -1;
-                break;
-            }
-            off += w;
-        }
-        if(ret != 0){
-            break;
-        }
-    }
 
-    if(close(in) != 0){
-        ret = -1;
-    }
-    if(close(out) != 0){
-        ret = -1;
-    }
-    return ret;
-}
+/*************************************************************************/
+typedef struct{
+    AString     addr;       //"192.168.0.1","/tmp/test"
+    int         family;     //AF_INET, AF_INET6, AF_UNIX
+    int         kinds;      //tcp_server, tcp_client, udp_server, ...
+    uint16_t    port;       //port
+}AIpPort;
+enum{
+    aip_tcp_server = 1,
+    aip_tcp_client,
+    aip_udp_server,
+    aip_udp_client,
+    aip_unix_server,
+    aip_unix_client,
+    aip_raw_server,
+    aip_raw_client,
+};
 
-static inline void __af_cp_r_impl(const char* name, const char* target){
-    struct stat st;
-    if(lstat(name, &st) != 0){
-        aExcSet(AEXC_system_error);
-        return;
-    }
+static inline AIpPort af_name_parsing(__noused AString name){
+    AIpPort ipport = {}; memset(&ipport, 0, sizeof(AIpPort));
 
-    if(S_ISDIR(st.st_mode)){
-        if(mkdir(target, st.st_mode & 0777) != 0 && errno != EEXIST){
-            aExcSet(AEXC_system_error);
-            return;
-        }
+    RAII(AString) addr = A_INIT(AString);
+    int family = 0, kinds = 0; uint64_t port = 0;
 
-        DIR* dp = opendir(name);
-        if(dp == nullptr){
-            aExcSet(AEXC_system_error);
-            return;
-        }
-
-        struct dirent* ent;
-        while((ent = readdir(dp)) != nullptr){
-            if(strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0){
-                continue;
-            }
-            RAII(AText) src = __af_join_path(name, ent->d_name);
-            RAII(AText) dst = __af_join_path(target, ent->d_name);
-            if(aExcOccur()){
-                break;
-            }
-            __af_cp_r_impl(src.s, dst.s);
-            if(aExcOccur()){
-                break;
-            }
-        }
-        if(closedir(dp) != 0 && !aExcOccur()){
-            aExcSet(AEXC_system_error);
-        }
-        return;
-    }
-
-    if(S_ISREG(st.st_mode)){
-        if(__af_copy_file(name, target) != 0){
-            aExcSet(AEXC_system_error);
-            return;
-        }
-        chmod(target, st.st_mode & 0777);
-        return;
-    }
-
-    aExcSet(AEXC_invalid_function);
-}
-
-static inline void __af_rm_r_impl(const char* name){
-    struct stat st;
-    if(lstat(name, &st) != 0){
-        aExcSet(AEXC_system_error);
-        return;
-    }
-
-    if(S_ISDIR(st.st_mode)){
-        DIR* dp = opendir(name);
-        if(dp == nullptr){
-            aExcSet(AEXC_system_error);
-            return;
-        }
-
-        struct dirent* ent;
-        while((ent = readdir(dp)) != nullptr){
-            if(strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0){
-                continue;
-            }
-            RAII(AText) child = __af_join_path(name, ent->d_name);
-            if(aExcOccur()){
-                break;
-            }
-            __af_rm_r_impl(child.s);
-            if(aExcOccur()){
-                break;
-            }
-        }
-        if(closedir(dp) != 0 && !aExcOccur()){
-            aExcSet(AEXC_system_error);
-        }
-        if(aExcOccur()){
-            return;
-        }
-        if(rmdir(name) != 0){
-            aExcSet(AEXC_system_error);
-        }
-        return;
-    }
-
-    if(unlink(name) != 0){
-        aExcSet(AEXC_system_error);
-    }
-}
-
-static inline void __af_chmod_r_impl(const char* name, char p){
-    af_chmod(name, p);
-    if(aExcOccur() || !af_isdir(name)){
-        return;
-    }
-
-    DIR* dp = opendir(name);
-    if(dp == nullptr){
-        aExcSet(AEXC_system_error);
-        return;
-    }
-
-    struct dirent* ent;
-    while((ent = readdir(dp)) != nullptr){
-        if(strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0){
-            continue;
-        }
-        RAII(AText) child = __af_join_path(name, ent->d_name);
-        if(aExcOccur()){
-            break;
-        }
-        __af_chmod_r_impl(child.s, p);
-        if(aExcOccur()){
-            break;
-        }
-    }
-    if(closedir(dp) != 0 && !aExcOccur()){
-        aExcSet(AEXC_system_error);
-    }
-}
-
-/* 创建目录 */
-void af_mkdir(const char* name){
-    if(name == nullptr){
-        aExcSet(AEXC_nullptr);
-        return;
-    }
-    if(mkdir(name, 0755) != 0 && errno != EEXIST){
-        aExcSet(AEXC_system_error);
-    }
-}
-void af_mkdir_p(const char* name){
-    if(name == nullptr){
-        aExcSet(AEXC_nullptr);
-        return;
-    }
-    if(name[0] == '\0'){
+    auto p = name.s;
+    if(strncmp(p, "tcp|server|", 11) == 0){
+        kinds = aip_tcp_server, p += 11;
+    }else if(strncmp(p, "tcp|client|", 11) == 0){
+        kinds = aip_tcp_client, p += 11;
+    }else if(strncmp(p, "udp|server|", 11) == 0){
+        kinds = aip_udp_server, p += 11;
+    }else if(strncmp(p, "udp|client|", 11) == 0){
+        kinds = aip_udp_client, p += 11;
+    }else if(strncmp(p, "raw|server|", 11) == 0){
+        kinds = aip_raw_server, p += 11;
+    }else if(strncmp(p, "raw|client|", 11) == 0){
+        kinds = aip_raw_client, p += 11;
+    }else if(strncmp(p, "unix|server|", 12) == 0){
+        kinds = aip_unix_server, p += 12;
+    }else if(strncmp(p, "unix|client|", 12) == 0){
+        kinds = aip_unix_client, p += 12;
+    }else{
         aExcSet(AEXC_outdomain);
-        return;
+        return ipport;
     }
 
-    RAII(AText) path = __af_text_owned(name);
-    if(aExcOccur()){
-        return;
-    }
-
-    for(uint32_t i = 1; i < path.byte_num; ++i){
-        if(path.s[i] != '/'){
-            continue;
+    if(kinds == aip_unix_server || kinds == aip_unix_client){
+        family = AF_UNIX;
+        addr.f->addBack(&addr, AString_new(p));
+    }else{
+        char buf[64]; memset(buf, 0, 64);
+        int addr_len = 0;
+        if(sscanf(p, "%63[^|]|%lu%n", buf, &port, &addr_len) != 2){
+            aExcSet(AEXC_outdomain);
+            return ipport;
         }
-        path.s[i] = '\0';
-        if(path.s[0] != '\0' && mkdir(path.s, 0755) != 0 && errno != EEXIST){
-            path.s[i] = '/';
+        p += addr_len;
+
+        if(p[0] == 0){
+        }else if(p[0] == '|' && '0' <= p[1] && p[1] <= '9'){
+            p++; uint64_t end = 0; int end_len = 0;
+            if(sscanf(p, "%lu%n", &end, &end_len) == 1 && p[end_len] == '\0'){
+            }else{
+                aExcSet(AEXC_outdomain);
+                return ipport;
+            }
+        }else{
+            aExcSet(AEXC_outdomain);
+            return ipport;
+        }
+
+        if(port >= (uint64_t)(1 << 16)){
+            aExcSet(AEXC_outdomain);
+            return ipport;
+        }
+
+        {
+            struct sockaddr_in addr; memset(&addr, 0, sizeof(addr));
+            if(inet_pton(AF_INET, buf, &addr.sin_addr) == 1){
+                family = AF_INET;
+            }else{
+                struct sockaddr_in6 addr6; memset(&addr6, 0, sizeof(addr6));
+                if(inet_pton(AF_INET6, buf, &addr6.sin6_addr) == 1){
+                    family = AF_INET6;
+                }else{
+                    aExcSet(AEXC_outdomain);
+                    return ipport;
+                }
+            }
+        }
+
+        addr.f->addBack(&addr, AString_new(buf));
+    }
+
+    ipport.family = family;
+    ipport.addr = A_MOVE(addr);
+    ipport.kinds = kinds;
+    ipport.port = port;
+    ipport.port = htons(ipport.port);
+
+    return ipport;
+}
+
+static inline void af_socket_connect(Afd fd, AIpPort ipport){
+    if(!Afd_exist(fd)){
+        aExcSet(AEXC_system_error);
+        return;
+    }
+
+    int ret = 0;
+
+    int size = 0; struct sockaddr* addr = nullptr;
+    struct sockaddr_in ip_addr = {
+        .sin_family = ipport.family,
+        .sin_port = ipport.port,
+    };
+    struct sockaddr_in6 ip_addr6 = {
+        .sin6_family = ipport.family,
+        .sin6_port = ipport.port,
+    };
+    struct sockaddr_un un_addr = {
+        .sun_family = ipport.family,
+    };
+
+    if(ipport.family == AF_INET6){
+        if(inet_pton(AF_INET6, ipport.addr.s, &ip_addr6.sin6_addr) < 0){
             aExcSet(AEXC_system_error);
             return;
         }
-        path.s[i] = '/';
-    }
-    if(mkdir(path.s, 0755) != 0 && errno != EEXIST){
-        aExcSet(AEXC_system_error);
-    }
-}
-
-/* 删除文件或目录 */
-void af_rm(const char* name){
-    if(name == nullptr){
-        aExcSet(AEXC_nullptr);
-        return;
-    }
-    if(remove(name) != 0){
-        aExcSet(AEXC_system_error);
-    }
-}
-void af_rm_r(const char* name){
-    if(name == nullptr){
-        aExcSet(AEXC_nullptr);
-        return;
-    }
-    __af_rm_r_impl(name);
-}
-
-/* 复制文件或目录 */
-void af_cp(const char* name, const char* target){
-    if(name == nullptr || target == nullptr){
-        aExcSet(AEXC_nullptr);
-        return;
-    }
-    if(__af_copy_file(name, target) != 0){
-        aExcSet(AEXC_system_error);
-    }
-}
-void af_cp_r(const char* name, const char* target){
-    if(name == nullptr || target == nullptr){
-        aExcSet(AEXC_nullptr);
-        return;
-    }
-    __af_cp_r_impl(name, target);
-}
-
-/* 移动文件或目录 */
-void af_mv(const char* name, const char* new_name){
-    if(name == nullptr || new_name == nullptr){
-        aExcSet(AEXC_nullptr);
-        return;
-    }
-    if(rename(name, new_name) != 0){
-        aExcSet(AEXC_system_error);
-    }
-}
-
-/* 创建空文件 */
-void af_touch(const char* name){
-    if(name == nullptr){
-        aExcSet(AEXC_nullptr);
-        return;
-    }
-    int fd = open(name, O_WRONLY | O_CREAT, 0644);
-    if(fd < 0){
-        aExcSet(AEXC_system_error);
-        return;
-    }
-    if(close(fd) != 0){
-        aExcSet(AEXC_system_error);
-    }
-}
-
-/* 修改当前用户文件权限 */ /* p=0|1|2|4 */
-void af_chmod(const char* name, char p){
-    if(name == nullptr){
-        aExcSet(AEXC_nullptr);
-        return;
-    }
-    struct stat st;
-    if(stat(name, &st) != 0){
-        aExcSet(AEXC_system_error);
-        return;
-    }
-    mode_t mode = st.st_mode & ~(S_IRUSR | S_IWUSR | S_IXUSR);
-    if(p & 4) mode |= S_IRUSR;
-    if(p & 2) mode |= S_IWUSR;
-    if(p & 1) mode |= S_IXUSR;
-    if(chmod(name, mode) != 0){
-        aExcSet(AEXC_system_error);
-    }
-}
-void af_chmod_r(const char* name, char p){
-    if(name == nullptr){
-        aExcSet(AEXC_nullptr);
-        return;
-    }
-    __af_chmod_r_impl(name, p);
-}
-
-/* 目标是文件 */
-bool af_isfile(const char* name){
-    struct stat st;
-    return name != nullptr && stat(name, &st) == 0 && S_ISREG(st.st_mode);
-}
-/* 目标是目录 */
-bool af_isdir(const char* name){
-    struct stat st;
-    return name != nullptr && stat(name, &st) == 0 && S_ISDIR(st.st_mode);
-}
-/* 目标是设备 */
-bool af_isdev(const char* name){
-    struct stat st;
-    return name != nullptr && stat(name, &st) == 0 &&
-           (S_ISCHR(st.st_mode) || S_ISBLK(st.st_mode) || S_ISFIFO(st.st_mode) || S_ISSOCK(st.st_mode));
-}
-
-/* 提取目录 */
-/* 若为目录则直接返回 */
-/* 若为空则返回当前目录"." */
-AText af_dir_extract(const char* name){
-    if(name == nullptr || name[0] == '\0'){
-        return __af_text_owned(".");
-    }
-    if(af_isdir(name)){
-        return __af_text_owned(name);
-    }
-
-    const char* slash = strrchr(name, '/');
-    if(slash == nullptr){
-        return __af_text_owned(".");
-    }
-    if(slash == name){
-        return __af_text_owned("/");
-    }
-
-    AText dir = A_INIT(AText);
-    AText src = AText_new(name);
-    dir.f->addBack(&dir, src);
-    if(!aExcOccur()){
-        dir.f->truncate(&dir, (uint32_t)(slash - name));
-    }
-    return dir;
-}
-
-/* 获取绝对路径 */
-/* 若为空则返回当前目录的绝对路径 */
-AText af_path_absolute(const char* name){
-    const char* src = (name != nullptr && name[0] != '\0') ? name : ".";
-
-    char* resolved = realpath(src, nullptr);
-    if(resolved != nullptr){
-        AText out = __af_text_owned(resolved);
-        free(resolved);
-        return out;
-    }
-
-    if(src[0] == '/'){
-        return __af_text_owned(src);
-    }
-
-    char cwd[PATH_MAX];
-    if(getcwd(cwd, sizeof(cwd)) == nullptr){
-        aExcSet(AEXC_system_error);
-        return A_INIT(AText);
-    }
-    return __af_join_path(cwd, src);
-}
-
-/* ls */
-static inline ALine(AText) __af_ls(const char* dir, int mode){
-    ALine(AText) list = A_INIT(ALine(AText));
-    const char* path = (dir != nullptr && dir[0] != '\0') ? dir : ".";
-    DIR* dp = opendir(path);
-    if(dp == nullptr){
-        aExcSet(AEXC_system_error);
-        return list;
-    }
-
-    struct dirent* ent;
-    while((ent = readdir(dp)) != nullptr){
-        bool dot = strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0;
-        bool hidden = ent->d_name[0] == '.';
-        if(mode == 0 && hidden){
-            continue;
+        addr = (void*)&ip_addr6, size = sizeof(ip_addr6);
+    }else if(ipport.family == AF_INET){
+        if(inet_pton(AF_INET, ipport.addr.s, &ip_addr.sin_addr) < 0){
+            aExcSet(AEXC_system_error);
+            return;
         }
-        if(mode == 2 && dot){
-            continue;
-        }
-
-        RAII(AText) item = __af_text_owned(ent->d_name);
-        if(aExcOccur()){
-            break;
-        }
-        list.f->pushBack(&list, item);
-        if(aExcOccur()){
-            break;
-        }
+        addr = (void*)&ip_addr, size = sizeof(ip_addr);
+    }else if(ipport.family == AF_UNIX){
+        strncpy(un_addr.sun_path, ipport.addr.s, sizeof(un_addr.sun_path) - 1);
+        addr = (void*)&un_addr, size = sizeof(un_addr);
     }
 
-    if(closedir(dp) != 0 && !aExcOccur()){
+    switch(ipport.kinds){
+        case aip_tcp_server: ret = bind(fd, addr, size); if(ret >= 0) ret = listen(fd, SOMAXCONN); break;
+
+        case aip_tcp_client: ret = connect(fd, addr, size); break;
+
+        case aip_udp_server: ret = bind(fd, addr, size); break;
+
+        case aip_udp_client: ret = connect(fd, addr, size); break;
+
+        case aip_unix_server: ret = bind(fd, addr, size); if(ret >= 0) ret = listen(fd, SOMAXCONN); break;
+
+        case aip_unix_client: ret = connect(fd, addr, size); break;
+
+        case aip_raw_server: ret = bind(fd, addr, size); break;
+
+        case aip_raw_client: ret = connect(fd, addr, size); break;
+
+        default: aExcSet(AEXC_outdomain); return; break;
+    }
+
+    if(ret < 0){
         aExcSet(AEXC_system_error);
     }
-    return list;
-}
-ALine(AText) af_ls(const char* dir){
-    return __af_ls(dir, 0);
-}
-ALine(AText) af_ls_a(const char* dir){
-    return __af_ls(dir, 1);
-}
-ALine(AText) af_ls_A(const char* dir){
-    return __af_ls(dir, 2);
 }
 
-/* file info */
-AFileInfo af_get_info(const char* name){
-    AFileInfo info = {0};
-    if(name == nullptr){
-        aExcSet(AEXC_nullptr);
-        return info;
+static inline Afd af_open_scoket(AString name){
+    Afd fd = A_INIT(Afd);
+    aExcClean(); auto ipport = af_name_parsing(name); if(aExcOccur()){
+        return -1;
     }
 
-    struct stat st;
-    if(stat(name, &st) != 0){
+    switch(ipport.kinds){
+        case aip_tcp_server:
+            fd = socket(ipport.family, SOCK_STREAM, 0);
+            if(Afd_exist(fd)){
+                int on = 1;
+                setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+            }; break;
+        case aip_tcp_client:
+            fd = socket(ipport.family, SOCK_STREAM, 0); break;
+        case aip_udp_server: case aip_udp_client:
+            fd = socket(ipport.family, SOCK_DGRAM, 0); break;
+        case aip_unix_server: case aip_unix_client:
+            fd = socket(ipport.family, SOCK_STREAM, 0); break;
+        case aip_raw_server: case aip_raw_client:
+            fd = socket(ipport.family, SOCK_RAW, IPPROTO_RAW);
+            if(Afd_exist(fd)){
+                int on = 1;
+                setsockopt(fd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on));
+            }; break;
+        default:
+            fd = A_INIT(Afd); break;
+    }
+
+    if(!Afd_exist(fd)){
         aExcSet(AEXC_system_error);
-        return info;
+        return fd;
     }
 
-    info.st_dev = (uint64_t)st.st_dev;
-    info.st_ino = (uint64_t)st.st_ino;
-    info.st_mode = (uint32_t)st.st_mode;
-    info.st_nlink = (uint32_t)st.st_nlink;
-    info.st_uid = (uint32_t)st.st_uid;
-    info.st_gid = (uint32_t)st.st_gid;
-    info.st_rdev = (uint64_t)st.st_rdev;
-    info.st_size = (uint64_t)st.st_size;
-    info.st_atime = (stat_time_t)st.st_atim.tv_sec;
-    info.st_mtime = (stat_time_t)st.st_mtim.tv_sec;
-    info.st_ctime = (stat_time_t)st.st_ctim.tv_sec;
-    return info;
+    aExcClean(); af_socket_connect(fd, ipport); if(aExcOccur()){
+        if(Afd_exist(fd)) a_close(fd);
+        fd = A_INIT(Afd);
+    }
+
+    return fd;
 }
 
 
@@ -512,13 +277,12 @@ static inline int AFileNode_uplock_r(AFileNode* self){
         AMtxRW_unlock_read(&self->lock);
         return -1;
     }
-    pid_t pid = getpid();
+    Apid pid = a_get_pid();
     if(pid != self->pid){
         self->pid = pid; self->fl_stat = false; self->rnum = 0;
     }
-    if(!self->fl_stat && self->rnum == 0 && !self->exclusive){
-        self->fl.l_type = F_RDLCK;
-        if(fcntl(self->fd, F_SETLKW, &self->fl) == -1){
+    if(!self->fl_stat && self->rnum == 0 && self->type != __aftype_socket){
+        if(AFileLock_uplock_read(&self->filelock, self->fd) == -1){
             aExcSet(AEXC_system_error);
             AMtx_unlock(&self->fl_lock);
             AMtxRW_unlock_read(&self->lock);
@@ -546,13 +310,12 @@ static inline int AFileNode_uplock_w(AFileNode* self){
         AMtxRW_unlock_write(&self->lock);
         return -1;
     }
-    pid_t pid = getpid();
+    Apid pid = a_get_pid();
     if(pid != self->pid){
         self->pid = pid; self->fl_stat = false;
     }
-    if(!self->fl_stat && !self->exclusive){
-        self->fl.l_type = F_WRLCK;
-        if(fcntl(self->fd, F_SETLKW, &self->fl) == -1){
+    if(!self->fl_stat && self->type != __aftype_socket){
+        if(AFileLock_uplock_write(&self->filelock, self->fd) == -1){
             aExcSet(AEXC_system_error);
             AMtx_unlock(&self->fl_lock);
             AMtxRW_unlock_write(&self->lock);
@@ -574,14 +337,13 @@ static inline int AFileNode_unlock_r(AFileNode* self){
     aExcClean(); AMtx_uplock(&self->fl_lock); if(aExcOccur()){
         return -1;
     }
-    pid_t pid = getpid();
+    Apid pid = a_get_pid();
     if(pid != self->pid){
         self->pid = pid; self->fl_stat = false; self->rnum = 0;
     }
     if(self->rnum > 0) self->rnum--;
-    if(self->fl_stat && self->rnum == 0 && !self->exclusive){
-        self->fl.l_type = F_UNLCK;
-        fcntl(self->fd, F_SETLKW, &self->fl);
+    if(self->fl_stat && self->rnum == 0 && self->type != __aftype_socket){
+        AFileLock_unlock(&self->filelock, self->fd);
         self->fl_stat = false;
     }
     AMtx_unlock(&self->fl_lock);
@@ -599,13 +361,12 @@ static inline int AFileNode_unlock_w(AFileNode* self){
     aExcClean(); AMtx_uplock(&self->fl_lock); if(aExcOccur()){
         return -1;
     }
-    pid_t pid = getpid();
+    Apid pid = a_get_pid();
     if(pid != self->pid){
         self->pid = pid; self->fl_stat = false;
     }
-    if(self->fl_stat && !self->exclusive){
-        self->fl.l_type = F_UNLCK;
-        fcntl(self->fd, F_SETLKW, &self->fl);
+    if(self->fl_stat && self->type != __aftype_socket){
+        AFileLock_unlock(&self->filelock, self->fd);
         self->fl_stat = false;
     }
     AMtx_unlock(&self->fl_lock);
@@ -614,138 +375,142 @@ static inline int AFileNode_unlock_w(AFileNode* self){
     return 0;
 }
 
-static void AFileNode_open(AFileNode* self, AText name, int mod, bool noblock, bool exclusive){
+static void AFileNode_open(AFileNode* self, int type, AString name, int mod){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return;
     }
 
-    self->name = A_COPY(AText, name);
+    self->name = A_COPY(AString, name);
     self->mod = mod;
-    if(af_isdev(name.s) && noblock){
-        self->noblock = noblock;
-    }
-    if(exclusive && self->mod != __afmod_r){
-        self->exclusive = true;
-    }
-    if(af_isfile(name.s) && !af_isdev(name.s) && self->mod == __afmod_w){
-        self->exclusive = true;
-    }
+    self->type = type;
 
     int flag = 0;
-    switch(self->mod){
-        case __afmod_r: flag = O_RDONLY; break;
-        case __afmod_w: flag = O_WRONLY; break;
-        case __afmod_rw: flag = O_RDWR; break;
-        case __afmod_aw: flag = O_WRONLY; break;
-        default:{
-            A_DEST(AFileNode, *self);
-            aExcSet(AEXC_outdomain);
-            return;
-        }
-    }
+    if((mod & __afmod_read) && !(mod & __afmod_write)) flag |= O_RDONLY;
+    if((mod & __afmod_write) && !(mod & __afmod_read)) flag |= O_WRONLY;
+    if((mod & __afmod_write) && (mod & __afmod_read)) flag |= O_RDWR;
+    if(mod & __afmod_creat) { flag |= O_CREAT; if(!(mod & __afmod_appent)) flag |= O_TRUNC; }
+    if(mod & __afmod_noblock) flag |= O_NONBLOCK;
+    if(mod & __afmod_appent) flag |= O_APPEND;
 
-    if(!af_isdev(name.s) && self->mod != __afmod_r){
-        flag |= O_CREAT;
-        if(self->mod == __afmod_w){
-            flag |= O_TRUNC;
-        }
-    }
-
-    if(self->noblock){
-        flag |= O_NONBLOCK;
-    }
-
-    if(self->mod == __afmod_aw){
-        flag |= O_APPEND;
-    }
-
-    if(!af_isdev(name.s)){
+    if(type == __aftype_file){
         self->fd = open(name.s, flag, 0644);
-    }else{
+    }else if(type == __aftype_device){
         self->fd = open(name.s, flag);
+    }else if(type == __aftype_socket){
+        self->fd = af_open_scoket(name);
+    }else{
+        aExcSet(AEXC_outdomain);
+        return;
     }
 
-    if(self->fd < 0){
+    if(!Afd_exist(self->fd)){
         aExcSet(AEXC_system_error);
         A_DEST(AFileNode, *self);
         return;
     }
 
-    if(self->exclusive){
-        self->fl.l_type = F_WRLCK;
-        if(fcntl(self->fd, F_SETLKW, &self->fl) == -1){
+    if(mod & __afmod_exclusive){
+        bool ret = true;
+        aExcClean(); AMtxRW_uplock_write(&self->lock); if(aExcOccur()){
+            ret = false;
+        }
+
+        if(ret && (AFileLock_uplock_write(&self->filelock, self->fd) == -1)){
+            AMtxRW_unlock_write(&self->lock);
+            ret = false;
+        }
+
+        if(ret) self->fl_stat = true;
+
+        if(!ret){
             A_DEST(AFileNode, *self);
             aExcSet(AEXC_system_error);
-            return;
         }
-        self->fl_stat = true;
     }
 }
 
-static uint32_t AFileNode_close(AFileNode* self, int fd){
+static void AFileNode_set(AFileNode* self, Afd fd, int type, AString name, int mod){
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+
+    self->name = A_COPY(AString, name);
+    self->mod = mod;
+    self->type = type;
+    self->fd = dup(fd);
+    if(!Afd_exist(self->fd)){
+        aExcSet(AEXC_system_error);
+    }
+}
+
+static uint32_t AFileNode_close(AFileNode* self, Afd fd){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return 1;
     }
-    if(fd < 0){
-        aExcSet(AEXC_system_error);
-        return -1;
+    if(!Afd_exist(fd)){
+        return 1;
     }
-
-    if(self->exclusive || (self->fl_stat && self->num > 0)){
+    if((self->mod & __afmod_exclusive) || (self->fl_stat && self->num > 0)){
         auto ls = &self->fd_list;
         ls->f->pushBack(ls, fd);
     }else{
-        close(fd);
+        a_close(fd);
     }
 
     if(self->num > 0){
         self->num--;
     }
-
     return self->num;
 }
 
-static int AFileNode_instantiation(AFileNode* self, int mod, bool noblock){
+static int AFileNode_instantiation(AFileNode* self, int mod){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
         return -1;
     }
 
-    if(mod != self->mod || noblock != self->noblock){
-        aExcSet(AEXC_system_error);
-        return -1;
+    if(!(self->mod & __afmod_write) && (self->mod & __afmod_read)){
+        if(mod & __afmod_write){
+            aExcSet(AEXC_system_error);
+            return -1;
+        }
     }
-
-    if(self->num > 0 && self->exclusive){
+    if((self->mod & __afmod_write) && (self->mod & __afmod_appent)){
+        if((mod & __afmod_write) && !(self->mod & __afmod_appent)){
+            aExcSet(AEXC_system_error);
+            return -1;
+        }
+    }
+    if((self->mod & __afmod_read) && (self->mod & __afmod_noblock)){
+        if(!((mod & __afmod_read) && (self->mod & __afmod_noblock))){
+            aExcSet(AEXC_system_error);
+            return -1;
+        }
+    }
+    if(self->num > 0 && (self->mod & __afmod_exclusive)){
         aExcSet(AEXC_system_error);
         return -1;
     }
 
     int flag = 0;
-    switch(self->mod){
-        case __afmod_r: flag = O_RDONLY; break;
-        case __afmod_w: flag = O_WRONLY; break;
-        case __afmod_rw: flag = O_RDWR; break;
-        case __afmod_aw: flag = O_WRONLY; break;
-        default:{
-            aExcSet(AEXC_outdomain);
-            return -1;
-        }
-    }
-
     auto name = self->name;
-    if(self->noblock){
-        flag |= O_NONBLOCK;
+    if((mod & __afmod_read) && !(mod & __afmod_write)) flag |= O_RDONLY;
+    if((mod & __afmod_write) && !(mod & __afmod_read)) flag |= O_WRONLY;
+    if((mod & __afmod_write) && (mod & __afmod_read)) flag |= O_RDWR;
+    if(mod & __afmod_noblock) flag |= O_NONBLOCK;
+    if(mod & __afmod_appent) flag |= O_APPEND;
+
+    Afd fd = A_INIT(Afd);
+    if((self->type == __aftype_file || self->type == __aftype_device) && self->num != 0){
+        fd = open(name.s, flag);
+    }else{
+        fd = dup(self->fd);
     }
 
-    if(self->mod == __afmod_aw){
-        flag |= O_APPEND;
-    }
-
-    int fd = open(name.s, flag);
-    if(fd < 0){
+    if(!Afd_exist(fd)){
         aExcSet(AEXC_system_error);
         return -1;
     }
@@ -757,409 +522,512 @@ static int AFileNode_instantiation(AFileNode* self, int mod, bool noblock){
 
 
 /*************************************************************************/
-AHash_Define(AText,AShPtr(AFileNode));
-AHash_Generate(AText,AShPtr(AFileNode));
-A_TYPE_REGISTER(AHash(AText,AShPtr(AFileNode)));
+AHash_Define(AString,AShPtr(AFileNode));
+AHash_Generate(AString,AShPtr(AFileNode));
+A_TYPE_REGISTER(AHash(AString,AShPtr(AFileNode)));
 
-typedef struct{
-    bool                            flag;
-    AMtxRW                          lock;
-    AHash(AText,AShPtr(AFileNode))  table;
-}AFileSystem;
+static bool         afsflag = false;
+static AMtxRW       afslock;
+static AHash(AString,AShPtr(AFileNode)) afstable;
 
-static inline void A_OBJ_INIT(AFileSystem)(AFileSystem* self){
-    aExcClean(); self->lock = A_INIT(AMtxRW); if(aExcOccur()){
+__attribute__((constructor)) static inline void afs_start(){
+    aExcClean(); afstable = A_INIT(AHash(AString,AShPtr(AFileNode))); if(aExcOccur()){
         return;
     }
-
-    aExcClean(); self->table = A_INIT(AHash(AText,AShPtr(AFileNode))); if(aExcOccur()){
+    aExcClean(); afslock = A_INIT(AMtxRW);if(aExcOccur()){
         return;
     }
-
-    self->flag = true;
+    afsflag = true;
+}
+__attribute__((destructor)) static inline void afs_poweroff(){
+    afsflag = false;
+    A_DEST(AHash(AString,AShPtr(AFileNode)), afstable);
+    A_DEST(AMtxRW, afslock);
 }
 
-static inline void A_OBJ_DEST(AFileSystem)(AFileSystem* self){
-    self->flag = false;
-    A_DEST(AMtxRW, self->lock);
-    A_DEST(AHash(AText,AShPtr(AFileNode)), self->table);
-}
-
-static inline void A_OBJ_COPY(AFileSystem)(__noused AFileSystem* self, __noused const AFileSystem* that){
-    aExcSet(AEXC_init_failed);
-}
-
-static inline int A_OBJ_CMPD(AFileSystem)(__noused const AFileSystem* self, __noused const AFileSystem* that){
-    return 0;
-}
-
-A_TYPE_REGISTER(AFileSystem);
-
-static inline void AFileSystem_add(AFileSystem* self, AText name, int mod, bool noblock, bool exclusive){
-    if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+static inline void afs_add(int type, AString _name, int mod){
+    aExcClean();
+    RAII(AString) name = A_INIT(AString); name.f->addBack(&name, _name);
+    if(aExcOccur()){
         return;
     }
-    auto tab = &self->table;
+    auto tab = &afstable;
 
     aExcClean(); RAII(AShPtr(AFileNode)) ptr = AShPtrNew(AFileNode);if(aExcOccur()){
         return;
     }
     AFileNode* node = ptr.p;
 
-    AFileNode_open(node, name, mod, noblock, exclusive);if(aExcOccur()){
+    AFileNode_open(node, type, name, mod);if(aExcOccur()){
         return;
     }
 
     tab->f->ins(tab, name, ptr);
 }
 
-static inline AShPtr(AFileNode)* AFileSystem_find(AFileSystem* self, AText name){
-    if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
-        return nullptr;
-    }
-
-    auto tab = &self->table;
-    return tab->f->at(tab, name);
-}
-
-static inline void AFileSystem_rm(AFileSystem* self, AText name){
-    if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+static inline void afs_add_fd(Afd fd, int type, AString _name, int mod){
+    aExcClean();
+    RAII(AString) name = A_INIT(AString); name.f->addBack(&name, _name);
+    if(aExcOccur()){
         return;
     }
 
-    auto tab = &self->table;
+    auto tab = &afstable;
+
+    aExcClean(); RAII(AShPtr(AFileNode)) ptr = AShPtrNew(AFileNode);if(aExcOccur()){
+        return;
+    }
+    AFileNode* node = ptr.p;
+
+    AFileNode_set(node, fd, type, name, mod);if(aExcOccur()){
+        return;
+    }
+
+    tab->f->ins(tab, name, ptr);
+}
+
+
+static inline AShPtr(AFileNode)* afs_find(AString name){
+    auto tab = &afstable;
+    auto ret = tab->f->at(tab, name);
+    aExcClean();
+    return ret;
+}
+
+static inline void afs_rm(AString name){
+    auto tab = &afstable;
     tab->f->rm(tab, name);
+    aExcClean();
 }
 
-static inline void AFileSystem_close(AFileSystem* self, AText name, int fd){
-    if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
-        return;
-    }
-
-    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&self->lock); if(aExcOccur()){
-        return;
-    }
-    if(!self->flag){
-        aExcSet(AEXC_system_error);
-        return;
-    }
-
-    auto ptrp = AFileSystem_find(self, name);
-    if(__a_unlikely(ptrp == nullptr)){
-        return;
-    }
-    auto ptr = *ptrp;
-    if(AFileNode_close(ptr.p, fd) == 0){
-        AFileSystem_rm(self, name);
-    }
-}
-
-static inline AFile AFileSystem_open(AFileSystem* self, int mod, bool noblock, bool exclusive, AText name){
-    AFile file = A_INIT(AFile);
-
-    if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
-        return file;
-    }
-
-    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&self->lock); if(aExcOccur()){
-        return file;
-    }
-    if(!self->flag){
-        aExcSet(AEXC_system_error);
-        return file;
-    }
-
-    auto ptrp = AFileSystem_find(self, name);
-    if(__a_unlikely(ptrp == nullptr)){
-        aExcClean();AFileSystem_add(self, name, mod, noblock, exclusive);if(aExcOccur()){
-            return file;
+static inline bool afs_readable(AString name){
+    auto shp = afs_find(name);
+    if(shp == nullptr){
+        return true;
+    }else{
+        auto node = shp->p; auto mod = node->mod;
+        if((mod & __afmod_read)){
+            if((!(mod & __afmod_exclusive)) || node->tid == thrd_current()){
+                return true;
+            }
         }
-        ptrp = AFileSystem_find(self, name);
+    }
+    return false;
+}
+
+static inline bool afs_writeable(AString name){
+    auto shp = afs_find(name);
+    if(shp == nullptr){
+        return true;
+    }else{
+        auto node = shp->p; auto mod = node->mod;
+        if((mod & __afmod_write)){
+            if((!(mod & __afmod_exclusive)) || node->tid == thrd_current()){
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static inline void afs_copy(AString src, AString tar){
+    if(!afs_readable(src) || !afs_writeable(tar)){
+        aExcSet(AEXC_system_error);
+        return;
+    }
+
+    Afd src_fd = open(src.s, O_RDONLY);
+    Afd tar_fd = open(tar.s, O_WRONLY | O_CREAT | O_TRUNC, 0755);
+    if(!Afd_exist(src_fd) || !Afd_exist(tar_fd)){
+        if(Afd_exist(src_fd)) a_close(src_fd);
+        if(Afd_exist(tar_fd)) a_close(tar_fd);
+        aExcSet(AEXC_system_error);
+        return;
+    }
+
+    aExcClean();
+    char buf[512]; memset(buf, 0, 512);
+    auto info = __af_get_info(src.s);
+    auto size = info.st_size;
+    uint64_t n = size / 512;
+    if(aExcOccur()){
+        if(Afd_exist(src_fd)) a_close(src_fd);
+        if(Afd_exist(tar_fd)) a_close(tar_fd);
+        return;
+    }
+
+    int ret = 0;
+    for(uint64_t i = 0; i < n; i++){
+        memset(buf, 0, 512);
+        if(read(src_fd, buf, 512) != 512){
+            ret = AEXC_system_error;
+            break;
+        }
+        if(write(tar_fd, buf, 512) != 512){
+            ret = AEXC_system_error;
+            break;
+        }
+    }
+    ssize_t x = size % 512;
+    if(ret == 0){
+        if(read(src_fd, buf, x) != x){
+            ret = AEXC_system_error;
+        }
+    }
+    if(ret == 0){
+        if(write(tar_fd, buf, x) != x){
+            ret = AEXC_system_error;
+        }
+    }
+
+    if(Afd_exist(src_fd)) a_close(src_fd);
+    if(Afd_exist(tar_fd)) a_close(tar_fd);
+    if(ret != 0) aExcSet(ret);
+}
+
+static inline void afs_close(AString name, Afd fd){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return;
+    }
+    if(!afsflag){
+        aExcSet(AEXC_system_error);
+        return;
+    }
+
+    auto ptrp = afs_find(name);
+    if(__a_unlikely(ptrp == nullptr)){
+        if(Afd_exist(fd)) a_close(fd);
+        return;
+    }
+    auto node = ptrp->p;
+    if(AFileNode_close(node, fd) == 0){
+        afs_rm(name);
+    }
+}
+
+static inline void afs_open(AFile* file, int type, const char* name, int32_t mod){
+    if(__a_unlikely(file == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return;
+    }
+    if(!afsflag){
+        aExcSet(AEXC_system_error);
+        return;
+    }
+
+    auto ptrp = afs_find(AString_new(name));
+    if(__a_unlikely(ptrp == nullptr)){
+        aExcClean();
+        afs_add(type, AString_new(name), mod);
+        if(aExcOccur()){
+            return;
+        }
+        ptrp = afs_find(AString_new(name));
         if(__a_unlikely(ptrp == nullptr)){
-            return file;
+            return;
         }
     }
-    auto ptr = *ptrp;
-    auto node = ptr.p;
-    aExcClean(); file.fd = AFileNode_instantiation(node, mod, noblock); if(aExcOccur()){
-        return file;
+    auto node = ptrp->p;
+    file->fd = AFileNode_instantiation(node, mod);
+    if(!Afd_exist(file->fd)){
+        return;
     }
-    file.name = A_COPY(AText, name);
-    file.node = A_COPY(AShPtr(AFileNode), ptr);
-    return file;
+
+    aExcClean();
+    file->name = A_INIT(AString); file->name.f->addBack(&file->name, AString_new(name));
+    file->node = A_COPY(AShPtr(AFileNode), *ptrp);
+    if(aExcOccur()){
+        A_DEST(AFile, *file);
+        file->fd = A_INIT(Afd);
+    }
+
+    return;
 }
 
-static inline AFile AFileSystem_open_copy(AFileSystem* self, AText name){
-    AFile file = A_INIT(AFile);
-
-    if(__a_unlikely(self == nullptr)){
+static inline void afs_register(AFile* file, int fd, int type, const char* name, int32_t mod){
+    if(__a_unlikely(file == nullptr)){
         aExcSet(AEXC_nullptr);
-        return file;
+        return;
+    }
+    if(!Afd_exist(fd)){
+        aExcSet(AEXC_init_failed);
+        return;
     }
 
-    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&self->lock); if(aExcOccur()){
-        return file;
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return;
     }
-    if(!self->flag){
+    if(!afsflag){
         aExcSet(AEXC_system_error);
-        return file;
+        return;
     }
 
-    auto ptrp = AFileSystem_find(self, name);
+    auto ptrp = afs_find(AString_new(name));
+    if(__a_unlikely(ptrp != nullptr)){
+        aExcSet(AEXC_repeat_write);
+        return;
+    }
+
+    aExcClean();
+    afs_add_fd(fd, type, AString_new(name), mod);
+    if(aExcOccur()){
+        return;
+    }
+    ptrp = afs_find(AString_new(name));
     if(__a_unlikely(ptrp == nullptr)){
-        aExcSet(AEXC_outdomain);
-        return file;
+        return;
     }
+
     auto ptr = *ptrp;
-    auto node = ptr.p;
-    aExcClean(); file.fd = AFileNode_instantiation(node, node->mod, node->noblock); if(aExcOccur()){
-        return file;
+    file->fd = fd;
+
+    aExcClean();
+    file->name = A_INIT(AString); file->name.f->addBack(&file->name, AString_new(name));
+    file->node = A_COPY(AShPtr(AFileNode), ptr);
+    if(aExcOccur()){
+        A_DEST(AFile, *file);
+        file->fd = A_INIT(Afd);
     }
-    file.name = A_COPY(AText, name);
-    file.node = A_COPY(AShPtr(AFileNode), ptr);
-    return file;
+    return;
 }
 
-static inline int AFileSystem_ioctl(AFileSystem* self, AShPtr(AFileNode) ptr, int fd, int cmd, void* buf){
-    if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
-        return 0;
-    }
-
+static inline int afs_ioctl(AShPtr(AFileNode) ptr, Afd fd, int cmd, void* buf){
     auto node = ptr.p;
-    if(__a_unlikely(node == nullptr || fd < 0)){
+    if(__a_unlikely(node == nullptr || !Afd_exist(fd))){
         aExcSet(AEXC_outdomain);
         return 0;
     }
-    if(!(node->mod == __afmod_rw)){
+
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return 0;
+    }
+    if(!afsflag){
         aExcSet(AEXC_system_error);
         return 0;
     }
 
-    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&self->lock); if(aExcOccur()){
-        return 0;
-    }
-    if(!self->flag){
-        aExcSet(AEXC_system_error);
-        return 0;
+    if(!((node->mod & __afmod_exclusive) && (node->tid == thrd_current()))){
+        if(AFileNode_uplock_w(node) != 0){
+            aExcSet(AEXC_system_error);
+            return 0;
+        }
     }
     A_DEST(AAutoKey, key);
-
-    if(AFileNode_uplock_w(node) != 0){
-        aExcSet(AEXC_system_error);
-        return 0;
-    }
 
     int ret = ioctl(fd, cmd, buf);
 
-    if(AFileNode_unlock_w(node) != 0){
-        aExcSet(AEXC_system_error);
-        return ret;
+    if(!((node->mod & __afmod_exclusive) && (node->tid == thrd_current()))){
+        if(AFileNode_unlock_w(node) != 0){
+            aExcSet(AEXC_system_error);
+            return ret;
+        }
     }
 
     return ret;
 }
 
-static inline int AFileSystem_read(AFileSystem* self, AShPtr(AFileNode) ptr, int fd, void* target, size_t size){
-    if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
-        return 0;
-    }
-
+static inline int afs_read(AShPtr(AFileNode) ptr, Afd fd, void* target, size_t size){
     auto node = ptr.p;
-    if(__a_unlikely(node == nullptr || fd < 0)){
+    if(__a_unlikely(node == nullptr || !Afd_exist(fd))){
         aExcSet(AEXC_outdomain);
         return 0;
     }
-    if(!(node->mod == __afmod_r || node->mod == __afmod_rw)){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&afslock); if(aExcOccur()){
+        return 0;
+    }
+
+    if(!afsflag){
+        aExcSet(AEXC_system_error);
+        return 0;
+    }
+    if(!(node->mod & __afmod_read)){
         aExcSet(AEXC_system_error);
         return 0;
     }
 
-    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&self->lock); if(aExcOccur()){
-        return 0;
-    }
-    if(!self->flag){
-        aExcSet(AEXC_system_error);
-        return 0;
+    if(!((node->mod & __afmod_exclusive) && (node->tid == thrd_current()))){
+        if(AFileNode_uplock_r(node) != 0){
+            aExcSet(AEXC_system_error);
+            return 0;
+        }
     }
     A_DEST(AAutoKey, key);
-
-    if(AFileNode_uplock_r(node) != 0){
-        aExcSet(AEXC_system_error);
-        return 0;
-    }
 
     int ret = read(fd, target, size);
 
-    if(AFileNode_unlock_r(node) != 0){
-        aExcSet(AEXC_system_error);
-        return ret;
+    if(!((node->mod & __afmod_exclusive) && (node->tid == thrd_current()))){
+        if(AFileNode_unlock_r(node) != 0){
+            aExcSet(AEXC_system_error);
+            return ret;
+        }
     }
 
     return ret;
 }
 
-static inline int AFileSystem_read_pos(AFileSystem* self, AShPtr(AFileNode) ptr, int fd, uint64_t offset, void* target, size_t size){
-    if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
-        return 0;
-    }
-
+static inline int afs_read_pos(AShPtr(AFileNode) ptr, Afd fd, uint64_t offset, void* target, size_t size){
     auto node = ptr.p;
-    if(__a_unlikely(node == nullptr || fd < 0)){
+    if(__a_unlikely(node == nullptr || !Afd_exist(fd))){
         aExcSet(AEXC_outdomain);
         return 0;
     }
-    if(!(node->mod == __afmod_r || node->mod == __afmod_rw)){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&afslock); if(aExcOccur()){
+        return 0;
+    }
+    if(!afsflag){
+        aExcSet(AEXC_system_error);
+        return 0;
+    }
+    if(!(node->mod & __afmod_read)){
         aExcSet(AEXC_system_error);
         return 0;
     }
 
-    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&self->lock); if(aExcOccur()){
-        return 0;
-    }
-    if(!self->flag){
-        aExcSet(AEXC_system_error);
-        return 0;
+    if(!((node->mod & __afmod_exclusive) && (node->tid == thrd_current()))){
+        if(AFileNode_uplock_r(node) != 0){
+            aExcSet(AEXC_system_error);
+            return 0;
+        }
     }
     A_DEST(AAutoKey, key);
-
-    if(AFileNode_uplock_r(node) != 0){
-        aExcSet(AEXC_system_error);
-        return 0;
-    }
 
     int ret = pread(fd, target, size, offset);
 
-   if(AFileNode_unlock_r(node) != 0){
-        aExcSet(AEXC_system_error);
-        return ret;
+    if(!((node->mod & __afmod_exclusive) && (node->tid == thrd_current()))){
+        if(AFileNode_unlock_r(node) != 0){
+            aExcSet(AEXC_system_error);
+            return ret;
+        }
     }
-
 
     return ret;
 }
 
-static inline int AFileSystem_write(AFileSystem* self, AShPtr(AFileNode) ptr, int fd, void* source, size_t size){
-    if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
-        return 0;
-    }
-
+static inline int afs_write(AShPtr(AFileNode) ptr, Afd fd, void* source, size_t size){
     auto node = ptr.p;
-    if(__a_unlikely(node == nullptr || fd < 0)){
+    if(__a_unlikely(node == nullptr || !Afd_exist(fd))){
         aExcSet(AEXC_outdomain);
         return 0;
     }
-    if((node->mod == __afmod_r)){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return 0;
+    }
+    if(!afsflag){
+        aExcSet(AEXC_system_error);
+        return 0;
+    }
+    if(!(node->mod & __afmod_write)){
         aExcSet(AEXC_system_error);
         return 0;
     }
 
-    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&self->lock); if(aExcOccur()){
-        return 0;
-    }
-    if(!self->flag){
-        aExcSet(AEXC_system_error);
-        return 0;
+    if(!((node->mod & __afmod_exclusive) && (node->tid == thrd_current()))){
+        if(AFileNode_uplock_w(node) != 0){
+            aExcSet(AEXC_system_error);
+            return 0;
+        }
     }
     A_DEST(AAutoKey, key);
-
-    if(AFileNode_uplock_w(node) != 0){
-        aExcSet(AEXC_system_error);
-        return 0;
-    }
 
     int ret = write(fd, source, size);
 
-    if(AFileNode_unlock_w(node) != 0){
-        aExcSet(AEXC_system_error);
-        return ret;
+    if(!((node->mod & __afmod_exclusive) && (node->tid == thrd_current()))){
+        if(AFileNode_unlock_w(node) != 0){
+            aExcSet(AEXC_system_error);
+            return ret;
+        }
     }
 
     return ret;
 }
 
-static inline int AFileSystem_write_pos(AFileSystem* self, AShPtr(AFileNode) ptr, int fd, uint64_t offset, void* source, size_t size){
-    if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
-        return 0;
-    }
-
+static inline int afs_write_pos(AShPtr(AFileNode) ptr, Afd fd, uint64_t offset, void* source, size_t size){
     auto node = ptr.p;
-    if(__a_unlikely(node == nullptr || fd < 0)){
+    if(__a_unlikely(node == nullptr || !Afd_exist(fd))){
         aExcSet(AEXC_outdomain);
         return 0;
     }
-    if((node->mod == __afmod_r)){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return 0;
+    }
+    if(!(node->mod & __afmod_write)){
         aExcSet(AEXC_system_error);
         return 0;
     }
 
-    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&self->lock); if(aExcOccur()){
-        return 0;
-    }
-    if(!self->flag){
+    if(!afsflag){
         aExcSet(AEXC_system_error);
         return 0;
+    }
+
+    if(!((node->mod & __afmod_exclusive) && (node->tid == thrd_current()))){
+        if(AFileNode_uplock_w(node) != 0){
+            aExcSet(AEXC_system_error);
+            return 0;
+        }
     }
     A_DEST(AAutoKey, key);
 
-    if(AFileNode_uplock_w(node) != 0){
-        aExcSet(AEXC_system_error);
-        return 0;
-    }
-
     int ret = pwrite(fd, source, size, offset);
 
-    if(AFileNode_unlock_w(node) != 0){
-        aExcSet(AEXC_system_error);
-        return ret;
+    if(!((node->mod & __afmod_exclusive) && (node->tid == thrd_current()))){
+        if(AFileNode_unlock_w(node) != 0){
+            aExcSet(AEXC_system_error);
+            return ret;
+        }
     }
 
     return ret;
 }
 
-#endif /* posix */
-
-
 
 /*************************************************************************/
-static AFileSystem afilesystem;
-
-__attribute__((constructor)) static inline void a_file_system_start(){
-    afilesystem = A_INIT(AFileSystem);
-}
-__attribute__((destructor)) static inline void a_file_system_poweroff(){
-    A_DEST(AFileSystem, afilesystem);
-}
-
-void AFile_close(AFile* self){
-    if(self == nullptr || self->fd < 0){
-        return;
-    }
-    aExcClean();
-    AFileSystem_close(&afilesystem, self->name, self->fd);
-    if(aExcOccur()){
-        if(self->fd >= 0) close(self->fd);
+static inline AString AFile_getip(AFile* self){
+    AString addr = A_INIT(AString);
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return addr;
     }
 
-    A_DEST(AShPtr(AFileNode), self->node);
-    A_DEST(AText, self->name);
-    memset(self, 0, sizeof(AFile));
-    self->fd = -1;
-}
-AFile AFile_open_copy(AText name){
-    return AFileSystem_open_copy(&afilesystem, name);
-}
-AFile AFile_open(int mod, bool noblock, bool exclusive, AText name){
-    return AFileSystem_open(&afilesystem, mod, noblock, exclusive, name);
+    if(!Afd_exist(self->fd)){
+        aExcSet(AEXC_outdomain);
+        return addr;
+    }
+
+    auto node = self->node.p;
+    if(node->type != __aftype_socket){
+        aExcSet(AEXC_outdomain);
+        return addr;
+    }
+    auto name = &node->name; auto p = name->s;
+    if(strncmp(p, "tcp|", 4) == 0){
+        p += 4;
+    }else if(strncmp(p, "udp|", 4) == 0){
+        p += 4;
+    }else if(strncmp(p, "raw|", 4) == 0){
+        p += 4;
+    }else if(strncmp(p, "unix|", 5) == 0){
+        p += 5;
+    }else{
+        aExcSet(AEXC_outdomain);
+        return addr;
+    }
+
+    if(strncmp(p, "server|", 7) == 0){
+        p += 7;
+    }else if(strncmp(p, "client|", 7) == 0){
+        p += 7;
+    }else{
+        aExcSet(AEXC_outdomain);
+        return addr;
+    }
+
+    addr.f->addBack(&addr, AString_new(p));
+    return addr;
 }
 
 int32_t  AFile_ioctl(AFile* self, int32_t cmd, void* buf){
@@ -1167,12 +1035,12 @@ int32_t  AFile_ioctl(AFile* self, int32_t cmd, void* buf){
         aExcSet(AEXC_nullptr);
         return 0;
     }
-    if(self->fd < 0){
+    if(!Afd_exist(self->fd)){
         aExcSet(AEXC_outdomain);
         return 0;
     }
 
-    int ret = AFileSystem_ioctl(&afilesystem, self->node, self->fd, cmd, buf);
+    int ret = afs_ioctl(self->node, self->fd, cmd, buf);
     if(ret < 0){
         aExcSet(AEXC_system_error);
         ret = 0;
@@ -1185,12 +1053,12 @@ uint32_t AFile_read (AFile* self, size_t size, void* target){
         aExcSet(AEXC_nullptr);
         return 0;
     }
-    if(self->fd < 0){
+    if(!Afd_exist(self->fd)){
         aExcSet(AEXC_outdomain);
         return 0;
     }
 
-    int ret = AFileSystem_read(&afilesystem, self->node, self->fd, target, size);
+    int ret = afs_read(self->node, self->fd, target, size);
     if(ret < 0){
         aExcSet(AEXC_system_error);
         ret = 0;
@@ -1203,12 +1071,12 @@ uint32_t AFile_write(AFile* self, size_t size, void* source){
         aExcSet(AEXC_nullptr);
         return 0;
     }
-    if(self->fd < 0){
+    if(!Afd_exist(self->fd)){
         aExcSet(AEXC_outdomain);
         return 0;
     }
 
-    int ret = AFileSystem_write(&afilesystem, self->node, self->fd, source, size);
+    int ret = afs_write(self->node, self->fd, source, size);
     if(ret < 0){
         aExcSet(AEXC_system_error);
         ret = 0;
@@ -1221,12 +1089,12 @@ uint32_t AFile_read_pos(AFile* self, uint64_t offset, size_t size, void* target)
         aExcSet(AEXC_nullptr);
         return 0;
     }
-    if(self->fd < 0){
+    if(!Afd_exist(self->fd)){
         aExcSet(AEXC_outdomain);
         return 0;
     }
 
-    int ret = AFileSystem_read_pos(&afilesystem, self->node, self->fd, offset, target, size);
+    int ret = afs_read_pos(self->node, self->fd, offset, target, size);
     if(ret < 0){
         aExcSet(AEXC_system_error);
         ret = 0;
@@ -1239,12 +1107,12 @@ uint32_t AFile_write_pos(AFile* self, uint64_t offset, size_t size, void* source
         aExcSet(AEXC_nullptr);
         return 0;
     }
-    if(self->fd < 0){
+    if(!Afd_exist(self->fd)){
         aExcSet(AEXC_outdomain);
         return 0;
     }
 
-    int ret = AFileSystem_write_pos(&afilesystem, self->node, self->fd, offset, source, size);
+    int ret = afs_write_pos(self->node, self->fd, offset, source, size);
     if(ret < 0){
         aExcSet(AEXC_system_error);
         ret = 0;
@@ -1252,5 +1120,947 @@ uint32_t AFile_write_pos(AFile* self, uint64_t offset, size_t size, void* source
     return (uint32_t)ret;
 }
 
+void AFile_close(AFile* self){
+    if(self == nullptr || !Afd_exist(self->fd)){
+        return;
+    }
+    aExcClean();
+    afs_close(self->name, self->fd);
+    if(aExcOccur()){
+        if(Afd_exist(self->fd)) a_close(self->fd);
+    }
+
+    A_DEST(AShPtr(AFileNode), self->node);
+    A_DEST(AString, self->name);
+    memset(self, 0, sizeof(AFile));
+    self->fd = A_INIT(Afd);
+}
+
+void AFile_register(AFile* self, Afd fd, int type, const char* name, int mod){
+    if(self == nullptr){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+
+    if(Afd_exist(self->fd)){
+        aExcSet(AEXC_init_failed);
+        return;
+    }
+
+    if(!(mod & __afmod_read)){ mod &= ~__afmod_noblock; }
+    if(!(mod & __afmod_write)){ mod &= ~__afmod_creat; }
+    if(!(mod & __afmod_write)){ mod &= ~__afmod_exclusive; }
+    switch(type){
+        case __aftype_file:  break;
+        case __aftype_device:break;
+        case __aftype_socket:break;
+        default: aExcSet(AEXC_outdomain); return; break;
+    }
+
+    afs_register(self, fd, type, name, mod);
+}
+
+void AFile_open(AFile* self, int type, const char* name, int mod){
+    if(self == nullptr){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+
+    if(Afd_exist(self->fd) || name == nullptr || mod == 0 || type == 0){
+        aExcSet(AEXC_init_failed);
+        return;
+    }
+
+    if(!(mod & __afmod_read)){ mod &= ~__afmod_noblock; }
+    if(!(mod & __afmod_write)){ mod &= ~__afmod_creat; }
+    if(!(mod & __afmod_write)){ mod &= ~__afmod_exclusive; }
+    switch(type){
+        case __aftype_file:  break;
+        case __aftype_device:break;
+        case __aftype_socket:break;
+        default: aExcSet(AEXC_outdomain); return; break;
+    }
+
+    afs_open(self, type, name, mod);
+}
 
 
+
+/*************************************************************************/
+AFile aFileInOpen(const char* name){
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    RAII(AString) path = __af_path_absolute(name);
+
+    int mod = __afmod_read;
+    AFile_open(&file, __aftype_file, path.s, mod);
+    return file;
+}
+AFile aFileOutOpen(const char* name){
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    RAII(AString) path = __af_path_absolute(name);
+
+    int mod = __afmod_write | __afmod_exclusive | __afmod_creat | __afmod_truncate;
+    AFile_open(&file, __aftype_file, path.s, mod);
+    return file;
+}
+AFile aFileEndOpen(const char* name){
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    RAII(AString) path = __af_path_absolute(name);
+
+    int mod = __afmod_write | __afmod_appent | __afmod_creat;
+    AFile_open(&file, __aftype_file, path.s, mod);
+    return file;
+}
+
+AFile aDevInOpen(const char* name, bool noblock){
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    RAII(AString) path = __af_path_absolute(name);
+
+    int mod = __afmod_read;
+    if(noblock) mod |= __afmod_noblock;
+    AFile_open(&file, __aftype_device, path.s, mod);
+    return file;
+}
+AFile aDevOutOpen(const char* name, bool exclusive){
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    RAII(AString) path = __af_path_absolute(name);
+
+    int mod = __afmod_write;
+    if(exclusive) mod |= __afmod_exclusive;
+    AFile_open(&file, __aftype_device, path.s, mod);
+    return file;
+}
+AFile aDevInOutOpen(const char* name, bool noblock, bool exclusive){
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    RAII(AString) path = __af_path_absolute(name);
+
+    int mod = __afmod_read | __afmod_write;
+    if(noblock) mod |= __afmod_noblock;
+    if(exclusive) mod |= __afmod_exclusive;
+    AFile_open(&file, __aftype_device, path.s, mod);
+    return file;
+}
+
+AFile aSocketTcpServerOpen(const char* name){
+    RAII(AString) addr = AString_new("tcp|server|");
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    aExcClean(); addr.f->addBack(&addr, AString_new(name)); if(aExcOccur()){
+        return file;
+    }
+
+    int mod = __afmod_read | __afmod_write;
+    AFile_open(&file, __aftype_socket, addr.s, mod);
+    return file;
+}
+AFile aSocketUdpServerOpen(const char* name){
+    RAII(AString) addr = AString_new("udp|server|");
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    aExcClean(); addr.f->addBack(&addr, AString_new(name)); if(aExcOccur()){
+        return file;
+    }
+
+    int mod = __afmod_read | __afmod_write;
+    AFile_open(&file, __aftype_socket, addr.s, mod);
+    return file;
+}
+AFile aSocketUnixServerOpen(const char* name){
+    RAII(AString) addr = AString_new("unix|server|");
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    aExcClean(); addr.f->addBack(&addr, AString_new(name)); if(aExcOccur()){
+        return file;
+    }
+
+    int mod = __afmod_read | __afmod_write;
+    AFile_open(&file, __aftype_socket, addr.s, mod);
+    return file;
+}
+AFile aSocketRawServerOpen(const char* name){
+    RAII(AString) addr = AString_new("raw|server|");
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    aExcClean(); addr.f->addBack(&addr, AString_new(name)); if(aExcOccur()){
+        return file;
+    }
+
+    int mod = __afmod_read | __afmod_write;
+    AFile_open(&file, __aftype_socket, addr.s, mod);
+    return file;
+}
+AFile aSocketTcpClientOpen(const char* name){
+    RAII(AString) addr = AString_new("tcp|client|");
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    aExcClean(); addr.f->addBack(&addr, AString_new(name)); if(aExcOccur()){
+        return file;
+    }
+
+    int mod = __afmod_read | __afmod_write;
+    AFile_open(&file, __aftype_socket, addr.s, mod);
+    return file;
+}
+AFile aSocketUdpClientOpen(const char* name){
+    RAII(AString) addr = AString_new("udp|client|");
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    aExcClean(); addr.f->addBack(&addr, AString_new(name)); if(aExcOccur()){
+        return file;
+    }
+
+    int mod = __afmod_read | __afmod_write;
+    AFile_open(&file, __aftype_socket, addr.s, mod);
+    return file;
+}
+AFile aSocketUnixClientOpen(const char* name){
+    RAII(AString) addr = AString_new("unix|client|");
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    aExcClean(); addr.f->addBack(&addr, AString_new(name)); if(aExcOccur()){
+        return file;
+    }
+
+    int mod = __afmod_read | __afmod_write;
+    AFile_open(&file, __aftype_socket, addr.s, mod);
+    return file;
+}
+AFile aSocketRawClientOpen(const char* name){
+    RAII(AString) addr = AString_new("raw|client|");
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(name == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+    aExcClean(); addr.f->addBack(&addr, AString_new(name)); if(aExcOccur()){
+        return file;
+    }
+
+    int mod = __afmod_read | __afmod_write;
+    AFile_open(&file, __aftype_socket, addr.s, mod);
+    return file;
+}
+AFile aSocketTcpAccept(AFile* tcp_server){
+    static atomic_ulong accept_num = 0;
+
+    RAII(AString) addr = AString_new("tcp|client|");
+    AFile file = A_INIT(AFile);
+    if(__a_unlikely(tcp_server == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return file;
+    }
+
+    aExcClean(); RAII(AString) ip = AFile_getip(tcp_server); if(aExcOccur()){
+        return file;
+    }
+    aExcClean(); addr.f->addBack(&addr, ip); if(aExcOccur()){
+        return file;
+    }
+    char accept_end[12]; memset(accept_end, 0, 12);
+    snprintf(accept_end, 10, "|%-8lu", (unsigned long)atomic_fetch_add(&accept_num, 1));
+    aExcClean(); addr.f->addBack(&addr, AString_new(accept_end)); if(aExcOccur()){
+        return file;
+    }
+
+    struct sockaddr_in client_addr; memset(&client_addr, 0, sizeof(client_addr));
+    socklen_t client_len = sizeof(client_addr);
+    Afd client_fd = accept(tcp_server->fd, (struct sockaddr*)&client_addr, &client_len);
+    if(!Afd_exist(client_fd)){
+        aExcSet(AEXC_system_error);
+        return file;
+    }
+
+    int mod = __afmod_read | __afmod_write;
+    aExcClean();
+    AFile_register(&file, client_fd, __aftype_socket, addr.s, mod);
+    if(aExcOccur()){
+        a_close(client_fd);
+    }
+    return file;
+}
+
+
+
+/*************************************************************************/
+static AFileInfo __af_get_info(const char* name){
+    AFileInfo info = {0};
+    if(name == nullptr){
+        aExcSet(AEXC_nullptr);
+        return info;
+    }
+
+    struct stat st;
+    if(stat(name, &st) != 0){
+        aExcSet(AEXC_system_error);
+        return info;
+    }
+
+    info.st_dev = (uint64_t)st.st_dev;
+    info.st_ino = (uint64_t)st.st_ino;
+    info.st_mode = (uint32_t)st.st_mode;
+    info.st_nlink = (uint32_t)st.st_nlink;
+    info.st_uid = (uint32_t)st.st_uid;
+    info.st_gid = (uint32_t)st.st_gid;
+    info.st_rdev = (uint64_t)st.st_rdev;
+    info.st_size = (uint64_t)st.st_size;
+    info.st_atime = (stat_time_t)st.st_atim.tv_sec;
+    info.st_mtime = (stat_time_t)st.st_mtim.tv_sec;
+    info.st_ctime = (stat_time_t)st.st_ctim.tv_sec;
+    return info;
+}
+
+static bool __af_path_exist(const char* name){
+    struct stat st;
+    return name != nullptr && stat(name, &st) == 0;
+}
+
+static bool __af_isfile(const char* name){
+    struct stat st;
+    return name != nullptr && stat(name, &st) == 0 && S_ISREG(st.st_mode);
+}
+static bool __af_isdir(const char* name){
+    struct stat st;
+    return name != nullptr && stat(name, &st) == 0 && S_ISDIR(st.st_mode);
+}
+static bool __af_isdev(const char* name){
+    struct stat st;
+    return name != nullptr && stat(name, &st) == 0 &&
+        (S_ISCHR(st.st_mode) || S_ISBLK(st.st_mode) || S_ISFIFO(st.st_mode) || S_ISSOCK(st.st_mode));
+}
+
+static void __af_mkdir(const char* name){
+    if(name == nullptr){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    if(__af_isdir(name)){
+        return;
+    }
+
+    RAII(AString) all = A_INIT(AString);
+    if(name[0] == '/'){
+        aExcClean();
+        all.f->addBack(&all, AString_new(name));
+        if(aExcOccur()){
+            return;
+        }
+    }else{
+        aExcClean();
+        RAII(AString) text = __af_path_absolute(".");
+        all.f->addBack(&all, text);
+        all.f->addBack(&all, AString_new("/"));
+        all.f->addBack(&all, AString_new(name));
+        if(aExcOccur()){
+            return;
+        }
+    }
+
+    aExcClean(); RAII(AString) path = __af_dir_extract(all.s); if(aExcOccur()){
+        return;
+    }
+
+    if(!__af_path_exist(path.s)){
+        aExcClean(); __af_mkdir(path.s); if(aExcOccur()){
+            return;
+        }
+    }
+
+    if(__af_isdir(path.s)){
+        if(mkdir(all.s, 0755) != 0){
+            aExcSet(AEXC_system_error);
+            return;
+        }
+    }else{
+        aExcSet(AEXC_repeat_write);
+        return;
+    }
+}
+
+static void __af_rm(const char* name){
+    if(name == nullptr){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    if(!__af_isfile(name)){
+        aExcSet(AEXC_outdomain);
+        return;
+    }
+
+    if(remove(name) != 0){
+        aExcSet(AEXC_system_error);
+    }
+}
+static void __af_rm_r(const char* name){
+    if(name == nullptr){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    if(strcmp(name, "/") == 0){
+        aExcSet(AEXC_outdomain);
+        return;
+    }
+    if(__af_isfile(name)){
+        __af_rm(name);
+    }else if(__af_isdir(name)){
+        RAII(ALine(AString)) list = __af_ls(name);
+        forEach(it, list){
+            AString* x = it.p;
+            if(x != nullptr){
+                aExcClean(); __af_rm_r(x->s); if(aExcOccur()){
+                    return;
+                }
+            }
+        }
+        if(rmdir(name) != 0){
+            aExcSet(AEXC_system_error);
+            return;
+        }
+    }else{
+        aExcSet(AEXC_outdomain);
+    }
+}
+
+static void __af_cp(const char* name, const char* target){
+    if(name == nullptr || target == nullptr){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    if(!__af_isfile(name)){
+        aExcSet(AEXC_outdomain);
+        return;
+    }
+
+    RAII(AString) src = __af_path_absolute(name);
+    RAII(AString) tar = A_INIT(AString);
+
+    if(__af_isdir(target)){
+        aExcClean();
+        RAII(AString) fn = __af_name_extract(name);
+        RAII(AString) pt = __af_path_absolute(target);
+
+        tar.f->addBack(&tar, pt);
+        int len = strlen(tar.s);
+        if(len > 1 && tar.s[len - 1] != '/'){
+            tar.f->addBack(&tar, AString_new("/"));
+        }
+        tar.f->addBack(&tar, fn);
+        len = strlen(tar.s);
+        if(len > 1 && tar.s[len - 1] == '/'){
+            tar.f->popBack(&tar);
+        }
+
+        if(aExcOccur()){
+            return;
+        }
+    }else if(target[0] == '/'){
+        //绝对路径
+        aExcClean();
+        tar.f->addBack(&tar, AString_new(target));
+        if(aExcOccur()){
+            return;
+        }
+    }else{
+        //文件名
+        aExcClean();
+        RAII(AString) pt = __af_dir_extract(src.s);
+
+        tar.f->addBack(&tar, pt);
+        int len = strlen(tar.s);
+        if(len > 1 && tar.s[len - 1] != '/'){
+            tar.f->addBack(&tar, AString_new("/"));
+        }
+        tar.f->addBack(&tar, AString_new(target));
+        len = strlen(tar.s);
+        if(len > 1 && tar.s[len - 1] == '/'){
+            tar.f->popBack(&tar);
+        }
+
+        if(aExcOccur()){
+            return;
+        }
+    }
+
+    afs_copy(src, tar);
+}
+static void __af_cp_r(const char* name, const char* target){
+    if(name == nullptr || target == nullptr){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    if(strcmp(name, "/") == 0){
+        aExcSet(AEXC_outdomain);
+        return;
+    }
+    if(__af_isfile(name)){
+        __af_cp(name, target);
+        return;
+    }
+
+    if(__af_path_exist(target) && !__af_isdir(target)){
+        aExcSet(AEXC_outdomain);
+        return;
+    }
+
+    aExcClean();
+    RAII(AString) tar = AString_new(target);
+    {
+        int len = strlen(tar.s);
+        if(len > 1 && tar.s[len - 1] != '/'){
+            tar.f->addBack(&tar, AString_new("/"));
+        }
+    }
+    if(__af_path_exist(target)){
+        RAII(AString) src = __af_name_extract(name);
+        tar.f->addBack(&tar, src);
+        int len = strlen(tar.s);
+        if(len > 1 && tar.s[len - 1] != '/'){
+            tar.f->addBack(&tar, AString_new("/"));
+        }
+    }
+    __af_mkdir(tar.s);
+    RAII(ALine(AString)) list = __af_ls(name);
+    if(aExcOccur()){
+        return;
+    }
+
+    forEach(it, list){
+        AString* entry = it.p;
+        if(entry != nullptr){
+            aExcClean(); __af_cp_r(entry->s, tar.s); if(aExcOccur()){
+                return;
+            }
+        }
+    }
+}
+
+static void __af_mv(const char* name, const char* new_name){
+    if(name == nullptr || new_name == nullptr){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    RAII(AString) tar = AString_new(new_name);
+    if(__af_isdir(new_name)){
+        aExcClean();
+        RAII(AString) src = __af_name_extract(name);
+        int len = strlen(tar.s);
+        if(len > 1 && tar.s[len - 1] != '/'){
+            tar.f->addBack(&tar, AString_new("/"));
+        }
+        tar.f->addBack(&tar, src);
+        if(aExcOccur()){
+            return;
+        }
+    }
+    if(rename(name, tar.s) != 0){
+        aExcSet(AEXC_system_error);
+    }
+}
+
+static void __af_touch(const char* name){
+    if(name == nullptr){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    if(__af_path_exist(name)){
+        if(!__af_isfile(name) || __af_isdev(name)){
+            aExcSet(AEXC_outdomain);
+        }
+        return;
+    }
+    Afd fd = open(name, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if(!Afd_exist(fd)){
+        aExcSet(AEXC_system_error);
+        return;
+    }
+    a_close(fd);
+}
+
+static void __af_chmod(const char* name, int p){
+    if(name == nullptr){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    if(!__af_isfile(name)){
+        aExcSet(AEXC_outdomain);
+        return;
+    }
+    if(chmod(name, p) != 0){
+        aExcSet(AEXC_system_error);
+    }
+}
+static void __af_chmod_r(const char* name, int p){
+    if(name == nullptr){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    if(__af_isfile(name)){
+        __af_chmod(name, p);
+        return;
+    }else if(__af_isdir(name)){
+        if(chmod(name, p) != 0){
+            aExcSet(AEXC_system_error);
+            return;
+        }
+        RAII(ALine(AString)) list = __af_ls(name);
+        forEach(it, list){
+            AString* x = it.p;
+            if(x != nullptr){
+                aExcClean(); __af_chmod_r(x->s, p); if(aExcOccur()){
+                    return;
+                }
+            }
+        }
+    }else{
+        aExcSet(AEXC_outdomain);
+    }
+}
+
+static ALine(AString) __af_ls(const char* name){
+    ALine(AString) list = A_INIT(ALine(AString));
+
+    if(name == nullptr){
+        aExcSet(AEXC_nullptr);
+        return list;
+    }
+    if(__af_isfile(name)){
+        list.f->pushBack(&list, AString_new(name));
+        return list;
+    }
+    if(!__af_isdir(name)){
+        aExcSet(AEXC_outdomain);
+        return list;
+    }
+
+    aExcClean(); RAII(AString) path = __af_path_absolute(name); if(aExcOccur()){
+        return list;
+    }
+
+    DIR* dir = opendir(name);
+    if(dir == nullptr){
+        aExcSet(AEXC_system_error);
+        return list;
+    }
+
+    errno = 0;
+    struct dirent *entry;
+    while((entry = readdir(dir)) != nullptr){
+        // 跳过 "." 和 ".."
+        if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0){
+            continue;
+        }
+        aExcClean();
+        RAII(AString) text = A_COPY(AString, path);
+        text.f->addBack(&text, AString_new("/"));
+        text.f->addBack(&text, AString_new(entry->d_name));
+        if(aExcOccur()){
+            break;
+        }
+
+        aExcClean();
+        int len = strlen(text.s);
+        if(len > 1 && text.s[len - 1] == '/'){
+            text.f->popBack(&text);
+        }
+        if(aExcOccur()){
+            break;
+        }
+
+        list.f->pushBack(&list, text);
+        if(aExcOccur()){
+            break;
+        }
+    }
+
+    if(errno != 0){
+        aExcSet(AEXC_system_error);
+        errno = 0;
+    }
+    closedir(dir);
+
+    return list;
+}
+
+static AString __af_path_absolute(const char* name){
+    char buf[PATH_MAX]; memset(buf, 0, PATH_MAX);
+    AString text = A_INIT(AString);
+    if(name == nullptr){
+        aExcSet(AEXC_nullptr);
+        return text;
+    }
+
+    aExcClean();
+    if(name[0] == '/'){
+        text.f->addBack(&text, AString_new(name));
+    }else{
+        if(realpath(".", buf) == nullptr){
+            aExcSet(AEXC_system_error);
+            return text;
+        }
+
+        text.f->addBack(&text, AString_new(buf));
+        int len = strlen(text.s);
+        if(len > 1 && text.s[len - 1] != '/'){
+            text.f->addBack(&text, AString_new("/"));
+        }
+        text.f->addBack(&text, AString_new(name));
+    }
+
+    if(__af_isdir(text.s)){
+        int len = strlen(text.s);
+        if(len > 1 && text.s[len - 1] == '/'){
+            text.f->popBack(&text);
+        }
+    }
+
+    if(aExcOccur()){
+        return A_INIT(AString);
+    }
+
+    return text;
+}
+
+static AString __af_name_extract(const char* name){
+    AString text = A_INIT(AString);
+    if(name == nullptr){
+        aExcSet(AEXC_nullptr);
+        return text;
+    }
+    if(strcmp(name, "/") == 0){
+        text.f->addBack(&text, AString_new(name));
+        return text;
+    }
+
+    if(strlen(name) == 0){
+        aExcSet(AEXC_outdomain);
+        return text;
+    }
+    const char* p = name + strlen(name) - 1;
+
+    if(*p == '/') p--;
+    while(p != name){
+        if(*p == '/' && *(p-1) != '\\'){
+            break;
+        }
+        p--;
+    }
+
+    if(*p == '/') p++;
+    aExcClean(); text.f->addBack(&text, AString_new(p)); if(aExcOccur()){
+        return text;
+    }
+
+    int len = strlen(text.s);
+    if(len > 1 && text.s[len - 1] == '/'){
+        text.f->popBack(&text);
+    }
+
+    return text;
+}
+
+static AString __af_dir_extract(const char* name){
+    if(name == nullptr){
+        aExcSet(AEXC_nullptr);
+        return A_INIT(AString);
+    }
+    if(strcmp(name, "/") == 0){
+        AString path = A_INIT(AString);
+        path.f->addBack(&path, AString_new(name));
+        return path;
+    }
+
+    AString path = A_INIT(AString);
+    if(name[0] == '/'){
+        aExcClean();
+        path.f->addBack(&path, AString_new(name));
+        if(aExcOccur()){
+            return A_INIT(AString);
+        }
+    }else{
+        aExcClean();
+        RAII(AString) all = __af_path_absolute(name);
+        path.f->addBack(&path, all);
+        if(aExcOccur()){
+            return A_INIT(AString);
+        }
+    }
+
+    char* p = path.s + path.f->getNumber(&path); p--;
+    if(*p == '/') p++;
+    while(p != path.s){
+        if(*p == '/' && *(p-1) != '\\'){
+            break;
+        }
+        p--;
+    }
+    path.f->truncate(&path, (uint32_t)(p - path.s));
+
+    int len = strlen(path.s);
+    if(len > 1 && path.s[len - 1] == '/'){
+        path.f->popBack(&path);
+    }
+    return path;
+}
+
+
+
+/*************************************************************************/
+void af_mkdir(const char* name){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return;
+    }
+    __af_mkdir(name);
+}
+
+void af_rm(const char* name){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return;
+    }
+    __af_rm(name);
+}
+void af_rm_r(const char* name){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return;
+    }
+    __af_rm_r(name);
+}
+
+void af_cp(const char* name, const char* target){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return;
+    }
+    __af_cp(name, target);
+}
+void af_cp_r(const char* name, const char* target){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return;
+    }
+    __af_cp_r(name, target);
+}
+
+void af_mv(const char* name, const char* new_name){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return;
+    }
+    __af_mv(name, new_name);
+}
+
+void af_touch(const char* name){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return;
+    }
+    __af_touch(name);
+}
+
+void af_chmod(const char* name, int p){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return;
+    }
+    __af_chmod(name, p);
+}
+void af_chmod_r(const char* name, int p){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_wlock(&afslock); if(aExcOccur()){
+        return;
+    }
+    __af_chmod_r(name, p);
+}
+
+bool af_path_exist(const char* name){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&afslock); if(aExcOccur()){
+        return false;
+    }
+    return __af_path_exist(name);
+}
+bool af_isfile(const char* name){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&afslock); if(aExcOccur()){
+        return false;
+    }
+    return __af_isfile(name);
+}
+bool af_isdir(const char* name){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&afslock); if(aExcOccur()){
+        return false;
+    }
+    return __af_isdir(name);
+}
+bool af_isdev(const char* name){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&afslock); if(aExcOccur()){
+        return false;
+    }
+    return __af_isdev(name);
+}
+
+AString af_dir_extract(const char* name){
+    return __af_dir_extract(name);
+}
+
+AString af_name_extract(const char* name){
+    return __af_name_extract(name);
+}
+
+AString af_path_absolute(const char* name){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&afslock); if(aExcOccur()){
+        return A_INIT(AString);
+    }
+    return __af_path_absolute(name);
+}
+
+ALine(AString) af_ls(const char* dir){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&afslock); if(aExcOccur()){
+        return A_INIT(ALine(AString));
+    }
+    return __af_ls(dir);
+}
+AFileInfo af_get_info(const char* name){
+    aExcClean(); RAII(AAutoKey) key = AMtxRW_rlock(&afslock); if(aExcOccur()){
+        return A_INIT(AFileInfo);
+    }
+    return __af_get_info(name);
+}
+
+
+#endif /* posix */

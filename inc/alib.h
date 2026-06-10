@@ -231,10 +231,10 @@ typedef enum{
     AEXC_thrd_err = -14,            //线程错误返回
 }AEXC_t;
 extern thread_local int __A_EXC_VALUE__;
-static inline void aExcClean() { __A_EXC_VALUE__ = 0; }
-static inline bool aExcOccur() { return __A_EXC_VALUE__ != 0; };
-static inline void aExcSet(AEXC_t v) { __A_EXC_VALUE__ = v; };
-static inline int  aExcGet() { return __A_EXC_VALUE__; };
+static inline void aExcClean(void)  { __A_EXC_VALUE__ = 0; }
+static inline bool aExcOccur(void)  { return __A_EXC_VALUE__ != 0; };
+static inline void aExcSet(AEXC_t v){ __A_EXC_VALUE__ = v; };
+static inline int  aExcGet(void)    { return __A_EXC_VALUE__; };
 
 
 
@@ -384,7 +384,8 @@ static inline int  aExcGet() { return __A_EXC_VALUE__; };
 
 #define A_COPY(T, obj)({                                                            \
     auto __a_obj = (obj); __a_type_assert(T, __a_obj);                              \
-    T __a_objx; __A_OBJ_COPY_FUNC_SELF(T)(&__a_objx, &__a_obj); __a_objx;           \
+    T __a_objx; memset(&__a_objx, 0, sizeof(T));                                    \
+    __A_OBJ_COPY_FUNC_SELF(T)(&__a_objx, &__a_obj); __a_objx;                       \
 })                                                                                  \
 
 #define A_MOVE(obj)({                                                               \

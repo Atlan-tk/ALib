@@ -100,6 +100,7 @@ static inline uint32_t A_OBJ_HASH(AText)(const AText* self) {
 }
 
 __noused static inline void A_OBJ_INIT(AText)(AText* self) {
+    memset(self, 0, sizeof(AText));
     self->f = &A_FUNC_TAB(AText);
 }
 

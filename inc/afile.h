@@ -14,56 +14,73 @@ extern "C" {
 #include "aptr.h"
 #include "aline.h"
 #include "alock.h"
-#include "atext.h"
 #include "aclass.h"
+#include "astring.h"
+
 #include <stdio.h>
 #include <stdatomic.h>
 
 /* 创建目录 */
+/* af_mkdir("/tmp/test_dir"); 相当于mkdir -p*/
 void af_mkdir(const char* name);
-void af_mkdir_p(const char* name);
 
 /* 删除文件或目录 */
+/* af_rm("/tmp/test.txt") */
 void af_rm(const char* name);
+/* af_rm_r("/tmp/test_dir/") */
 void af_rm_r(const char* name);
 
 /* 复制文件或目录 */
+/* af_cp("/tmp/test.txt", "/tmp/test1.txt") */
 void af_cp(const char* name, const char* target);
+/* af_cp_r("/tmp/test_dir", "/tmp/test_dir1") */
 void af_cp_r(const char* name, const char* target);
 
 /* 移动文件或目录 */
+/* af_mv("/tmp/test.txt", "/tmp/test1.txt") */
 void af_mv(const char* name, const char* new_name);
 
 /* 创建空文件 */
+/* 若已存在则直接返回 */
+/* af_touch("/tmp/test.txt") */
 void af_touch(const char* name);
 
-/* 修改当前用户文件权限 */ /* p=0|1|2|4 */
-void af_chmod(const char* name, char p);
-void af_chmod_r(const char* name, char p);
+/* 修改当前用户文件权限 */ /* p=0|1|2|4 x/w/r */
+/* af_chmod("/tmp/test.txt", 0644) */
+void af_chmod(const char* name, int p);
+/* af_chmod_r("/tmp/test_dir", 0755); chmod -R */
+void af_chmod_r(const char* name, int p);
 
-/* 目标是文件 */
+/* 路径存在 */
+bool af_path_exist(const char* name);
+/* 目标是文件 *//* 包含设备 */
 bool af_isfile(const char* name);
 /* 目标是目录 */
 bool af_isdir(const char* name);
 /* 目标是设备 */
 bool af_isdev(const char* name);
 
-/* 提取目录 */
-/* 若为目录则直接返回 */
-/* 若为空则返回当前目录"." */
-AText af_dir_extract(const char* name);
+/* 提取上层目录 */
+/* 输入根目录返回根目录 *//* 末尾不带'/' */
+/* af_dir_extract("/tmp/test.txt"); return "/tmp" */
+AString af_dir_extract(const char* name);
 
-/* 获取绝对路径 */
-/* 若为空则返回当前目录的绝对路径 */
-AText af_path_absolute(const char* name);
+/* 提取文件/目录名 */
+/* 输入根目录返回根目录 *//* 末尾不带'/' */
+/* af_dir_extract("/tmp/test.txt"); return "test.txt" */
+/* af_dir_extract("/tmp/test_dir"); return "test_dir" */
+AString af_name_extract(const char* name);
 
-/* ls */
-ALine_Define(AText);
-ALine_Generate(AText);
-A_TYPE_REGISTER(ALine(AText));
-ALine(AText) af_ls(const char* dir);
-ALine(AText) af_ls_a(const char* dir);
-ALine(AText) af_ls_A(const char* dir);
+/* 获取绝对路径 *//* 末尾不带'/' */
+AString af_path_absolute(const char* name);
+
+ALine_Define(AString);
+ALine_Generate(AString);
+A_TYPE_REGISTER(ALine(AString));
+
+/* 获取文件/目录列表 */
+/* af_ls("/tmp/test_dir/"); ls -A */
+ALine(AString) af_ls(const char* dir);
 
 /* file info */
 typedef int64_t stat_time_t;
@@ -89,64 +106,138 @@ AFileInfo af_get_info(const char* name);
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>      // ioctl
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <netinet/in.h>
 
-ALine_Define(int);
-ALine_Generate(int);
-A_TYPE_REGISTER(ALine(int));
+typedef int Afd;
+static void A_OBJ_INIT(Afd)(Afd* self){ *self = -1; }
+static void A_OBJ_DEST(Afd)(Afd* self){ *self = -1; }
+static void A_OBJ_COPY(Afd)(Afd* self, const Afd* that){ *self = *that; }
+static int  A_OBJ_CMPD(Afd)(const Afd* self, const Afd* that){ return A_CMPD(int, *self, *that); }
+A_TYPE_REGISTER(Afd);
 
-typedef struct{
-    AText           name;       //绝对路径
-    struct flock    fl;         //文件锁
-    AMtx            fl_lock;    //文件锁保护锁
-    AMtxRW          lock;       //进程内读写锁
-    int             fd;         //文件描述符
-    int32_t         mod;        //0只读, 1只写, 2读写, 3追加
-    uint32_t        num;        //连接数量
-    uint64_t        size;       //文件体积
-    pid_t           pid;        //pid
-    bool            fl_stat;    //读写者数量
-    bool            noblock;    //是否非阻塞
-    bool            exclusive;  //是否独占
-    uint32_t        rnum;       //读者数
-    ALine(int)      fd_list;    //废弃的fd, 析构时统一释放
-}AFileNode;
-enum{
-    __afmod_r = 0,
-    __afmod_w = 1,
-    __afmod_rw = 2,
-    __afmod_aw = 3,
-};
-__noused static inline void A_OBJ_INIT(AFileNode)(AFileNode* self){
-    memset(self, 0, sizeof(AFileNode));
+static inline bool Afd_exist(Afd fd){
+    return fd < 0 ? false : true;
+}
 
-    self->fl = (struct flock){
+static inline int a_close(Afd fd){
+    return close(fd);
+}
+
+ALine_Define(Afd);
+ALine_Generate(Afd);
+A_TYPE_REGISTER(ALine(Afd));
+
+typedef pid_t Apid;
+static inline Apid a_get_pid(void){ return getpid(); }
+
+typedef struct flock AFileLock;
+static void A_OBJ_INIT(AFileLock)(AFileLock* self){
+    *self = (AFileLock){
         .l_type   = F_UNLCK,
         .l_whence = SEEK_SET,
         .l_start  = 0,
         .l_len    = 0,          // 整个文件
         .l_pid    = 0,          // 不用设置
     };
-    self->fd = -1;
-    self->pid = getpid();
-    self->name = A_INIT(AText);
+}
+static void A_OBJ_COPY(AFileLock)(__noused AFileLock* self, __noused const AFileLock* that){
+    //不可复制
+    aExcSet(AEXC_init_failed);
+}
+A_TYPE_REGISTER(AFileLock);
+static inline int AFileLock_uplock_read(AFileLock* self, Afd fd){
+    self->l_type = F_RDLCK;
+    int ret = fcntl(fd, F_SETLKW, self);
+    if(ret == -1){
+        aExcSet(AEXC_system_error);
+    }
+    return ret;
+}
+
+static inline int AFileLock_uplock_write(AFileLock* self, Afd fd){
+    self->l_type = F_WRLCK;
+    int ret = fcntl(fd, F_SETLKW, self);
+    if(ret == -1){
+        aExcSet(AEXC_system_error);
+    }
+    return ret;
+}
+
+static inline int AFileLock_unlock(AFileLock* self, Afd fd){
+    self->l_type = F_UNLCK;
+    int ret = fcntl(fd, F_SETLKW, self);
+    if(ret == -1){
+        aExcSet(AEXC_system_error);
+    }
+    return ret;
+}
+
+#endif /* posix */
+
+
+
+typedef struct{
+    AString         name;       //绝对路径
+    AFileLock       filelock;   //文件锁
+    AMtx            fl_lock;    //文件锁保护锁
+    AMtxRW          lock;       //进程内读写锁
+    ALine(Afd)      fd_list;    //废弃的fd, 析构时统一释放
+    Afd             fd;         //文件描述符
+    Apid            pid;        //pid
+    thrd_t          tid;        //tid
+    bool            fl_stat;    //文件锁状态
+    int32_t         mod;        //模式 & 属性
+    uint32_t        type;       //0.file, 1.device, 2+.socket
+    uint32_t        num;        //连接数量
+    uint32_t        rnum;       //读者数
+}AFileNode;
+enum{
+    __afmod_read = 0x0001,
+    __afmod_write = 0x0002,
+};
+enum{
+    __afmod_creat = 0x0004,
+    __afmod_appent = 0x0008,
+    __afmod_truncate = 0x0010,
+    __afmod_noblock = 0x0200,
+    __afmod_exclusive = 0x0400,
+};
+enum{
+    __aftype_file = 1,
+    __aftype_device,
+    __aftype_socket,    //持不支持域名,需要自行转换
+                        //支持tcp|udp|raw|unix
+};
+
+__noused static inline void A_OBJ_INIT(AFileNode)(AFileNode* self){
+    memset(self, 0, sizeof(AFileNode));
+
+    self->fd = A_INIT(Afd);
+    self->pid = a_get_pid();
+    self->tid = thrd_current();
+    self->name = A_INIT(AString);
     self->lock = A_INIT(AMtxRW);
     self->fl_lock = A_INIT(AMtx);
-    self->fd_list = A_INIT(ALine(int));
+    self->filelock= A_INIT(AFileLock);
+    self->fd_list = A_INIT(ALine(Afd));
 }
 __noused static inline void A_OBJ_DEST(AFileNode)(AFileNode* self){
-    if(self->fl_stat){
-        self->fl.l_type = F_UNLCK;
-        fcntl(self->fd, F_SETLKW, &self->fl);
+    if(self->fl_stat && (self->mod & __afmod_exclusive)){
+        AFileLock_unlock(&self->filelock, self->fd);
+        AMtxRW_unlock_write(&self->lock);
         self->fl_stat = false;
     }
-    if(self->fd >= 0) close(self->fd);
     forEach(it, self->fd_list){
         auto fd = *it.p;
-        if(fd >= 0) close(fd);
+        if(Afd_exist(fd)) a_close(fd);
     }
+    if(Afd_exist(self->fd)) a_close(self->fd);
     A_DEST(AMtx, self->fl_lock);
-    A_DEST(ALine(int), self->fd_list);
-    A_DEST(AText, self->name);
+    A_DEST(ALine(Afd), self->fd_list);
+    A_DEST(AString, self->name);
     A_DEST(AMtxRW, self->lock);
 }
 __noused static inline void A_OBJ_COPY(AFileNode)(__noused AFileNode* self, __noused const AFileNode* that){
@@ -154,14 +245,13 @@ __noused static inline void A_OBJ_COPY(AFileNode)(__noused AFileNode* self, __no
     aExcSet(AEXC_init_failed);
 }
 __noused static inline int A_OBJ_CMPD(AFileNode)(const AFileNode* self, const AFileNode* that){
-    return A_CMPD(AText, self->name, that->name);
+    return A_CMPD(AString, self->name, that->name);
 }
 A_TYPE_REGISTER(AFileNode);
 /*
- * 文件模式(r|w|rw|aw)完全互斥，即以不同模式重复打开同一文件时会直接失败
- * 独占仅在(w|rw|)模式下可用，处于独占模式时直到文件关闭，期间始终持有写锁，其他任何打开操作都会直接失败
+ * 文件模式(r|w|rw)完全互斥，即以不同模式重复打开同一文件时会直接失败
+ * 独占仅在(w|rw|)模式下可用，处于独占模式时直到文件关闭，期间始终持有写锁，其他任何打开操作都会阻塞
  * r模式下自动使用共享方法，即持有读锁
- * aw模式下自动使用抢占方法，即持有写锁
  */
 
 
@@ -175,8 +265,8 @@ A_TYPE_REGISTER(AShPtr(AFileNode));
 /* file基类 */
 AClass_Inherit(AFile);
 AClass_Struct(AFile,
-    int                 fd;
-    AText               name;
+    Afd                 fd;
+    AString             name;
     AShPtr(AFileNode)   node;
 );
 AClass_Function(AFile,
@@ -194,12 +284,39 @@ uint32_t AFile_write_pos(AFile* self, uint64_t offset, size_t size, void* source
 AClass_Generate(AFile, AFile_ioctl, AFile_read, AFile_write, AFile_read_pos, AFile_write_pos);
 
 void AFile_close(AFile* self);
-AFile AFile_open_copy(AText name);
-AFile AFile_open(int mod, bool noblock, bool exclusive, AText name);
+void AFile_open(AFile* self, int type, const char* name, int mod);
+/*
+ *  AFile_open(&file, __aftype_file, "/tmp/test.txt", __afmod_read);
+ *  AFile_open(&file, __aftype_file, "/tmp/test.txt", __afmod_write | __afmod_exclusive);
+ *  AFile_open(&file, __aftype_file, "/tmp/test.txt", __afmod_write | __afmod_appent | __afmod_exclusive);
+ *  AFile_open(&file, __aftype_device, "/dev/test", __afmod_read | __afmod_noblock);
+ *  AFile_open(&file, __aftype_device, "/dev/test", __afmod_write | __afmod_exclusive);
+ *  AFile_open(&file, __aftype_device, "/dev/test", __afmod_read | __afmod_write | __afmod_noblock | __afmod_exclusive);
+ *  AFile_open(&file, __aftype_socket, "tcp|server|0.0.0.0|8290", __afmod_read | __afmod_write);
+ *  AFile_open(&file, __aftype_socket, "tcp|client|192.168.0.1|8290", __afmod_read | __afmod_write);
+ *  AFile_open(&file, __aftype_socket, "udp|server|0.0.0.0|8290", __afmod_read | __afmod_write);
+ *  AFile_open(&file, __aftype_socket, "raw|server|192.168.0.1|8290", __afmod_read | __afmod_write);
+ *  AFile_open(&file, __aftype_socket, "unix|server|/tmp/test.txt", __afmod_read | __afmod_write);
+ */
+void AFile_register(AFile* self, Afd fd, int type, const char* name, int mod);
+/*
+ *  注册fd并构造file
+ *  AFile_register(&file, fd, __aftype_file, "/tmp/test.txt", __afmod_w | __afmod_exclusive);
+ */
+static inline int AFile_getmod(const AFile* self){
+    if(self != nullptr && self->node.p != nullptr)
+        return self->node.p->mod;
+    return -1;
+}
+static inline int AFile_gettype(const AFile* self){
+    if(self != nullptr && self->node.p != nullptr)
+        return self->node.p->type;
+    return -1;
+}
 
 __noused static inline void A_OBJ_INIT(AFile)(AFile* self){
     self->node = A_INIT(AShPtr(AFileNode));
-    self->name = A_INIT(AText);
+    self->name = A_INIT(AString);
     self->fd = -1;
 }
 __noused static inline void A_OBJ_DEST(AFile)(AFile* self){
@@ -207,73 +324,36 @@ __noused static inline void A_OBJ_DEST(AFile)(AFile* self){
     aExcClean();
 }
 __noused static inline void A_OBJ_COPY(AFile)(AFile* self, const AFile* that){
-    *self = AFile_open_copy(that->name);
+    int mod = AFile_getmod(that);
+    int type = AFile_gettype(that);
+    AFile_open(self, type, that->name.s, mod);
 }
 __noused static inline int A_OBJ_CMPD(AFile)(const AFile* self, const AFile* that){
-    return A_CMPD(AText, self->name, that->name);
+    return A_CMPD(AString, self->name, that->name);
 }
 A_CLASS_REGISTER(AFile);
 
-#endif /* posix */
 
 
 
-static inline AFile  aFileInOpen(const char* name){
-    if(name == nullptr){
-        aExcSet(AEXC_outdomain);
-        return (AFile){};
-    }
+AFile aFileInOpen(const char* name);
+AFile aFileOutOpen(const char* name);
+AFile aFileEndOpen(const char* name);
 
-    return AFile_open(__afmod_r, false, false, af_path_absolute(name));
-}
+AFile aDevInOpen(const char* name, bool noblock);
+AFile aDevOutOpen(const char* name, bool exclusive);
+AFile aDevInOutOpen(const char* name, bool noblock, bool exclusive);
 
-static inline AFile  aFileEnOpen(const char* name){
-    if(name == nullptr){
-        aExcSet(AEXC_outdomain);
-        return (AFile){};
-    }
+AFile aSocketTcpServerOpen(const char* name);
+AFile aSocketUdpServerOpen(const char* name);
+AFile aSocketUnixServerOpen(const char* name);
+AFile aSocketRawServerOpen(const char* name);
+AFile aSocketTcpClientOpen(const char* name);
+AFile aSocketUdpClientOpen(const char* name);
+AFile aSocketUnixClientOpen(const char* name);
+AFile aSocketRawClientOpen(const char* name);
+AFile aSocketTcpAccept(AFile* tcp_server);
 
-    return AFile_open(__afmod_aw, false, false, af_path_absolute(name));
-}
-
-/* 强制独占 */
-static inline AFile aFileOutOpen(const char* name){
-    if(name == nullptr){
-        aExcSet(AEXC_outdomain);
-        return (AFile){};
-    }
-
-    return AFile_open(__afmod_w, false, true, af_path_absolute(name));
-}
-
-
-
-static inline AFile  aDevInOpen(const char* name, bool noblock){
-    if(name == nullptr){
-        aExcSet(AEXC_outdomain);
-        return (AFile){};
-    }
-
-    return AFile_open(__afmod_r, noblock, false, af_path_absolute(name));
-}
-
-static inline AFile aDevOutOpen(const char* name, bool exclusive){
-    if(name == nullptr){
-        aExcSet(AEXC_outdomain);
-        return (AFile){};
-    }
-
-    return AFile_open(__afmod_w, false, exclusive, af_path_absolute(name));
-}
-
-static inline AFile aDevInOutOpen(const char* name, bool noblock, bool exclusive){
-    if(name == nullptr){
-        aExcSet(AEXC_outdomain);
-        return (AFile){};
-    }
-
-    return AFile_open(__afmod_rw, noblock, exclusive, af_path_absolute(name));
-}
 
 
 

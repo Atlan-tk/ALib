@@ -241,7 +241,7 @@ A_TYPE_REGISTER(ATree(KeyType, ValueType));
 | `athrd.h` | C11 线程兼容层；线程、互斥锁、条件变量、TSS、`call_once` |
 | `alock.h` | 互斥锁、递归锁、读写锁、自动解锁 token |
 | `asignal.h` | 信号系统、接收者基类、异常收集器 |
-| `afile.h` | POSIX 文件工具函数，以及统一的 `AFile` 文件/设备读写对象 |
+| `afile.h` | POSIX 文件工具函数，以及统一的 `AFile` 文件/设备/socket 读写对象 |
 
 ## 5. 完整模块与 API 参考
 
@@ -1403,25 +1403,27 @@ a_signal_transmit(signal, &collector);
 
 ### 5.19 `afile.h` — 文件工具与 `AFile`
 
-`afile.h` 当前提供 POSIX 文件系统工具函数，以及基于文件描述符的 `AFile` 值对象。`AFile` 析构时自动关闭实例 fd，并通过内部 `AFileSystem` 管理同一路径的共享节点、进程内读写锁和 POSIX `fcntl` 文件锁。
+`afile.h` 当前提供 POSIX 文件系统工具函数，以及基于文件描述符的 `AFile` 值对象。`AFile` 析构时自动关闭实例 fd，并通过内部共享节点管理同一路径的进程内读写锁、模式互斥和 POSIX `fcntl` 文件锁。普通文件、设备和 socket 都通过同一个 `AFile` 读写接口暴露。
 
 #### 5.19.1 文件系统工具函数
 
 | API | 说明 |
 | --- | --- |
-| `af_mkdir(name)` / `af_mkdir_p(name)` | 创建单级目录 / 递归创建目录 |
-| `af_rm(name)` / `af_rm_r(name)` | 删除文件或空目录 / 递归删除 |
+| `af_mkdir(name)` | 递归创建目录，行为接近 `mkdir -p` |
+| `af_rm(name)` / `af_rm_r(name)` | 删除普通文件 / 递归删除文件或目录 |
 | `af_cp(name, target)` / `af_cp_r(name, target)` | 复制普通文件 / 递归复制目录 |
 | `af_mv(name, new_name)` | 移动或重命名 |
 | `af_touch(name)` | 创建空文件；已存在时保留内容 |
-| `af_chmod(name, p)` / `af_chmod_r(name, p)` | 修改当前用户权限位；`p` 使用 `4/2/1` 表示读/写/执行 |
-| `af_isfile(name)` / `af_isdir(name)` / `af_isdev(name)` | 判断目标类型 |
-| `af_dir_extract(name)` | 提取目录；目录本身直接返回；空值返回 `"."` |
-| `af_path_absolute(name)` | 返回绝对路径；空值使用当前目录 |
-| `af_ls(dir)` / `af_ls_a(dir)` / `af_ls_A(dir)` | 列目录；分别对应隐藏项过滤、包含所有项、排除 `.` 和 `..` |
+| `af_chmod(name, p)` / `af_chmod_r(name, p)` | 修改权限位；`p` 使用 POSIX mode 值，例如 `0644`、`0755` |
+| `af_path_exist(name)` | 判断路径是否存在 |
+| `af_isfile(name)` / `af_isdir(name)` / `af_isdev(name)` | 判断目标类型；`af_isdev` 包含字符设备、块设备、FIFO 和 socket |
+| `af_dir_extract(name)` | 提取上层目录，返回 `AString`；根目录返回根目录，末尾不带 `/` |
+| `af_name_extract(name)` | 提取文件或目录名，返回 `AString`；末尾不带 `/` |
+| `af_path_absolute(name)` | 返回绝对路径 `AString`；相对路径基于当前目录拼接 |
+| `af_ls(dir)` | 列目录，返回 `ALine(AString)`；结果为不含 `.` 和 `..` 的绝对路径列表 |
 | `af_get_info(name)` | 返回 `AFileInfo`，包含设备、inode、权限、大小和时间信息 |
 
-这些函数失败时设置 `AEXC_nullptr`、`AEXC_outdomain`、`AEXC_system_error` 或 `AEXC_invalid_function`。
+这些函数失败时通常设置 `AEXC_nullptr`、`AEXC_outdomain`、`AEXC_repeat_write` 或 `AEXC_system_error`。
 
 #### 5.19.2 `AFile` 类型
 
@@ -1440,8 +1442,9 @@ a_signal_transmit(signal, &collector);
 | `AFile_write_pos(self, offset, size, source)` | 使用 `pwrite` 按位置写入 |
 | `AFile_ioctl(self, cmd, buf)` | 仅 `rw` 模式允许，封装 POSIX `ioctl` |
 | `AFile_close(self)` | 幂等关闭；`RAII(AFile)` 会自动调用 |
-| `AFile_open(mod, noblock, exclusive, name)` | 低层打开入口，`name` 使用 `AText` 绝对路径，返回 `AFile` |
-| `AFile_open_copy(name)` | 复制同一路径现有打开节点，返回新的 `AFile` 实例 fd |
+| `AFile_open(self, type, name, mod)` | 低层打开入口，在已初始化的 `AFile` 上打开文件、设备或 socket |
+| `AFile_register(self, fd, type, name, mod)` | 把已有 fd 注册为 `AFile`；内部会复制/接管对应实例 fd |
+| `AFile_getmod(self)` / `AFile_gettype(self)` | 返回共享节点保存的打开模式和类型，失败返回 `-1` |
 
 #### 5.19.3 打开入口
 
@@ -1449,21 +1452,37 @@ a_signal_transmit(signal, &collector);
 | --- | --- |
 | `aFileInOpen(name)` | 只读打开已有文件；不存在时失败，不创建文件 |
 | `aFileOutOpen(name)` | 写入打开普通文件，创建并截断；始终保持独占文件锁直到关闭 |
-| `aFileEnOpen(name)` | 追加打开普通文件，创建但不截断 |
+| `aFileEndOpen(name)` | 追加打开普通文件，创建但不截断 |
 | `aDevInOpen(name, noblock)` | 只读打开设备或路径；设备可启用 `O_NONBLOCK` |
 | `aDevOutOpen(name, exclusive)` | 写入打开设备或路径 |
 | `aDevInOutOpen(name, noblock, exclusive)` | 读写打开设备或路径；可用于 `ioctl` 和位置读写 |
+| `aSocketTcpServerOpen(name)` / `aSocketTcpClientOpen(name)` | 打开 TCP 服务端或客户端；`name` 形如 `"127.0.0.1|8290"` |
+| `aSocketUdpServerOpen(name)` / `aSocketUdpClientOpen(name)` | 打开 UDP 服务端或客户端 |
+| `aSocketUnixServerOpen(name)` / `aSocketUnixClientOpen(name)` | 打开 Unix domain socket；`name` 是 socket 文件路径 |
+| `aSocketRawServerOpen(name)` / `aSocketRawClientOpen(name)` | 打开 raw socket；通常需要系统权限 |
+| `aSocketTcpAccept(tcp_server)` | 从 TCP server `AFile` 接受一个客户端连接，返回新的 `AFile` |
 
-同一路径在进程内按模式互斥：已用一种模式打开后，再用另一种模式打开会失败并设置异常。推荐把返回值写成 `RAII(AFile)`，并在使用前检查 `aExcOccur()`。
+同一路径或 socket 名称在进程内按模式互斥：已用一种模式打开后，再用不兼容模式打开会失败并设置异常。推荐把返回值写成 `RAII(AFile)`，并在使用前检查 `aExcOccur()`。
 
 打开模式：
 
 | 模式 | 行为 |
 | --- | --- |
-| `__afmod_r` | `O_RDONLY`；读操作持有共享文件锁 |
-| `__afmod_w` | `O_WRONLY`；普通文件会 `O_CREAT | O_TRUNC`，并以独占写锁方式打开 |
-| `__afmod_rw` | `O_RDWR`；允许 `read/write/pread/pwrite/ioctl` |
-| `__afmod_aw` | `O_WRONLY | O_APPEND`；创建但不截断，写入追加 |
+| `__afmod_read` | 允许读；普通文件按 `O_RDONLY` 或 `O_RDWR` 打开 |
+| `__afmod_write` | 允许写；普通文件按 `O_WRONLY` 或 `O_RDWR` 打开 |
+| `__afmod_creat` | 创建普通文件；仅在写模式下有效 |
+| `__afmod_appent` | 追加写入，对应 `O_APPEND` |
+| `__afmod_truncate` | 语义上表示截断；当前普通文件在 `__afmod_creat` 且非追加时会截断 |
+| `__afmod_noblock` | 非阻塞打开，对应 `O_NONBLOCK`；仅在读相关模式下保留 |
+| `__afmod_exclusive` | 独占打开；写相关模式可用，持有写锁直到关闭 |
+
+打开类型：
+
+| 类型 | 行为 |
+| --- | --- |
+| `__aftype_file` | 普通文件 |
+| `__aftype_device` | 设备或特殊文件 |
+| `__aftype_socket` | socket；低层名称形如 `tcp|server|127.0.0.1|8290`、`unix|client|/tmp/a.sock` |
 
 #### 5.19.4 使用示例
 
@@ -1488,10 +1507,14 @@ int main(void) {
 
 - 同一个 `AFile*` 不应和 `AFile_close()` 并发使用；需要并发时应复制/重新打开独立对象。
 - `AFile` 当前只在 POSIX 分支定义；Windows 旧设备对象接口已不再是本节描述的 API。
+- `AFile` 的 IO 线程安全/进程安全语义建立在所有参与方都使用 ALib 的 `AFile` API 打开和读写同一路径的前提上；如果有代码绕过 ALib 直接使用 POSIX fd、`FILE*` 或其他库访问同一文件，ALib 无法协调这些外部操作。
+- `af_*` 文件系统工具函数只在当前进程内使用全局锁串行化调用，不保证跨进程安全；如果其他进程同时移动、删除、复制、创建或 chmod 同一路径，调用方需要自行协调。
 - 独占打开会延迟关闭相关 fd，以维持 POSIX 进程级文件锁语义。跨进程文件锁使用 `F_SETLKW`，遇到其他进程持锁时可能阻塞等待；进程内同路径模式冲突会直接失败。
-- `aFileOutOpen()` 会截断普通文件；追加写请使用 `aFileEnOpen()`。
+- `aFileOutOpen()` 会截断普通文件；追加写请使用 `aFileEndOpen()`。
 - `aFileInOpen()` 不创建不存在的文件。
 - 路径 key 来自 `af_path_absolute()`；已存在路径优先使用 `realpath()`，不存在路径会基于当前目录拼接。
+- IP socket 地址只接受数字 IPv4/IPv6 字符串，不做域名解析；需要域名时调用方应先自行解析。
+- `sample/sample_afile_socket.c` 是长期运行的 TCP 回显示例，服务端和客户端会循环收发 `hello` / `yes`，需要手动停止；它不是自动退出型测试。
 
 ## 6. 示例与测试入口
 

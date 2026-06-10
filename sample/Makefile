@@ -11,7 +11,7 @@ all: $(TAR)
 clean:
 	rm -rf $(TAR) $(OBJ)
 
-$(TAR): $(OUTDIR)%.$(EXE): $(BUILD)%.o
+$(TAR): $(OUTDIR)%.$(EXE): $(BUILD)%.o $(TARLIB)
 	$(CC) $< -o $@ $(CFLAGS_LD)
 
 $(OBJ): $(BUILD)%.o: $(DRI)%.c $(INC)
