@@ -66,13 +66,6 @@ __noused static bool AString_empty(const AString* self){
 
 static const A_FUNC(AString) A_FUNC_TAB(AString);
 
-static inline uint32_t A_OBJ_HASH(AString)(const AString* self){
-    if(__a_unlikely(self == nullptr || self->s == nullptr)){
-        return 0;
-    }
-    return alib_hash_str(self->s);
-}
-
 __noused static inline void A_OBJ_INIT(AString)(AString* self) {
     memset(self, 0, sizeof(AString));
     self->f = &A_FUNC_TAB(AString);

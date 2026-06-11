@@ -688,18 +688,18 @@ static thread_local int  a_call_num = 0;
 
 static ASignalSystem a_signal_system;
 
-__attribute__((constructor)) static inline void a_signal_system_start(){
+bool a_signal_system_start(void){
     aExcClean();
 
     a_call_lock = A_INIT(AMtxRW);
     if(aExcOccur()){
-        return;
+        return false;
     }
 
     a_global_lock = A_INIT(AMtxRW);
     if(aExcOccur()){
         A_DEST(AMtxRW, a_call_lock);
-        return;
+        return false;
     }
 
     a_signal_system = A_INIT(ASignalSystem);
@@ -711,8 +711,10 @@ __attribute__((constructor)) static inline void a_signal_system_start(){
     }else{
         a_system_flag = true;
     }
+
+    return a_system_flag;
 }
-__attribute__((destructor)) static inline void a_signal_system_poweroff(){
+void a_signal_system_poweroff(void){
     if(a_system_flag){
         A_DEST(ASignalSystem, a_signal_system);
         A_DEST(AMtxRW, a_global_lock);

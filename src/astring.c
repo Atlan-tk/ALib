@@ -255,3 +255,12 @@ int AString_reCap(AString* self, uint32_t new_cap){
 
     return ret;
 }
+
+uint32_t A_OBJ_HASH(AString)(const AString* self){
+    if(__a_unlikely(self == nullptr || self->s == nullptr)){
+        return 0;
+    }
+    return alib_hash_str(self->s);
+}
+
+

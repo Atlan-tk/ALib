@@ -24,26 +24,27 @@ AHash_Generate(AString,AShPtr(AFileNode));
 A_TYPE_REGISTER(AHash(AString,AShPtr(AFileNode)));
 
 static bool         afsflag = false;
-static AMtx         prwl;
+static AMtx         afsprwl;
 static AMtxRW       afslock;
 static AHash(AString,AShPtr(AFileNode)) afstable;
 
-__attribute__((constructor)) static inline void afs_start(){
+bool a_fs_start(void){
     aExcClean(); afstable = A_INIT(AHash(AString,AShPtr(AFileNode))); if(aExcOccur()){
-        return;
+        return false;
     }
     aExcClean(); afslock = A_INIT(AMtxRW);if(aExcOccur()){
-        return;
+        return false;
     }
-    aExcClean(); prwl = A_INIT(AMtx);if(aExcOccur()){
-        return;
+    aExcClean(); afsprwl = A_INIT(AMtx);if(aExcOccur()){
+        return false;
     }
     afsflag = true;
+    return true;
 }
-__attribute__((destructor)) static inline void afs_poweroff(){
+void a_fs_poweroff(void){
     afsflag = false;
     A_DEST(AHash(AString,AShPtr(AFileNode)), afstable);
-    A_DEST(AMtx, prwl);
+    A_DEST(AMtx, afsprwl);
     A_DEST(AMtxRW, afslock);
 }
 
@@ -57,7 +58,7 @@ __noused static ssize_t af_pread_fallback(Afd fd, void* target, size_t size, off
         return -1;
     }
 
-    aExcClean(); RAII(AAutoKey) key = AMtx_lock(&prwl); if(aExcOccur()){
+    aExcClean(); RAII(AAutoKey) key = AMtx_lock(&afsprwl); if(aExcOccur()){
         return -1;
     }
 
@@ -92,7 +93,7 @@ __noused static ssize_t af_pwrite_fallback(Afd fd, const void* source, size_t si
         return -1;
     }
 
-    aExcClean(); RAII(AAutoKey) key = AMtx_lock(&prwl); if(aExcOccur()){
+    aExcClean(); RAII(AAutoKey) key = AMtx_lock(&afsprwl); if(aExcOccur()){
         return -1;
     }
 

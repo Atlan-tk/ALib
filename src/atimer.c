@@ -488,14 +488,17 @@ static atomic_long a_work_count = 0;
 static ATimer a_timer_0;
 
 /* 毫秒级定时器 */
-__attribute__((constructor)) static inline void a_mstimer_start(){
+bool a_mstimer_start(void){
     atomic_store_explicit(&a_work_count, 1, memory_order_relaxed);
     aExcClean(); a_timer_0 = A_INIT(ATimer);if(aExcOccur()){
-        return;
+        return false;
     }
-    ATimer_start(&a_timer_0);
+    aExcClean(); ATimer_start(&a_timer_0); if(aExcOccur()){
+        return false;
+    }
+    return true;
 }
-__attribute__((destructor)) static inline void a_mstimer_poweroff(){
+void a_mstimer_poweroff(void){
     ATimer_poweroff(&a_timer_0);
     A_DEST(ATimer, a_timer_0);
     atomic_store_explicit(&a_work_count, 0, memory_order_relaxed);

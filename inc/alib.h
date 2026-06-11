@@ -438,7 +438,6 @@ __noused static inline void __A_OBJ_DEST_FUNC_SELF(void)(__noused void* self){}
 __noused static inline void __A_OBJ_INIT_FUNC_SELF(void)(__noused void* self){}
 __noused static inline void __A_OBJ_COPY_FUNC_SELF(void)(__noused void* self, __noused const void* that){}
 __noused static inline int  __A_OBJ_CMPD_FUNC_SELF(void)(__noused const void* self, __noused const void* that){ return 0; }
-__noused static inline uint32_t A_OBJ_HASH(void)(__noused const void* self){ return 0; };
 
 //int
 #define __A_PRIMITIVE_TYPE_REGISTER(T)                                                                      \
@@ -461,20 +460,6 @@ __noused static inline uint32_t A_OBJ_HASH(void)(__noused const void* self){ ret
     }                                                                                                       \
 
 
-
-__noused static uint32_t A_OBJ_HASH(cstr_t)(const cstr_t* self){
-    if(__a_unlikely(self == nullptr || *self == nullptr)){
-        return 0;
-    }
-    return alib_hash_str(*self);
-}
-
-__noused static uint32_t A_OBJ_HASH(astr_t)(const astr_t* self){
-    if(__a_unlikely(self == nullptr || self->s == nullptr)){
-        return 0;
-    }
-    return alib_hash_str(self->s);
-}
 
 __A_PRIMITIVE_TYPE_REGISTER(int);
 __A_PRIMITIVE_TYPE_REGISTER(bool);
@@ -534,8 +519,6 @@ __noused static inline int  __A_OBJ_CMPD_FUNC_SELF(Atlan)(const Atlan* self, con
     if(self == nullptr){ return 1; } if(that == nullptr){ return -1; }
     return 0;
 }
-
-__noused static inline uint32_t A_OBJ_HASH(Atlan)(__noused const Atlan* self){ return 0; }
 
 static const A_FUNC(Atlan) A_FUNC_TAB(Atlan) = { .flag = true, (void*)__A_OBJ_DEST_FUNC_SELF(Atlan) };
 

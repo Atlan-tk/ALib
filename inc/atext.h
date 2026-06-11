@@ -92,13 +92,6 @@ __noused static inline bool AText_empty(const AText* self) {
 
 static const A_FUNC(AText) A_FUNC_TAB(AText);
 
-static inline uint32_t A_OBJ_HASH(AText)(const AText* self) {
-    if (__a_unlikely(self == nullptr || self->s == nullptr)) {
-        return 0;
-    }
-    return alib_hash_str(self->s);
-}
-
 __noused static inline void A_OBJ_INIT(AText)(AText* self) {
     memset(self, 0, sizeof(AText));
     self->f = &A_FUNC_TAB(AText);

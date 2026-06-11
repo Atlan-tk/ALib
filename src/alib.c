@@ -151,11 +151,48 @@ uint32_t alib_hash_str(const char* s) {
     return alib_hash(s, strlen(s));
 }
 
-
+uint32_t A_OBJ_HASH(cstr_t)(const cstr_t* self){
+    if(__a_unlikely(self == nullptr || *self == nullptr)){
+        return 0;
+    }
+    return alib_hash_str(*self);
+}
+uint32_t A_OBJ_HASH(astr_t)(const astr_t* self){
+    if(__a_unlikely(self == nullptr || self->s == nullptr)){
+        return 0;
+    }
+    return alib_hash_str(self->s);
+}
+uint32_t A_OBJ_HASH(void)(__noused const void* self){ return 0; };
+uint32_t A_OBJ_HASH(Atlan)(__noused const Atlan* self){ return 0; }
 
 /* exception handling */
 thread_local int __A_EXC_VALUE__ = 0;
 
+
+
+bool a_fs_start(void);
+bool a_mstimer_start(void);
+bool a_signal_system_start(void);
+
+void a_fs_poweroff(void);
+void a_mstimer_poweroff(void);
+void a_signal_system_poweroff(void);
+
+__attribute__((destructor)) static inline void alib_poweroff(void){
+    a_fs_poweroff();
+    a_mstimer_poweroff();
+    a_signal_system_poweroff();
+}
+__attribute__((constructor)) static inline void alib_start(void){
+    bool ret = a_signal_system_start();
+    if(ret) ret = a_mstimer_start();
+    if(ret) ret = a_fs_start();
+
+    if(!ret){
+        alib_poweroff();
+    }
+}
 
 
 

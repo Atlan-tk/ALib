@@ -1006,3 +1006,12 @@ void AText_toGBK(const AText* self, char* buf, uint32_t buf_size) {
     buf[out_off] = '\0';
 #endif
 }
+
+uint32_t A_OBJ_HASH(AText)(const AText* self) {
+    if (__a_unlikely(self == nullptr || self->s == nullptr)) {
+        return 0;
+    }
+    return alib_hash_str(self->s);
+}
+
+
