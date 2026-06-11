@@ -112,10 +112,10 @@ AFileInfo af_get_info(const char* name);
 #include <netinet/in.h>
 
 typedef int Afd;
-static void A_OBJ_INIT(Afd)(Afd* self){ *self = -1; }
-static void A_OBJ_DEST(Afd)(Afd* self){ *self = -1; }
-static void A_OBJ_COPY(Afd)(Afd* self, const Afd* that){ *self = *that; }
-static int  A_OBJ_CMPD(Afd)(const Afd* self, const Afd* that){ return A_CMPD(int, *self, *that); }
+__noused static void A_OBJ_INIT(Afd)(Afd* self){ *self = -1; }
+__noused static void A_OBJ_DEST(Afd)(Afd* self){ *self = -1; }
+__noused static void A_OBJ_COPY(Afd)(Afd* self, const Afd* that){ *self = *that; }
+__noused static int  A_OBJ_CMPD(Afd)(const Afd* self, const Afd* that){ return A_CMPD(int, *self, *that); }
 A_TYPE_REGISTER(Afd);
 
 static inline bool Afd_exist(Afd fd){
@@ -134,7 +134,7 @@ typedef pid_t Apid;
 static inline Apid a_get_pid(void){ return getpid(); }
 
 typedef struct flock AFileLock;
-static void A_OBJ_INIT(AFileLock)(AFileLock* self){
+__noused static void A_OBJ_INIT(AFileLock)(AFileLock* self){
     *self = (AFileLock){
         .l_type   = F_UNLCK,
         .l_whence = SEEK_SET,
@@ -143,7 +143,7 @@ static void A_OBJ_INIT(AFileLock)(AFileLock* self){
         .l_pid    = 0,          // 不用设置
     };
 }
-static void A_OBJ_COPY(AFileLock)(__noused AFileLock* self, __noused const AFileLock* that){
+__noused static void A_OBJ_COPY(AFileLock)(__noused AFileLock* self, __noused const AFileLock* that){
     //不可复制
     aExcSet(AEXC_init_failed);
 }
