@@ -85,17 +85,17 @@ ALine(AString) af_ls(const char* dir);
 /* file info */
 typedef int64_t stat_time_t;
 typedef struct{
-    uint64_t    st_dev;     /* 设备 ID  */
-    uint64_t    st_ino;     /* 文件索引 */
-    uint32_t    st_mode;    /* 文件类型 + 权限位 */
-    uint32_t    st_nlink;   /* 硬链接数 */
-    uint32_t    st_uid;     /* 所有者用户 ID */
-    uint32_t    st_gid;     /* 所有者组 ID */
-    uint64_t    st_rdev;    /* 设备 ID */
-    uint64_t    st_size;    /* 文件大小（字节） */
-    stat_time_t st_atime;   /* 最后访问时间 */
-    stat_time_t st_mtime;   /* 最后修改时间 */
-    stat_time_t st_ctime;   /* 最后状态更改时间（近似为写入时间） */
+    uint64_t    ast_dev;     /* 设备 ID  */
+    uint64_t    ast_ino;     /* 文件索引 */
+    uint32_t    ast_mode;    /* 文件类型 + 权限位 */
+    uint32_t    ast_nlink;   /* 硬链接数 */
+    uint32_t    ast_uid;     /* 所有者用户 ID */
+    uint32_t    ast_gid;     /* 所有者组 ID */
+    uint64_t    ast_rdev;    /* 设备 ID */
+    uint64_t    ast_size;    /* 文件大小（字节） */
+    stat_time_t ast_atime;   /* 最后访问时间 */
+    stat_time_t ast_mtime;   /* 最后修改时间 */
+    stat_time_t ast_ctime;   /* 最后状态更改时间（近似为写入时间） */
 }AFileInfo;
 A_TYPE_REGISTER(AFileInfo);
 AFileInfo af_get_info(const char* name);

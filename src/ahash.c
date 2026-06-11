@@ -55,7 +55,7 @@ static inline int __AhsBucket_expand(__AhsBucket* bt, uint32_t ele_size){
         uint32_t cap = bt->cap * 2;
         if(cap == 0) cap = 8;
 
-        char* p = alib_realloc(bt->p, ele_size * cap);
+        char* p = bt->p == nullptr ? alib_alloc(ele_size * cap) : alib_realloc(bt->p, ele_size * cap);
         if(__a_unlikely(p == nullptr)){
             return AEXC_alloc_failed;
         }
@@ -235,6 +235,9 @@ void __Ahash_dest(__Ahash* hash){
     __Ahash_dest_arr(hash);
 }
 void* __Ahash_at(const __Ahash* hash, const void* k){
+    if(__a_unlikely(hash == nullptr || k == nullptr || hash->bucket_num == 0 || hash->bucket_arr == nullptr)){
+        return nullptr;
+    }
     uint32_t obj_size = hash->size;
 
     uint32_t hv = hash_func(hash, k, hash->bucket_num);
@@ -473,5 +476,3 @@ int __Ahash_copy(__Ahash* self, const __Ahash* that){
 
     return 0;
 }
-
-

@@ -366,9 +366,9 @@ typedef struct{
 #else
     atomic_long                         count;
 #endif /* 64 or 32 */
-    AList(ASignalLink)                linkPool;
-    AHash(int64_t,ASignalTower)       idMap;
-    AHash(const_ptr_t,ASignalRadio)   adMap;
+    AList(ASignalLink)                  linkPool;
+    AHash(int64_t,ASignalTower)         idMap;
+    AHash(const_ptr_t,ASignalRadio)     adMap;
 }ASignalSystem;
 __noused static inline void A_OBJ_INIT(ASignalSystem)(ASignalSystem* self){
     aExcClean();

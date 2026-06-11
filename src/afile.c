@@ -18,15 +18,125 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
-#ifdef st_atime
-#undef st_atime
+/*************************************************************************/
+AHash_Define(AString,AShPtr(AFileNode));
+AHash_Generate(AString,AShPtr(AFileNode));
+A_TYPE_REGISTER(AHash(AString,AShPtr(AFileNode)));
+
+static bool         afsflag = false;
+static AMtx         prwl;
+static AMtxRW       afslock;
+static AHash(AString,AShPtr(AFileNode)) afstable;
+
+__attribute__((constructor)) static inline void afs_start(){
+    aExcClean(); afstable = A_INIT(AHash(AString,AShPtr(AFileNode))); if(aExcOccur()){
+        return;
+    }
+    aExcClean(); afslock = A_INIT(AMtxRW);if(aExcOccur()){
+        return;
+    }
+    aExcClean(); prwl = A_INIT(AMtx);if(aExcOccur()){
+        return;
+    }
+    afsflag = true;
+}
+__attribute__((destructor)) static inline void afs_poweroff(){
+    afsflag = false;
+    A_DEST(AHash(AString,AShPtr(AFileNode)), afstable);
+    A_DEST(AMtx, prwl);
+    A_DEST(AMtxRW, afslock);
+}
+
+
+
+/*************************************************************************/
+/* 若平台未提供pread/pwrite则使用lseek+read/write模拟 */
+__noused static ssize_t af_pread_fallback(Afd fd, void* target, size_t size, off_t offset){
+    if(!afsflag){
+        aExcSet(AEXC_system_error);
+        return -1;
+    }
+
+    aExcClean(); RAII(AAutoKey) key = AMtx_lock(&prwl); if(aExcOccur()){
+        return -1;
+    }
+
+    ssize_t ret;
+    off_t old_offset;
+
+    /* 1. 保存当前文件偏移量 */
+    old_offset = lseek(fd, 0, SEEK_CUR);
+    if(old_offset == (off_t)-1){
+        return -1;
+    }
+
+    /* 2. 移动到目标偏移量 */
+    if(lseek(fd, offset, SEEK_SET) == (off_t)-1){
+        lseek(fd, old_offset, SEEK_SET);
+        return -1;
+    }
+
+    /* 3. 执行读取 */
+    ret = read(fd, target, size);
+
+    /* 4. 恢复原偏移量（即使读取失败也尽量恢复） */
+    if(lseek(fd, old_offset, SEEK_SET) == (off_t)-1){
+        return -1;
+    }
+
+    return ret;
+}
+__noused static ssize_t af_pwrite_fallback(Afd fd, const void* source, size_t size, off_t offset){
+    if(!afsflag){
+        aExcSet(AEXC_system_error);
+        return -1;
+    }
+
+    aExcClean(); RAII(AAutoKey) key = AMtx_lock(&prwl); if(aExcOccur()){
+        return -1;
+    }
+
+    ssize_t ret;
+    off_t old_offset;
+
+    /* 1. 保存当前文件偏移量 */
+    old_offset = lseek(fd, 0, SEEK_CUR);
+    if(old_offset == (off_t)-1){
+        return -1;
+    }
+
+    /* 2. 移动到目标偏移量 */
+    if(lseek(fd, offset, SEEK_SET) == (off_t)-1){
+        lseek(fd, old_offset, SEEK_SET);
+        return -1;
+    }
+
+    /* 3. 执行写入 */
+    ret = write(fd, source, size);
+
+    /* 4. 恢复原偏移量（即使写入失败也尽量恢复） */
+    if(lseek(fd, old_offset, SEEK_SET) == (off_t)-1){
+        return -1;
+    }
+
+    return ret;
+}
+
+static inline ssize_t af_pread(Afd fd, void* target, size_t size, off_t offset){
+#if defined(__GLIBC__) && !defined(__UCLIBC__)
+    return pread(fd, target, size, offset);
+#else
+    return af_pread_fallback(fd, target, size, offset);
 #endif
-#ifdef st_mtime
-#undef st_mtime
+}
+
+static inline ssize_t af_pwrite(Afd fd, const void* source, size_t size, off_t offset){
+#if defined(__GLIBC__) && !defined(__UCLIBC__)
+    return pwrite(fd, source, size, offset);
+#else
+    return af_pwrite_fallback(fd, source, size, offset);
 #endif
-#ifdef st_ctime
-#undef st_ctime
-#endif
+}
 
 
 
@@ -74,7 +184,7 @@ static inline AIpPort af_name_parsing(__noused AString name){
     AIpPort ipport = {}; memset(&ipport, 0, sizeof(AIpPort));
 
     RAII(AString) addr = A_INIT(AString);
-    int family = 0, kinds = 0; uint64_t port = 0;
+    int family = 0, kinds = 0; unsigned long port = 0;
 
     auto p = name.s;
     if(strncmp(p, "tcp|server|", 11) == 0){
@@ -112,7 +222,7 @@ static inline AIpPort af_name_parsing(__noused AString name){
 
         if(p[0] == 0){
         }else if(p[0] == '|' && '0' <= p[1] && p[1] <= '9'){
-            p++; uint64_t end = 0; int end_len = 0;
+            p++; unsigned long end = 0; int end_len = 0;
             if(sscanf(p, "%lu%n", &end, &end_len) == 1 && p[end_len] == '\0'){
             }else{
                 aExcSet(AEXC_outdomain);
@@ -522,29 +632,6 @@ static int AFileNode_instantiation(AFileNode* self, int mod){
 
 
 /*************************************************************************/
-AHash_Define(AString,AShPtr(AFileNode));
-AHash_Generate(AString,AShPtr(AFileNode));
-A_TYPE_REGISTER(AHash(AString,AShPtr(AFileNode)));
-
-static bool         afsflag = false;
-static AMtxRW       afslock;
-static AHash(AString,AShPtr(AFileNode)) afstable;
-
-__attribute__((constructor)) static inline void afs_start(){
-    aExcClean(); afstable = A_INIT(AHash(AString,AShPtr(AFileNode))); if(aExcOccur()){
-        return;
-    }
-    aExcClean(); afslock = A_INIT(AMtxRW);if(aExcOccur()){
-        return;
-    }
-    afsflag = true;
-}
-__attribute__((destructor)) static inline void afs_poweroff(){
-    afsflag = false;
-    A_DEST(AHash(AString,AShPtr(AFileNode)), afstable);
-    A_DEST(AMtxRW, afslock);
-}
-
 static inline void afs_add(int type, AString _name, int mod){
     aExcClean();
     RAII(AString) name = A_INIT(AString); name.f->addBack(&name, _name);
@@ -648,7 +735,7 @@ static inline void afs_copy(AString src, AString tar){
     aExcClean();
     char buf[512]; memset(buf, 0, 512);
     auto info = __af_get_info(src.s);
-    auto size = info.st_size;
+    auto size = info.ast_size;
     uint64_t n = size / 512;
     if(aExcOccur()){
         if(Afd_exist(src_fd)) a_close(src_fd);
@@ -895,7 +982,7 @@ static inline int afs_read_pos(AShPtr(AFileNode) ptr, Afd fd, uint64_t offset, v
     }
     A_DEST(AAutoKey, key);
 
-    int ret = pread(fd, target, size, offset);
+    int ret = af_pread(fd, target, size, offset);
 
     if(!((node->mod & __afmod_exclusive) && (node->tid == thrd_current()))){
         if(AFileNode_unlock_r(node) != 0){
@@ -972,7 +1059,7 @@ static inline int afs_write_pos(AShPtr(AFileNode) ptr, Afd fd, uint64_t offset, 
     }
     A_DEST(AAutoKey, key);
 
-    int ret = pwrite(fd, source, size, offset);
+    int ret = af_pwrite(fd, source, size, offset);
 
     if(!((node->mod & __afmod_exclusive) && (node->tid == thrd_current()))){
         if(AFileNode_unlock_w(node) != 0){
@@ -1440,17 +1527,17 @@ static AFileInfo __af_get_info(const char* name){
         return info;
     }
 
-    info.st_dev = (uint64_t)st.st_dev;
-    info.st_ino = (uint64_t)st.st_ino;
-    info.st_mode = (uint32_t)st.st_mode;
-    info.st_nlink = (uint32_t)st.st_nlink;
-    info.st_uid = (uint32_t)st.st_uid;
-    info.st_gid = (uint32_t)st.st_gid;
-    info.st_rdev = (uint64_t)st.st_rdev;
-    info.st_size = (uint64_t)st.st_size;
-    info.st_atime = (stat_time_t)st.st_atim.tv_sec;
-    info.st_mtime = (stat_time_t)st.st_mtim.tv_sec;
-    info.st_ctime = (stat_time_t)st.st_ctim.tv_sec;
+    info.ast_dev = (uint64_t)st.st_dev;
+    info.ast_ino = (uint64_t)st.st_ino;
+    info.ast_mode = (uint32_t)st.st_mode;
+    info.ast_nlink = (uint32_t)st.st_nlink;
+    info.ast_uid = (uint32_t)st.st_uid;
+    info.ast_gid = (uint32_t)st.st_gid;
+    info.ast_rdev = (uint64_t)st.st_rdev;
+    info.ast_size = (uint64_t)st.st_size;
+    info.ast_atime = (stat_time_t)st.st_atim.tv_sec;
+    info.ast_mtime = (stat_time_t)st.st_mtim.tv_sec;
+    info.ast_ctime = (stat_time_t)st.st_ctim.tv_sec;
     return info;
 }
 

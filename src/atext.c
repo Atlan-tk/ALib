@@ -270,7 +270,7 @@ static inline int AText_grow(AText* self, uint32_t new_cap) {
 
     new_cap = AText_calCap(new_cap);
 
-    char* new_s = alib_realloc(self->s, new_cap);
+    char* new_s = self->s == nullptr ? alib_alloc(new_cap) : alib_realloc(self->s, new_cap);
     if (__a_unlikely(new_s == nullptr)) {
         return AEXC_alloc_failed;
     }

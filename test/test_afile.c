@@ -129,7 +129,7 @@ static void test_file_tools(const char* root) {
 
     AFileInfo info = af_get_info(file);
     expect_clean();
-    assert(info.st_size == strlen("tool-data"));
+    assert(info.ast_size == strlen("tool-data"));
 
     make_path(subdir, sizeof(subdir), nested, "sub");
     af_mkdir(subdir);
