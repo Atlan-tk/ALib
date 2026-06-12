@@ -16,9 +16,9 @@ INCLUDE := $(BUILD).include/
 export TARLIB OUTDIR BUILD INCLUDE
 
 CFLAGS_AR := rcs
-CFLAGS_LD := -lpthread -latomic -L$(OUTDIR) -lalib
-CFLAGS_CC := -O3 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc -DGNU_SOURCE
-CFLAGS_TEST := -g -O0 -Wall -Wextra -Werror -I$(INCLUDE) -DGNU_SOURCE
+CFLAGS_LD := -L$(OUTDIR) -lalib -lpthread
+CFLAGS_CC := -O3 -Wall -Wextra -Werror -fPIC -I$(ALIB)inc
+CFLAGS_TEST := -g -O0 -Wall -Wextra -Werror -I$(INCLUDE)
 export CFLAGS_CC CFLAGS_AR CFLAGS_LD CFLAGS_TEST
 
 INSTALL_INC := /usr/local/include/alib/

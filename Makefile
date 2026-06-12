@@ -45,6 +45,7 @@ clean:
 	rm -rf $(BUILD)
 
 disclean:
+	$(MAKE) clean
 	rm -rf $(ALIB).config
 
 $(BUILD):

@@ -11,7 +11,6 @@ extern "C" {
 #endif /* __cplusplus */
 
 #include "alib.h"
-#include "astring.h"
 
 /* 计算字符数 */
 uint32_t astrlen_u8(const char* s);
