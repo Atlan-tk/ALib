@@ -165,14 +165,19 @@ static ALine(AString) __af_ls(const char* dir);
 
 /*************************************************************************/
 typedef struct{
-    AString     addr;       //"192.168.0.1","/tmp/test"
-    int         family;     //AF_INET, AF_INET6, AF_UNIX
-    int         kinds;      //tcp_server, tcp_client, udp_server, ...
-    uint16_t    port;       //port
-}AIpPort;
+    union{
+        struct sockaddr         ip;
+        struct sockaddr_un      unp;
+        struct sockaddr_in      ipv4;
+        struct sockaddr_in6     ipv6;
+    };
+    int kinds;  //套接字类型
+    int len;
+}Aaddr;
 enum{
     aip_tcp_server = 1,
     aip_tcp_client,
+    aip_tcp_accept,
     aip_udp_server,
     aip_udp_client,
     aip_unix_server,
@@ -181,17 +186,18 @@ enum{
     aip_raw_client,
 };
 
-static inline AIpPort af_name_parsing(__noused AString name){
-    AIpPort ipport = {}; memset(&ipport, 0, sizeof(AIpPort));
-
-    RAII(AString) addr = A_INIT(AString);
-    int family = 0, kinds = 0; unsigned long port = 0;
+static inline Aaddr af_name_parsing(__noused AString name){
+    Aaddr addr; memset(&addr, 0, sizeof(addr));
+    char ipstr[64]; memset(ipstr, 0, 64);
+    int kinds = 0; unsigned long port = 0;
 
     auto p = name.s;
     if(strncmp(p, "tcp|server|", 11) == 0){
         kinds = aip_tcp_server, p += 11;
     }else if(strncmp(p, "tcp|client|", 11) == 0){
         kinds = aip_tcp_client, p += 11;
+    }else if(strncmp(p, "tcp|accept|", 11) == 0){
+        kinds = aip_tcp_accept, p += 11;
     }else if(strncmp(p, "udp|server|", 11) == 0){
         kinds = aip_udp_server, p += 11;
     }else if(strncmp(p, "udp|client|", 11) == 0){
@@ -206,120 +212,78 @@ static inline AIpPort af_name_parsing(__noused AString name){
         kinds = aip_unix_client, p += 12;
     }else{
         aExcSet(AEXC_outdomain);
-        return ipport;
+        return addr;
     }
+    addr.kinds = kinds;
 
+    int len = 0;
     if(kinds == aip_unix_server || kinds == aip_unix_client){
-        family = AF_UNIX;
-        addr.f->addBack(&addr, AString_new(p));
+        addr.ip.sa_family = AF_UNIX;
+        addr.len = sizeof(struct sockaddr_un);
+        strncpy(addr.unp.sun_path, p, sizeof(addr.unp.sun_path) - 1);
+        return addr;
+    }else if(kinds == aip_tcp_accept){
+        unsigned long long id = 0;
+        if(sscanf(p, "%llu|%63[^|]|%lu%n", &id, ipstr, &port, &len) != 3){
+            aExcSet(AEXC_outdomain);
+            return addr;
+        }
     }else{
-        char buf[64]; memset(buf, 0, 64);
-        int addr_len = 0;
-        if(sscanf(p, "%63[^|]|%lu%n", buf, &port, &addr_len) != 2){
+        if(sscanf(p, "%63[^|]|%lu%n", ipstr, &port, &len) != 2){
             aExcSet(AEXC_outdomain);
-            return ipport;
+            return addr;
         }
-        p += addr_len;
-
-        if(p[0] == 0){
-        }else if(p[0] == '|' && '0' <= p[1] && p[1] <= '9'){
-            p++; unsigned long end = 0; int end_len = 0;
-            if(sscanf(p, "%lu%n", &end, &end_len) == 1 && p[end_len] == '\0'){
-            }else{
-                aExcSet(AEXC_outdomain);
-                return ipport;
-            }
-        }else{
-            aExcSet(AEXC_outdomain);
-            return ipport;
-        }
-
-        if(port >= (uint64_t)(1 << 16)){
-            aExcSet(AEXC_outdomain);
-            return ipport;
-        }
-
-        {
-            struct sockaddr_in addr; memset(&addr, 0, sizeof(addr));
-            if(inet_pton(AF_INET, buf, &addr.sin_addr) == 1){
-                family = AF_INET;
-            }else{
-                struct sockaddr_in6 addr6; memset(&addr6, 0, sizeof(addr6));
-                if(inet_pton(AF_INET6, buf, &addr6.sin6_addr) == 1){
-                    family = AF_INET6;
-                }else{
-                    aExcSet(AEXC_outdomain);
-                    return ipport;
-                }
-            }
-        }
-
-        addr.f->addBack(&addr, AString_new(buf));
+    }
+    if(p[len] != '\0'){
+        aExcSet(AEXC_outdomain);
+        return addr;
+    }
+    if(port >= (uint32_t)(1 << 16)){
+        aExcSet(AEXC_outdomain);
+        return addr;
     }
 
-    ipport.family = family;
-    ipport.addr = A_MOVE(addr);
-    ipport.kinds = kinds;
-    ipport.port = port;
-    ipport.port = htons(ipport.port);
+    if(inet_pton(AF_INET, ipstr, &addr.ipv4.sin_addr) == 1){
+        addr.ip.sa_family = AF_INET;
+        addr.ipv4.sin_port = htons(port);
+        addr.len = sizeof(struct sockaddr_in);
+    }else if(inet_pton(AF_INET6, ipstr, &addr.ipv6.sin6_addr) == 1){
+        addr.ip.sa_family = AF_INET6;
+        addr.ipv6.sin6_port = htons(port);
+        addr.len = sizeof(struct sockaddr_in6);
+    }else{
+        aExcSet(AEXC_outdomain);
+        return addr;
+    }
 
-    return ipport;
+    return addr;
 }
 
-static inline void af_socket_connect(Afd fd, AIpPort ipport){
+static inline void af_socket_connect(Afd fd, Aaddr addr){
     if(!Afd_exist(fd)){
         aExcSet(AEXC_system_error);
         return;
     }
 
     int ret = 0;
+    switch(addr.kinds){
+        case aip_tcp_server: ret = bind(fd, &addr.ip, addr.len); if(ret >= 0) ret = listen(fd, SOMAXCONN); break;
 
-    int size = 0; struct sockaddr* addr = nullptr;
-    struct sockaddr_in ip_addr = {
-        .sin_family = ipport.family,
-        .sin_port = ipport.port,
-    };
-    struct sockaddr_in6 ip_addr6 = {
-        .sin6_family = ipport.family,
-        .sin6_port = ipport.port,
-    };
-    struct sockaddr_un un_addr = {
-        .sun_family = ipport.family,
-    };
+        case aip_tcp_client: ret = connect(fd, &addr.ip, addr.len); break;
 
-    if(ipport.family == AF_INET6){
-        if(inet_pton(AF_INET6, ipport.addr.s, &ip_addr6.sin6_addr) < 0){
-            aExcSet(AEXC_system_error);
-            return;
-        }
-        addr = (void*)&ip_addr6, size = sizeof(ip_addr6);
-    }else if(ipport.family == AF_INET){
-        if(inet_pton(AF_INET, ipport.addr.s, &ip_addr.sin_addr) < 0){
-            aExcSet(AEXC_system_error);
-            return;
-        }
-        addr = (void*)&ip_addr, size = sizeof(ip_addr);
-    }else if(ipport.family == AF_UNIX){
-        strncpy(un_addr.sun_path, ipport.addr.s, sizeof(un_addr.sun_path) - 1);
-        addr = (void*)&un_addr, size = sizeof(un_addr);
-    }
+        case aip_udp_server: ret = bind(fd, &addr.ip, addr.len); break;
 
-    switch(ipport.kinds){
-        case aip_tcp_server: ret = bind(fd, addr, size); if(ret >= 0) ret = listen(fd, SOMAXCONN); break;
+        case aip_udp_client: ret = connect(fd, &addr.ip, addr.len); break;
 
-        case aip_tcp_client: ret = connect(fd, addr, size); break;
+        case aip_unix_server: ret = bind(fd, &addr.ip, addr.len); if(ret >= 0) ret = listen(fd, SOMAXCONN); break;
 
-        case aip_udp_server: ret = bind(fd, addr, size); break;
+        case aip_unix_client: ret = connect(fd, &addr.ip, addr.len); break;
 
-        case aip_udp_client: ret = connect(fd, addr, size); break;
+        case aip_raw_server: ret = bind(fd, &addr.ip, addr.len); break;
 
-        case aip_unix_server: ret = bind(fd, addr, size); if(ret >= 0) ret = listen(fd, SOMAXCONN); break;
+        case aip_raw_client: ret = connect(fd, &addr.ip, addr.len); break;
 
-        case aip_unix_client: ret = connect(fd, addr, size); break;
-
-        case aip_raw_server: ret = bind(fd, addr, size); break;
-
-        case aip_raw_client: ret = connect(fd, addr, size); break;
+        case aip_tcp_accept: ret = 0; break;
 
         default: aExcSet(AEXC_outdomain); return; break;
     }
@@ -331,25 +295,25 @@ static inline void af_socket_connect(Afd fd, AIpPort ipport){
 
 static inline Afd af_open_scoket(AString name){
     Afd fd = A_INIT(Afd);
-    aExcClean(); auto ipport = af_name_parsing(name); if(aExcOccur()){
+    aExcClean(); auto addr = af_name_parsing(name); if(aExcOccur()){
         return -1;
     }
 
-    switch(ipport.kinds){
+    switch(addr.kinds){
         case aip_tcp_server:
-            fd = socket(ipport.family, SOCK_STREAM, 0);
+            fd = socket(addr.ip.sa_family, SOCK_STREAM, 0);
             if(Afd_exist(fd)){
                 int on = 1;
                 setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
             }; break;
         case aip_tcp_client:
-            fd = socket(ipport.family, SOCK_STREAM, 0); break;
+            fd = socket(addr.ip.sa_family, SOCK_STREAM, 0); break;
         case aip_udp_server: case aip_udp_client:
-            fd = socket(ipport.family, SOCK_DGRAM, 0); break;
+            fd = socket(addr.ip.sa_family, SOCK_DGRAM, 0); break;
         case aip_unix_server: case aip_unix_client:
-            fd = socket(ipport.family, SOCK_STREAM, 0); break;
+            fd = socket(addr.ip.sa_family, SOCK_STREAM, 0); break;
         case aip_raw_server: case aip_raw_client:
-            fd = socket(ipport.family, SOCK_RAW, IPPROTO_RAW);
+            fd = socket(addr.ip.sa_family, SOCK_RAW, IPPROTO_RAW);
             if(Afd_exist(fd)){
                 int on = 1;
                 setsockopt(fd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on));
@@ -363,7 +327,7 @@ static inline Afd af_open_scoket(AString name){
         return fd;
     }
 
-    aExcClean(); af_socket_connect(fd, ipport); if(aExcOccur()){
+    aExcClean(); af_socket_connect(fd, addr); if(aExcOccur()){
         if(Afd_exist(fd)) a_close(fd);
         fd = A_INIT(Afd);
     }
@@ -1074,48 +1038,53 @@ static inline int afs_write_pos(AShPtr(AFileNode) ptr, Afd fd, uint64_t offset, 
 
 
 /*************************************************************************/
-static inline AString AFile_getip(AFile* self){
-    AString addr = A_INIT(AString);
+static inline const char* AFile_getip(AFile* self){
     if(__a_unlikely(self == nullptr)){
         aExcSet(AEXC_nullptr);
-        return addr;
+        return nullptr;
     }
 
     if(!Afd_exist(self->fd)){
         aExcSet(AEXC_outdomain);
-        return addr;
+        return nullptr;
     }
 
     auto node = self->node.p;
     if(node->type != __aftype_socket){
         aExcSet(AEXC_outdomain);
-        return addr;
+        return nullptr;
     }
-    auto name = &node->name; auto p = name->s;
-    if(strncmp(p, "tcp|", 4) == 0){
-        p += 4;
-    }else if(strncmp(p, "udp|", 4) == 0){
-        p += 4;
-    }else if(strncmp(p, "raw|", 4) == 0){
-        p += 4;
-    }else if(strncmp(p, "unix|", 5) == 0){
-        p += 5;
+    auto name = &node->name; const char* p = name->s;
+
+    if(strncmp(p, "tcp|server|", 11) == 0){
+        p += 11;
+    }else if(strncmp(p, "tcp|client|", 11) == 0){
+        p += 11;
+    }else if(strncmp(p, "tcp|accept|", 11) == 0){
+        p += 11; unsigned long long id = 0; int len;
+        if(sscanf(p, "%llu|%n", &id, &len) != 1){
+            aExcSet(AEXC_system_error);
+            return nullptr;
+        }
+        p += len;
+    }else if(strncmp(p, "udp|server|", 11) == 0){
+        p += 11;
+    }else if(strncmp(p, "udp|client|", 11) == 0){
+        p += 11;
+    }else if(strncmp(p, "raw|server|", 11) == 0){
+        p += 11;
+    }else if(strncmp(p, "raw|client|", 11) == 0){
+        p += 11;
+    }else if(strncmp(p, "unix|server|", 12) == 0){
+        p += 12;
+    }else if(strncmp(p, "unix|client|", 12) == 0){
+        p += 12;
     }else{
         aExcSet(AEXC_outdomain);
-        return addr;
+        return nullptr;
     }
 
-    if(strncmp(p, "server|", 7) == 0){
-        p += 7;
-    }else if(strncmp(p, "client|", 7) == 0){
-        p += 7;
-    }else{
-        aExcSet(AEXC_outdomain);
-        return addr;
-    }
-
-    addr.f->addBack(&addr, AString_new(p));
-    return addr;
+    return p;
 }
 
 int32_t  AFile_ioctl(AFile* self, int32_t cmd, void* buf){
@@ -1476,38 +1445,40 @@ AFile aSocketRawClientOpen(const char* name){
 AFile aSocketTcpAccept(AFile* tcp_server){
     static atomic_ulong accept_num = 0;
 
-    RAII(AString) addr = AString_new("tcp|client|");
+    RAII(AString) name = AString_new("tcp|accept|");
     AFile file = A_INIT(AFile);
     if(__a_unlikely(tcp_server == nullptr)){
         aExcSet(AEXC_nullptr);
         return file;
     }
 
-    aExcClean(); RAII(AString) ip = AFile_getip(tcp_server); if(aExcOccur()){
+    char id[16]; memset(id, 0, 16);
+    const char* ipstr = AFile_getip(tcp_server);
+    if(ipstr == nullptr){
         return file;
     }
-    aExcClean(); addr.f->addBack(&addr, ip); if(aExcOccur()){
-        return file;
-    }
-    char accept_end[12]; memset(accept_end, 0, 12);
-    snprintf(accept_end, 10, "|%-8lu", (unsigned long)atomic_fetch_add(&accept_num, 1));
-    aExcClean(); addr.f->addBack(&addr, AString_new(accept_end)); if(aExcOccur()){
+    snprintf(id, sizeof(id), "%-lu|", (unsigned long)atomic_fetch_add(&accept_num, 1));
+
+    aExcClean();
+    name.f->addBack(&name, AString_new(id));
+    name.f->addBack(&name, AString_new(ipstr));
+    if(aExcOccur()){
         return file;
     }
 
-    struct sockaddr_in client_addr; memset(&client_addr, 0, sizeof(client_addr));
-    socklen_t client_len = sizeof(client_addr);
-    Afd client_fd = accept(tcp_server->fd, (struct sockaddr*)&client_addr, &client_len);
-    if(!Afd_exist(client_fd)){
+    socklen_t len = sizeof(Aaddr);
+    Aaddr addr; memset(&addr, 0, len);
+    Afd fd = accept(tcp_server->fd, &addr.ip, &len);
+    if(!Afd_exist(fd)){
         aExcSet(AEXC_system_error);
         return file;
     }
 
-    int mod = __afmod_read | __afmod_write;
     aExcClean();
-    AFile_register(&file, client_fd, __aftype_socket, addr.s, mod);
+    int mod = __afmod_read | __afmod_write;
+    AFile_register(&file, fd, __aftype_socket, name.s, mod);
     if(aExcOccur()){
-        a_close(client_fd);
+        a_close(fd);
     }
     return file;
 }
