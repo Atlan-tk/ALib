@@ -182,6 +182,7 @@ enum{
     aip_udp_client,
     aip_unix_server,
     aip_unix_client,
+    aip_unix_accept,
     aip_raw_server,
     aip_raw_client,
 };
@@ -210,6 +211,8 @@ static inline Aaddr af_name_parsing(__noused AString name){
         kinds = aip_unix_server, p += 12;
     }else if(strncmp(p, "unix|client|", 12) == 0){
         kinds = aip_unix_client, p += 12;
+    }else if(strncmp(p, "unix|accept|", 12) == 0){
+        kinds = aip_unix_accept, p += 12;
     }else{
         aExcSet(AEXC_outdomain);
         return addr;
@@ -221,6 +224,15 @@ static inline Aaddr af_name_parsing(__noused AString name){
         addr.ip.sa_family = AF_UNIX;
         addr.len = sizeof(struct sockaddr_un);
         strncpy(addr.unp.sun_path, p, sizeof(addr.unp.sun_path) - 1);
+        return addr;
+    }else if(kinds == aip_unix_accept){
+        addr.ip.sa_family = AF_UNIX;
+        unsigned long long id = 0;
+        if(sscanf(p, "%llu|%n", &id, &len) != 1){
+            aExcSet(AEXC_outdomain);
+            return addr;
+        }
+        strncpy(addr.unp.sun_path, p + len, sizeof(addr.unp.sun_path) - 1);
         return addr;
     }else if(kinds == aip_tcp_accept){
         unsigned long long id = 0;
@@ -284,6 +296,8 @@ static inline void af_socket_connect(Afd fd, Aaddr addr){
         case aip_raw_client: ret = connect(fd, &addr.ip, addr.len); break;
 
         case aip_tcp_accept: ret = 0; break;
+
+        case aip_unix_accept: ret = 0; break;
 
         default: aExcSet(AEXC_outdomain); return; break;
     }
@@ -1056,29 +1070,38 @@ static inline const char* AFile_getip(AFile* self){
     }
     auto name = &node->name; const char* p = name->s;
 
-    if(strncmp(p, "tcp|server|", 11) == 0){
-        p += 11;
-    }else if(strncmp(p, "tcp|client|", 11) == 0){
-        p += 11;
-    }else if(strncmp(p, "tcp|accept|", 11) == 0){
-        p += 11; unsigned long long id = 0; int len;
+    if(strncmp(p, "tcp|server|", sizeof("tcp|server|")-1) == 0){
+        p += sizeof("tcp|server|")-1;
+    }else if(strncmp(p, "tcp|client|", sizeof("tcp|client|")-1) == 0){
+        p += sizeof("tcp|client|")-1;
+    }else if(strncmp(p, "tcp|accept|", sizeof("tcp|accept|")-1) == 0){
+        p += sizeof("tcp|accept|")-1;
+        int len; unsigned long long id = 0;
         if(sscanf(p, "%llu|%n", &id, &len) != 1){
             aExcSet(AEXC_system_error);
             return nullptr;
         }
         p += len;
-    }else if(strncmp(p, "udp|server|", 11) == 0){
-        p += 11;
-    }else if(strncmp(p, "udp|client|", 11) == 0){
-        p += 11;
-    }else if(strncmp(p, "raw|server|", 11) == 0){
-        p += 11;
-    }else if(strncmp(p, "raw|client|", 11) == 0){
-        p += 11;
-    }else if(strncmp(p, "unix|server|", 12) == 0){
-        p += 12;
-    }else if(strncmp(p, "unix|client|", 12) == 0){
-        p += 12;
+    }else if(strncmp(p, "udp|server|", sizeof("udp|server|")-1) == 0){
+        p += sizeof("udp|server|")-1;
+    }else if(strncmp(p, "udp|client|", sizeof("udp|client|")-1) == 0){
+        p += sizeof("udp|client|")-1;
+    }else if(strncmp(p, "raw|server|", sizeof("raw|server|")-1) == 0){
+        p += sizeof("raw|server|")-1;
+    }else if(strncmp(p, "raw|client|", sizeof("raw|client|")-1) == 0){
+        p += sizeof("raw|client|")-1;
+    }else if(strncmp(p, "unix|server|", sizeof("unix|server|")-1) == 0){
+        p += sizeof("unix|server|")-1;
+    }else if(strncmp(p, "unix|client|", sizeof("unix|client|")-1) == 0){
+        p += sizeof("unix|client|")-1;
+    }else if(strncmp(p, "unix|accept|", sizeof("unix|accept|")-1) == 0){
+        p += sizeof("unix|accept|")-1;
+        int len; unsigned long long id = 0;
+        if(sscanf(p, "%llu|%n", &id, &len) != 1){
+            aExcSet(AEXC_system_error);
+            return nullptr;
+        }
+        p += len;
     }else{
         aExcSet(AEXC_outdomain);
         return nullptr;
@@ -1442,18 +1465,18 @@ AFile aSocketRawClientOpen(const char* name){
     AFile_open(&file, __aftype_socket, addr.s, mod);
     return file;
 }
-AFile aSocketTcpAccept(AFile* tcp_server){
+static inline AFile aSocketAccept(AFile* server, const char* kinds){
     static atomic_ulong accept_num = 0;
 
-    RAII(AString) name = AString_new("tcp|accept|");
+    RAII(AString) name = AString_new(kinds);
     AFile file = A_INIT(AFile);
-    if(__a_unlikely(tcp_server == nullptr)){
+    if(__a_unlikely(server == nullptr)){
         aExcSet(AEXC_nullptr);
         return file;
     }
 
     char id[16]; memset(id, 0, 16);
-    const char* ipstr = AFile_getip(tcp_server);
+    const char* ipstr = AFile_getip(server);
     if(ipstr == nullptr){
         return file;
     }
@@ -1468,7 +1491,7 @@ AFile aSocketTcpAccept(AFile* tcp_server){
 
     socklen_t len = sizeof(Aaddr);
     Aaddr addr; memset(&addr, 0, len);
-    Afd fd = accept(tcp_server->fd, &addr.ip, &len);
+    Afd fd = accept(server->fd, &addr.ip, &len);
     if(!Afd_exist(fd)){
         aExcSet(AEXC_system_error);
         return file;
@@ -1481,6 +1504,12 @@ AFile aSocketTcpAccept(AFile* tcp_server){
         a_close(fd);
     }
     return file;
+}
+AFile aSocketTcpAccept(AFile* server){
+    return aSocketAccept(server, "tcp|accept|");
+}
+AFile aSocketUnixAccept(AFile* server){
+    return aSocketAccept(server, "unix|accept|");
 }
 
 

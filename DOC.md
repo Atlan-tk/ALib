@@ -1460,7 +1460,8 @@ a_signal_transmit(signal, &collector);
 | `aSocketUdpServerOpen(name)` / `aSocketUdpClientOpen(name)` | 打开 UDP 服务端或客户端 |
 | `aSocketUnixServerOpen(name)` / `aSocketUnixClientOpen(name)` | 打开 Unix domain socket；`name` 是 socket 文件路径 |
 | `aSocketRawServerOpen(name)` / `aSocketRawClientOpen(name)` | 打开 raw socket；通常需要系统权限 |
-| `aSocketTcpAccept(tcp_server)` | 从 TCP server `AFile` 接受一个客户端连接，返回新的 `AFile` |
+| `aSocketTcpAccept(server)` | 从 TCP server `AFile` 接受一个客户端连接，返回新的 `AFile` |
+| `aSocketUnixAccept(server)` | 从 Unix domain server `AFile` 接受一个客户端连接，返回新的 `AFile` |
 
 同一路径或 socket 名称在进程内按模式互斥：已用一种模式打开后，再用不兼容模式打开会失败并设置异常。推荐把返回值写成 `RAII(AFile)`，并在使用前检查 `aExcOccur()`。
 

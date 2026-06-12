@@ -352,7 +352,8 @@ AFile aSocketTcpClientOpen(const char* name);
 AFile aSocketUdpClientOpen(const char* name);
 AFile aSocketUnixClientOpen(const char* name);
 AFile aSocketRawClientOpen(const char* name);
-AFile aSocketTcpAccept(AFile* tcp_server);
+AFile aSocketTcpAccept(AFile* server);
+AFile aSocketUnixAccept(AFile* server);
 
 
 

@@ -253,7 +253,7 @@ out.f->write(&out, n, buf);
 - `aFileEndOpen(name)`：以追加模式创建或打开文件，不截断旧内容。
 - `aDevInOpen(name, noblock)` / `aDevOutOpen(name, exclusive)` / `aDevInOutOpen(name, noblock, exclusive)`：按设备或读写需求打开 `AFile`；设备写打开可显式选择是否独占。
 - `aSocketTcpServerOpen(name)` / `aSocketTcpClientOpen(name)`：打开 TCP 服务端或客户端，`name` 形如 `"127.0.0.1|8290"`；TCP 服务端使用 `aSocketTcpAccept(server)` 接收连接。
-- `aSocketUdpServerOpen(name)` / `aSocketUdpClientOpen(name)` / `aSocketUnixServerOpen(name)` / `aSocketUnixClientOpen(name)` / `aSocketRawServerOpen(name)` / `aSocketRawClientOpen(name)`：打开 UDP、Unix domain 或 raw socket。IP socket 只接受数字地址，不做域名解析。
+- `aSocketUdpServerOpen(name)` / `aSocketUdpClientOpen(name)` / `aSocketUnixServerOpen(name)` / `aSocketUnixClientOpen(name)` / `aSocketRawServerOpen(name)` / `aSocketRawClientOpen(name)`：打开 UDP、Unix domain 或 raw socket。Unix domain 服务端使用 `aSocketUnixAccept(server)` 接收连接。IP socket 只接受数字地址，不做域名解析。
 - `AFile_read/write/read_pos/write_pos/ioctl`：封装 `read/write/pread/pwrite/ioctl`，失败时设置异常并返回 `0`。
 - `af_mkdir`、`af_rm(_r)`、`af_cp(_r)`、`af_mv`、`af_touch`、`af_chmod(_r)`、`af_path_exist`、`af_isfile/isdir/isdev`、`af_dir_extract`、`af_name_extract`、`af_path_absolute`、`af_ls`、`af_get_info`：基础文件系统工具函数。`af_mkdir` 等价于递归创建目录；`af_ls` 返回不含 `.` 和 `..` 的绝对路径列表。
 
