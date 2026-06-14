@@ -12,14 +12,19 @@ extern "C" {
 
 #include "alib.h"
 
-typedef struct AStr AStr;
+typedef int Achar;
+static inline void A_OBJ_INIT(Achar)(__noused Achar* self){}
+static inline void A_OBJ_DEST(Achar)(__noused Achar* self){}
+static inline void A_OBJ_COPY(Achar)(Achar* self, const Achar* that){ *self = *that; }
+static inline int  A_OBJ_CMPD(Achar)(const Achar* self, const Achar* that){ return A_CMPD(int, *self, *that); }
+A_TYPE_REGISTER(Achar);
 
-struct AStr{
+typedef struct{
     char* s;
     bool noLiteral;     //是否为字面量, false指向字面量
     uint32_t number;    //字符数量，不包括\0
     uint32_t capacity;
-};
+}AStr;
 
 char AStr_at(AStr* self, uint32_t index);
 void AStr_rm(AStr* self, uint32_t index);
@@ -108,6 +113,24 @@ static inline AStr AStr_new(const char* s){
         .capacity = 0,
     };
 }
+
+
+
+/* 字符编码操作 */
+/* 第index个u8字符位置 */
+uint32_t autf8_index(const char* s, uint32_t index);
+/* 计算u8字符数 */
+uint32_t autf8_num(const char* s);
+
+/* 字符编码转换 */
+AStr autf8_foru32(char* s);
+AStr autf8_foru16(char* s);
+AStr autf8_forgbk(char* s);
+
+/* 字符编码转换 */
+AStr autf8_tou32(const char* s);
+AStr autf8_tou16(const char* s);
+AStr autf8_togbk(const char* s);
 
 
 
