@@ -325,11 +325,19 @@ static inline void AStr_pushAchar(AStr* self, Achar ch){
     if(__a_unlikely(ch == 0)){
         return;
     }
+    size_t i = 0;
     char* p = (char*)&ch;
-    if(*p != 0){ AStr_pushBack(self, *p); p++; }
-    if(*p != 0){ AStr_pushBack(self, *p); p++; }
-    if(*p != 0){ AStr_pushBack(self, *p); p++; }
-    if(*p != 0){ AStr_pushBack(self, *p); p++; }
+    for( ; i < sizeof(Achar); i++){
+        if(p[i] != 0) break;
+    }
+
+    for( ; i < sizeof(Achar); i++){
+        if(p[i] == 0){
+            aExcSet(AEXC_outdomain);
+            return;
+        }
+        AStr_pushBack(self, p[i]);
+    }
 }
 static inline void AStr_pushAchar_s(AStr* self, Achar* s){
     if(__a_unlikely(self == nullptr || s == nullptr)){
@@ -420,11 +428,12 @@ static AStr a_iconv(const char* s, const char* tar_name, const char* src_name){
         return A_INIT(AStr);
     }
 
-    int ret = 0;
+    int ret = 0; size_t len = strlen(s);
     char* src = (char*)s; char* tar = (void*)buf;
-    while((size_t)src < (size_t)(s + strlen(s))){
-        memset(buf, 0, sizeof(buf));
-        size_t len_src = 63; size_t len_tar = sizeof(Achar) * 63;
+    while((size_t)(s + len) > (size_t)src){
+        memset(buf, 0, sizeof(buf)); tar = (void*)buf;
+        size_t len_tar = sizeof(Achar) * 63;
+        size_t len_src = (size_t)(s + len) - (size_t)src; if(len_src > 63) len_src = 63; 
 
         ret = iconv(fd, &src, &len_src, &tar, &len_tar);
         if(ret != 0){
