@@ -50,11 +50,11 @@ static void test_wrappers_once(const char* path, int iter) {
     assert_file_text(path, "hello");
 
     {
-        RAII(AString) abs = af_path_absolute(path);
+        RAII(AStr) abs = af_path_absolute(path);
         expect_clean_at("absolute append", iter);
 
         RAII(AFile) end = A_INIT(AFile);
-        AFile_open(&end, __aftype_file, abs.s,
+        AFile_open(&end, __aftype_file, abs,
                    __afmod_write | __afmod_appent | __afmod_creat);
         expect_clean_at("AFile_open append", iter);
         assert(end.fd >= 0);
@@ -78,11 +78,11 @@ static void test_wrappers_once(const char* path, int iter) {
 
 static void test_direct_open_once(const char* path, int iter) {
     {
-        RAII(AString) abs = af_path_absolute(path);
+        RAII(AStr) abs = af_path_absolute(path);
         expect_clean_at("absolute direct", iter);
 
         RAII(AFile) file = A_INIT(AFile);
-        AFile_open(&file, __aftype_file, abs.s,
+        AFile_open(&file, __aftype_file, abs,
                    __afmod_write | __afmod_creat | __afmod_truncate | __afmod_exclusive);
         expect_clean_at("AFile_open direct write", iter);
         assert(file.fd >= 0);
@@ -93,12 +93,12 @@ static void test_direct_open_once(const char* path, int iter) {
     assert_file_text(path, "Z");
 
     {
-        RAII(AString) abs = af_path_absolute(path);
+        RAII(AStr) abs = af_path_absolute(path);
         expect_clean_at("absolute read", iter);
 
         char buf[4] = {0};
         RAII(AFile) file = A_INIT(AFile);
-        AFile_open(&file, __aftype_file, abs.s, __afmod_read);
+        AFile_open(&file, __aftype_file, abs, __afmod_read);
         expect_clean_at("AFile_open direct read", iter);
         assert(file.fd >= 0);
         assert(file.f->read(&file, sizeof(buf), buf) == 1);

@@ -54,7 +54,7 @@ static void assert_file_text(const char* path, const char* expected) {
     assert(strcmp(buf, expected) == 0);
 }
 
-static int line_has_path(ALine(AString)* list, const char* path) {
+static int line_has_path(ALine(AStr)* list, const char* path) {
     forEach(it, *list) {
         if(it.p != NULL && strcmp(it.p->s, path) == 0) {
             return 1;
@@ -88,12 +88,12 @@ static void test_file_tools(const char* root) {
     assert(!af_isdir(file));
     assert(!af_isdev(file));
 
-    RAII(AString) dir = af_dir_extract(file);
+    RAII(AStr) dir = af_dir_extract(file);
     expect_clean();
     printf("[afile] dir_extract actual='%s' expected='%s'\n", dir.s, nested);
     assert(strcmp(dir.s, nested) == 0);
 
-    RAII(AString) abs = af_path_absolute(file);
+    RAII(AStr) abs = af_path_absolute(file);
     expect_clean();
     assert(abs.s != NULL);
     assert(abs.s[0] == '/');
@@ -121,7 +121,7 @@ static void test_file_tools(const char* root) {
     assert(af_isfile(moved));
 
     test_mark("file tools: ls");
-    RAII(ALine(AString)) names = af_ls(nested);
+    RAII(ALine(AStr)) names = af_ls(nested);
     expect_clean();
     assert(names.f->getNumber(&names) >= 2);
     assert(line_has_path(&names, file));
@@ -258,7 +258,7 @@ static void test_invalid_inputs(const char* root) {
     af_chmod(missing, 0600);
     expect_error();
 
-    RAII(ALine(AString)) list = af_ls(missing);
+    RAII(ALine(AStr)) list = af_ls(missing);
     (void)list;
     expect_error();
 }

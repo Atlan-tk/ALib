@@ -8,9 +8,9 @@ ATree_Define(int, int);
 ATree_Generate(int, int);
 A_TYPE_REGISTER(ATree(int, int));
 
-ATree_Define(AString, AString);
-ATree_Generate(AString, AString);
-A_TYPE_REGISTER(ATree(AString, AString));
+ATree_Define(AStr, AStr);
+ATree_Generate(AStr, AStr);
+A_TYPE_REGISTER(ATree(AStr, AStr));
 
 static void test_atree_int(void) {
     RAII(ATree(int, int)) t = A_INIT(ATree(int, int));
@@ -85,7 +85,7 @@ static void test_atree_int(void) {
 }
 
 static void test_atree_astring(void) {
-    RAII(ATree(AString, AString)) t = A_INIT(ATree(AString, AString));
+    RAII(ATree(AStr, AStr)) t = A_INIT(ATree(AStr, AStr));
     assert(!aExcOccur());
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
@@ -93,13 +93,13 @@ static void test_atree_astring(void) {
         char kbuf[32], vbuf[32];
         snprintf(kbuf, sizeof(kbuf), "key%d", i);
         snprintf(vbuf, sizeof(vbuf), "val%d", i);
-        RAII(AString) k = A_INIT(AString);
-        RAII(AString) v = A_INIT(AString);
+        RAII(AStr) k = A_INIT(AStr);
+        RAII(AStr) v = A_INIT(AStr);
         {
-            RAII(AString) tk = AString_new(kbuf);
-            RAII(AString) tv = AString_new(vbuf);
-            k.f->addBack(&k, tk);
-            v.f->addBack(&v, tv);
+            RAII(AStr) tk = AStr_new(kbuf);
+            RAII(AStr) tv = AStr_new(vbuf);
+            AStr_addBack(&k, tk.s);
+            AStr_addBack(&v, tv.s);
         }
         t.f->ins(&t, k, v);
         assert(!aExcOccur());
@@ -108,17 +108,17 @@ static void test_atree_astring(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 拷贝 */
-    RAII(ATree(AString, AString)) t2 = A_COPY(ATree(AString, AString), t);
+    RAII(ATree(AStr, AStr)) t2 = A_COPY(ATree(AStr, AStr), t);
     assert(!aExcOccur());
     assert(t2.f->getNumber(&t2) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 删除操作 */
     {
-        RAII(AString) delkey = A_INIT(AString);
+        RAII(AStr) delkey = A_INIT(AStr);
         {
-            RAII(AString) tmp = AString_new("key5");
-            delkey.f->addBack(&delkey, tmp);
+            RAII(AStr) tmp = AStr_new("key5");
+            AStr_addBack(&delkey, tmp.s);
         }
         t.f->rm(&t, delkey);
         assert(!aExcOccur());
@@ -128,7 +128,7 @@ static void test_atree_astring(void) {
     /* 迭代器顺序校验（字符串比较顺序） */
     int idx = 0;
     forEach(it, t) {
-        AString *val = it.p;
+        AStr *val = it.p;
         assert(val != NULL);
         idx++;
     }
@@ -136,18 +136,18 @@ static void test_atree_astring(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 大量数据 */
-    RAII(ATree(AString, AString)) big = A_INIT(ATree(AString, AString));
+    RAII(ATree(AStr, AStr)) big = A_INIT(ATree(AStr, AStr));
     for (int i = 0; i < 600; i++) {
         char kbuf[32], vbuf[32];
         snprintf(kbuf, sizeof(kbuf), "k%03d", i);
         snprintf(vbuf, sizeof(vbuf), "v%03d", i);
-        RAII(AString) k = A_INIT(AString);
-        RAII(AString) v = A_INIT(AString);
+        RAII(AStr) k = A_INIT(AStr);
+        RAII(AStr) v = A_INIT(AStr);
         {
-            RAII(AString) tk = AString_new(kbuf);
-            RAII(AString) tv = AString_new(vbuf);
-            k.f->addBack(&k, tk);
-            v.f->addBack(&v, tv);
+            RAII(AStr) tk = AStr_new(kbuf);
+            RAII(AStr) tv = AStr_new(vbuf);
+            AStr_addBack(&k, tk.s);
+            AStr_addBack(&v, tv.s);
         }
         big.f->ins(&big, k, v);
         assert(!aExcOccur());

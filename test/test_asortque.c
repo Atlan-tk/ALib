@@ -5,14 +5,14 @@
 #include <assert.h>
 #include <stdio.h>
 
-/* 生成 int 和 AString 的有序数组实现 */
+/* 生成 int 和 AStr 的有序数组实现 */
 ASortque_Define(int);
 ASortque_Generate(int);
 A_TYPE_REGISTER(ASortque(int));
 
-ASortque_Define(AString);
-ASortque_Generate(AString);
-A_TYPE_REGISTER(ASortque(AString));
+ASortque_Define(AStr);
+ASortque_Generate(AStr);
+A_TYPE_REGISTER(ASortque(AStr));
 
 /* ---------- int 元素测试 ---------- */
 static void test_asortque_int(void) {
@@ -127,10 +127,10 @@ static void test_asortque_int(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
-/* ---------- AString 元素测试 ---------- */
+/* ---------- AStr 元素测试 ---------- */
 static void test_asortque_astring(void) {
     /* 1. 基本构造 */
-    RAII(ASortque(AString)) sq = A_INIT(ASortque(AString));
+    RAII(ASortque(AStr)) sq = A_INIT(ASortque(AStr));
     assert(!aExcOccur());
     assert(sq.f->empty(&sq));
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -139,32 +139,32 @@ static void test_asortque_astring(void) {
     char* words[] = {"banana", "apple", "cherry", "blueberry", "apricot"};
     int n = sizeof(words) / sizeof(words[0]);
     for (int i = 0; i < n; i++) {
-        RAII(AString) elem = AString_new(words[i]);  // 字面量包装
+        RAII(AStr) elem = AStr_new(words[i]);  // 字面量包装
         sq.f->ins(&sq, elem);
         assert(!aExcOccur());
     }
     assert((int)sq.f->getNumber(&sq) == n);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
-    /* 验证排序：接口返回的 AString 指针所指向的字符串应非降序 */
+    /* 验证排序：接口返回的 AStr 指针所指向的字符串应非降序 */
     for (int i = 1; i < n; i++) {
-        AString *a = sq.f->at(&sq, i - 1);
-        AString *b = sq.f->at(&sq, i);
+        AStr *a = sq.f->at(&sq, i - 1);
+        AStr *b = sq.f->at(&sq, i);
         assert(a != NULL && b != NULL);
         assert(strcmp(a->s, b->s) <= 0);
     }
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 空容器 at 触发异常 */
-    RAII(ASortque(AString)) empty_sq = A_INIT(ASortque(AString));
-    AString *null_s = empty_sq.f->at(&empty_sq, 0);
+    RAII(ASortque(AStr)) empty_sq = A_INIT(ASortque(AStr));
+    AStr *null_s = empty_sq.f->at(&empty_sq, 0);
     assert(null_s == NULL);
     assert(aExcOccur());
     aExcClean();
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 空容器 popMin/popMax 触发异常 */
-    AString dummy = AString_new("");
+    AStr dummy = AStr_new("");
     empty_sq.f->popMin(&empty_sq, &dummy);
     assert(aExcOccur());
     aExcClean();
@@ -174,20 +174,20 @@ static void test_asortque_astring(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 3. 拷贝构造 */
-    RAII(ASortque(AString)) sq2 = A_COPY(ASortque(AString), sq);
+    RAII(ASortque(AStr)) sq2 = A_COPY(ASortque(AStr), sq);
     assert(!aExcOccur());
     assert((int)sq2.f->getNumber(&sq2) == n);
     for (int i = 0; i < n; i++) {
-        AString *orig = sq.f->at(&sq, i);
-        AString *copy = sq2.f->at(&sq2, i);
+        AStr *orig = sq.f->at(&sq, i);
+        AStr *copy = sq2.f->at(&sq2, i);
         assert(strcmp(orig->s, copy->s) == 0);
     }
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
-    /* 4. 修改拷贝不影响原容器（AString 写时拷贝） */
-    AString *first_copy = sq2.f->at(&sq2, 0);
-    first_copy->f->pushBack(first_copy, 'X');
-    AString *first_orig = sq.f->at(&sq, 0);
+    /* 4. 修改拷贝不影响原容器（AStr 写时拷贝） */
+    AStr *first_copy = sq2.f->at(&sq2, 0);
+    AStr_pushBack(first_copy, 'X');
+    AStr *first_orig = sq.f->at(&sq, 0);
     assert(strstr(first_orig->s, "X") == NULL);
     assert(strstr(first_copy->s, "X") != NULL);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -201,11 +201,11 @@ static void test_asortque_astring(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 6. popMin / popMax */
-    AString min_val = A_INIT(AString);
+    AStr min_val = A_INIT(AStr);
     sq.f->popMin(&sq, &min_val);
     assert(!aExcOccur());
     assert(strcmp(min_val.s, sq.f->at(&sq, 0)->s) <= 0);
-    AString max_val = A_INIT(AString);
+    AStr max_val = A_INIT(AStr);
     sq.f->popMax(&sq, &max_val);
     assert(!aExcOccur());
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -215,13 +215,13 @@ static void test_asortque_astring(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 7. 大量数据测试 (>512) */
-    RAII(ASortque(AString)) big = A_INIT(ASortque(AString));
+    RAII(ASortque(AStr)) big = A_INIT(ASortque(AStr));
     const int BIG_N = 600;
     char buf[32];
     /* 降序插入编号字符串 "str599" .. "str0" */
     for (int i = BIG_N - 1; i >= 0; i--) {
         snprintf(buf, sizeof(buf), "str%d", i);
-        RAII(AString) elem = AString_new(buf);
+        RAII(AStr) elem = AStr_new(buf);
         big.f->ins(&big, elem);
         assert(!aExcOccur());
     }
@@ -231,7 +231,7 @@ static void test_asortque_astring(void) {
     int cnt = 0;
     forEach(it, big) {
         snprintf(buf, sizeof(buf), "str%d", cnt);
-        AString *v = it.p;
+        AStr *v = it.p;
         assert(strcmp(v->s, buf) == 0);
         cnt++;
     }

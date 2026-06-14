@@ -4,14 +4,14 @@
 #include <assert.h>
 #include <stdio.h>
 
-/* 生成 int 和 AString 的 ALine 实现 */
+/* 生成 int 和 AStr 的 ALine 实现 */
 ALine_Define(int);
 ALine_Generate(int);
 A_TYPE_REGISTER(ALine(int));
 
-ALine_Define(AString);
-ALine_Generate(AString);
-A_TYPE_REGISTER(ALine(AString));
+ALine_Define(AStr);
+ALine_Generate(AStr);
+A_TYPE_REGISTER(ALine(AStr));
 
 /* 测试 int 元素 */
 static void test_aline_int(void) {
@@ -82,16 +82,16 @@ static void test_aline_int(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
-/* 测试 AString 元素 */
+/* 测试 AStr 元素 */
 static void test_aline_astring(void) {
-    RAII(ALine(AString)) line = A_INIT(ALine(AString));
+    RAII(ALine(AStr)) line = A_INIT(ALine(AStr));
     assert(!aExcOccur());
     assert(line.f->empty(&line));
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 插入普通字符串 */
     for (int i = 0; i < 10; i++) {
-        RAII(AString) tmp = AString_new("constant");
+        RAII(AStr) tmp = AStr_new("constant");
         line.f->pushBack(&line, tmp);
         assert(!aExcOccur());
     }
@@ -100,44 +100,44 @@ static void test_aline_astring(void) {
 
     /* 访问并校验内容 */
     for (int i = 0; i < 10; i++) {
-        AString *ps = line.f->at(&line, i);
+        AStr *ps = line.f->at(&line, i);
         assert(ps != NULL);
         assert(strcmp(ps->s, "constant") == 0);
     }
 
     /* 拷贝容器 */
-    RAII(ALine(AString)) line2 = A_COPY(ALine(AString), line);
+    RAII(ALine(AStr)) line2 = A_COPY(ALine(AStr), line);
     assert(!aExcOccur());
     assert(line2.f->getNumber(&line2) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
-    /* 修改拷贝容器中的元素（AString 会触发写时拷贝） */
-    AString *ps2 = line2.f->at(&line2, 0);
-    ps2->f->pushBack(ps2, 'X');
+    /* 修改拷贝容器中的元素（AStr 会触发写时拷贝） */
+    AStr *ps2 = line2.f->at(&line2, 0);
+    AStr_pushBack(ps2, 'X');
     assert(!aExcOccur());
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 原容器元素不应受影响 */
-    AString *ps1 = line.f->at(&line, 0);
+    AStr *ps1 = line.f->at(&line, 0);
     assert(strcmp(ps1->s, "constant") == 0);
     assert(strcmp(ps2->s, "constantX") == 0);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 空容器边界测试 */
-    RAII(ALine(AString)) empty_line = A_INIT(ALine(AString));
+    RAII(ALine(AStr)) empty_line = A_INIT(ALine(AStr));
     empty_line.f->popBack(&empty_line, NULL);
     assert(aExcOccur());
     aExcClean();
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 大量数据（>512） */
-    RAII(ALine(AString)) big = A_INIT(ALine(AString));
+    RAII(ALine(AStr)) big = A_INIT(ALine(AStr));
     for (int i = 0; i < 600; i++) {
         char buf[32];
         snprintf(buf, sizeof(buf), "s%d", i);
-        RAII(AString) tmp = AString_new(buf);
-        RAII(AString) elem = A_INIT(AString);
-        elem.f->addBack(&elem, tmp);       /* 深拷贝到 elem */
+        RAII(AStr) tmp = AStr_new(buf);
+        RAII(AStr) elem = A_INIT(AStr);
+        AStr_addBack(&elem, tmp.s);       /* 深拷贝到 elem */
         big.f->pushBack(&big, elem);
         assert(!aExcOccur());
     }
@@ -145,7 +145,7 @@ static void test_aline_astring(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     for (int i = 0; i < 600; i++) {
-        AString *ps = big.f->at(&big, i);
+        AStr *ps = big.f->at(&big, i);
         char expected[32];
         snprintf(expected, sizeof(expected), "s%d", i);
         assert(strcmp(ps->s, expected) == 0);

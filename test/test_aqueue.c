@@ -9,14 +9,14 @@ AQueue_Define(int);
 AQueue_Generate(int);
 A_TYPE_REGISTER(AQueue(int));
 
-AQueue_Define(AString);
-AQueue_Generate(AString);
-A_TYPE_REGISTER(AQueue(AString));
+AQueue_Define(AStr);
+AQueue_Generate(AStr);
+A_TYPE_REGISTER(AQueue(AStr));
 
-static AString owned_string(const char *s) {
-    AString out = A_INIT(AString);
-    AString lit = AString_new((char *)s);
-    out.f->addBack(&out, lit);
+static AStr owned_string(const char *s) {
+    AStr out = A_INIT(AStr);
+    AStr lit = AStr_new((char *)s);
+    AStr_addBack(&out, lit.s);
     return out;
 }
 
@@ -83,22 +83,22 @@ static void test_aqueue_int(void) {
 }
 
 static void test_aqueue_astring(void) {
-    RAII(AQueue(AString)) qu = A_INIT(AQueue(AString));
+    RAII(AQueue(AStr)) qu = A_INIT(AQueue(AStr));
     assert(qu.f->empty(&qu));
 
-    RAII(AString) one = owned_string("one");
-    RAII(AString) two = owned_string("two");
+    RAII(AStr) one = owned_string("one");
+    RAII(AStr) two = owned_string("two");
     qu.f->push(&qu, one);
     qu.f->push(&qu, two);
     assert(qu.f->getNumber(&qu) == 2);
 
-    RAII(AQueue(AString)) cp = A_COPY(AQueue(AString), qu);
-    AString *front_copy = cp.f->at(&cp, 0);
-    front_copy->f->pushBack(front_copy, '!');
+    RAII(AQueue(AStr)) cp = A_COPY(AQueue(AStr), qu);
+    AStr *front_copy = cp.f->at(&cp, 0);
+    AStr_pushBack(front_copy, '!');
     assert(strcmp(qu.f->at(&qu, 0)->s, "one") == 0);
     assert(strcmp(cp.f->at(&cp, 0)->s, "one!") == 0);
 
-    RAII(AString) popped = A_INIT(AString);
+    RAII(AStr) popped = A_INIT(AStr);
     qu.f->pop(&qu, &popped);
     assert(strcmp(popped.s, "one") == 0);
     assert(strcmp(qu.f->at(&qu, 0)->s, "two") == 0);

@@ -5,7 +5,7 @@
 
 #include <astring.h>
 
-static inline uint32_t AString_calCap(uint32_t cap){
+static inline uint32_t AStr_calCap(uint32_t cap){
     if(__a_unlikely(cap >= __aPagSize)){
         cap = (cap / __aPagSize + (cap % __aPagSize ? 1 : 0)) * __aPagSize;
     }else{
@@ -16,11 +16,11 @@ static inline uint32_t AString_calCap(uint32_t cap){
 }
 
 /* 字面量转为堆分配 */
-static inline int AString_ensure_writable(AString* self) {
+static inline int AStr_ensure_writable(AStr* self) {
     if(__a_likely(self->noLiteral)) return 0;
 
     uint32_t new_cap = self->number + 1;  /* 至少容纳字符和'\0' */
-    new_cap = AString_calCap(new_cap);
+    new_cap = AStr_calCap(new_cap);
 
     char* new_s = alib_alloc(new_cap);
     if (__a_unlikely(new_s == nullptr)) {
@@ -39,10 +39,10 @@ static inline int AString_ensure_writable(AString* self) {
 }
 
 /* 扩展容量（假设已可写） */
-static inline int AString_grow(AString* self, uint32_t new_cap) {
+static inline int AStr_grow(AStr* self, uint32_t new_cap) {
     if (__a_likely(new_cap <= self->capacity)) return 0;
 
-    new_cap = AString_calCap(new_cap);
+    new_cap = AStr_calCap(new_cap);
 
     char* new_s = self->s == nullptr ? alib_alloc(new_cap) : alib_realloc(self->s, new_cap);
     if (__a_unlikely(new_s == nullptr)) {
@@ -53,11 +53,11 @@ static inline int AString_grow(AString* self, uint32_t new_cap) {
 }
 
 /* 收缩容量（假设已可写） */
-static int AString_sub(AString* self) {
+static int AStr_sub(AStr* self) {
     if (__a_likely(self->number + 1 >= (self->capacity + 1) / 2)) return 0;
 
     uint32_t new_cap = self->number + 1;
-    new_cap = AString_calCap(new_cap);
+    new_cap = AStr_calCap(new_cap);
 
     char * new_s = alib_realloc(self->s, new_cap);
     if (__a_unlikely(new_s == nullptr)) {
@@ -69,13 +69,59 @@ static int AString_sub(AString* self) {
 
 
 /* ---------- 虚函数实现 ---------- */
+char AStr_at(AStr* self, uint32_t index) {
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return 0;
+    }
 
-void AString_rm(AString* self, uint32_t index) {
+    if(__a_unlikely(self->number == 0)){
+        aExcSet(AEXC_overstep);
+        return 0;
+    }
+
     if (__a_unlikely(index >= self->number)) {
+        index = self->number - 1;
+    }
+
+    char ch = self->s[index];
+    return ch;
+}
+
+void AStr_set(AStr* self, uint32_t index, char ch) {
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
         return;
     }
 
-    int ret = AString_ensure_writable(self);
+    if(__a_unlikely(self->number == 0)){
+        aExcSet(AEXC_overstep);
+        return;
+    }
+
+    if (__a_unlikely(index >= self->number)) {
+        index = self->number - 1;
+    }
+
+    self->s[index] = ch;
+}
+
+void AStr_rm(AStr* self, uint32_t index) {
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+
+    if(__a_unlikely(self->number == 0)){
+        aExcSet(AEXC_overstep);
+        return;
+    }
+
+    if (__a_unlikely(index >= self->number)) {
+        index = self->number - 1;
+    }
+
+    int ret = AStr_ensure_writable(self);
     if(ret != 0){
         aExcSet(AEXC_alloc_failed);
         return;
@@ -83,22 +129,26 @@ void AString_rm(AString* self, uint32_t index) {
 
     memmove(self->s + index, self->s + index + 1, self->number - index);
     self->number--;
-    AString_sub(self);
+    AStr_sub(self);
 }
 
-void AString_ins(AString* self, uint32_t index, char c) {
-    if (__a_unlikely(index > self->number)) {
-        aExcSet(AEXC_overstep);
+void AStr_ins(AStr* self, uint32_t index, char c) {
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
         return;
     }
 
-    int ret = AString_ensure_writable(self);
+    if (__a_unlikely(index > self->number)) {
+        index = self->number;
+    }
+
+    int ret = AStr_ensure_writable(self);
     if(ret != 0){
         aExcSet(AEXC_alloc_failed);
         return;
     }
 
-    ret = AString_grow(self, self->number + 2);
+    ret = AStr_grow(self, self->number + 2);
     if(ret != 0){
         aExcSet(AEXC_alloc_failed);
         return;
@@ -112,20 +162,26 @@ void AString_ins(AString* self, uint32_t index, char c) {
     self->s[index] = c, self->number++;
 }
 
-void AString_pushBack(AString* self, char c) {
-    AString_ins(self, self->number, c);
+void AStr_pushBack(AStr* self, char c) {
+    AStr_ins(self, self->number, c);
 }
 
-void AString_pushFront(AString* self, char c) {
-    AString_ins(self, 0, c);
+void AStr_pushFront(AStr* self, char c) {
+    AStr_ins(self, 0, c);
 }
 
-char AString_popBack(AString* self) {
+char AStr_popBack(AStr* self) {
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return 0;
+    }
+
     if (__a_unlikely(self->number == 0)) {
+        aExcSet(AEXC_overstep);
         return '\0';
     }
 
-    if(0 != AString_ensure_writable(self)){
+    if(0 != AStr_ensure_writable(self)){
         aExcSet(AEXC_alloc_failed);
         return '\0';
     }
@@ -133,17 +189,23 @@ char AString_popBack(AString* self) {
     char c = self->s[self->number - 1];
     self->s[self->number - 1] = '\0';
     self->number--;
-    AString_sub(self);
+    AStr_sub(self);
 
     return c;
 }
 
-char AString_popFront(AString* self) {
+char AStr_popFront(AStr* self) {
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return 0;
+    }
+
     if (__a_unlikely(self->number == 0)) {
+        aExcSet(AEXC_overstep);
         return '\0';
     }
 
-    if(0 != AString_ensure_writable(self)){
+    if(0 != AStr_ensure_writable(self)){
         aExcSet(AEXC_alloc_failed);
         return '\0';
     }
@@ -151,78 +213,61 @@ char AString_popFront(AString* self) {
     char c = self->s[0];
     memmove(self->s, self->s + 1, self->number);
     self->number--;
-    AString_sub(self);
+    AStr_sub(self);
 
     return c;
 }
 
-void AString_addBack(AString* self, AString that) {
-    bool flag = false;
-    if(self->s == that.s){
-        that = A_COPY(AString, that);
-        flag = true;
-    }
-
-    if(__a_unlikely(that.number == 0)){
-        if(flag) A_DEST(AString, that);
+void AStr_addBack(AStr* self, const char* s) {
+    if(__a_unlikely(self == nullptr || s == nullptr)){
+        aExcSet(AEXC_nullptr);
         return;
     }
 
-    int ret = AString_ensure_writable(self);
+    uint32_t len = strlen(s);
+    int ret = AStr_ensure_writable(self);
     if(ret != 0){
         aExcSet(AEXC_alloc_failed);
-        if(flag) A_DEST(AString, that);
         return;
     }
 
-    ret = AString_grow(self, self->number + that.number + 1);
+    ret = AStr_grow(self, self->number + len + 1);
     if(ret != 0){
         aExcSet(AEXC_alloc_failed);
-        if(flag) A_DEST(AString, that);
         return;
     }
 
-    memcpy(self->s + self->number, that.s, that.number + 1);
-    self->number += that.number;
-
-    if(flag) A_DEST(AString, that);
+    memcpy(self->s + self->number, s, len + 1);
+    self->number += len;
 }
 
-void AString_addFront(AString* self, AString that) {
-    bool flag = false;
-    if(self->s == that.s){
-        that = A_COPY(AString, that);
-        flag = true;
-    }
-
-    if(__a_unlikely(that.number == 0)){
-        if(flag) A_DEST(AString, that);
+void AStr_addFront(AStr* self, const char* s) {
+    if(__a_unlikely(self == nullptr || s == nullptr)){
+        aExcSet(AEXC_nullptr);
         return;
     }
 
-    int ret = AString_ensure_writable(self);
+    uint32_t len = strlen(s);
+    int ret = AStr_ensure_writable(self);
     if(ret != 0){
         aExcSet(AEXC_alloc_failed);
-        if(flag) A_DEST(AString, that);
         return;
     }
 
-    ret = AString_grow(self, self->number + that.number + 1);
+    ret = AStr_grow(self, self->number + len + 1);
     if(ret != 0){
         aExcSet(AEXC_alloc_failed);
-        if(flag) A_DEST(AString, that);
         return;
     }
 
-    memmove(self->s + that.number, self->s, self->number + 1);
-    memcpy(self->s, that.s, that.number);
-    self->number += that.number;
-
-    if(flag) A_DEST(AString, that);
+    memmove(self->s + len, self->s, self->number + 1);
+    memcpy(self->s, s, len);
+    self->number += len;
 }
 
-void AString_truncate(AString* self, uint32_t index) {
-    if(__a_unlikely(index >= self->number)){
+void AStr_truncate(AStr* self, uint32_t index) {
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
         return;
     }
 
@@ -231,32 +276,36 @@ void AString_truncate(AString* self, uint32_t index) {
         return;
     }
 
-    int ret = AString_ensure_writable(self);
+    if(__a_unlikely(index >= self->number)){
+        return;
+    }
+
+    int ret = AStr_ensure_writable(self);
     if(ret != 0){
         aExcSet(AEXC_alloc_failed);
         return;
     }
 
     self->number = index, self->s[index] = '\0';
-    AString_sub(self);
+    AStr_sub(self);
 }
 
-int AString_reCap(AString* self, uint32_t new_cap){
+int AStr_reCap(AStr* self, uint32_t new_cap){
     if(__a_unlikely(new_cap < self->number + 1)){
         return AEXC_overstep;
     }
 
     int ret = 0;
     if(new_cap > self->capacity){
-        ret = AString_grow(self, new_cap);
+        ret = AStr_grow(self, new_cap);
     }else{
-        ret = AString_sub(self);
+        ret = AStr_sub(self);
     }
 
     return ret;
 }
 
-uint32_t A_OBJ_HASH(AString)(const AString* self){
+uint32_t A_OBJ_HASH(AStr)(const AStr* self){
     if(__a_unlikely(self == nullptr || self->s == nullptr)){
         return 0;
     }

@@ -63,24 +63,24 @@ bool af_isdev(const char* name);
 /* 提取上层目录 */
 /* 输入根目录返回根目录 *//* 末尾不带'/' */
 /* af_dir_extract("/tmp/test.txt"); return "/tmp" */
-AString af_dir_extract(const char* name);
+AStr af_dir_extract(const char* name);
 
 /* 提取文件/目录名 */
 /* 输入根目录返回根目录 *//* 末尾不带'/' */
 /* af_dir_extract("/tmp/test.txt"); return "test.txt" */
 /* af_dir_extract("/tmp/test_dir"); return "test_dir" */
-AString af_name_extract(const char* name);
+AStr af_name_extract(const char* name);
 
 /* 获取绝对路径 *//* 末尾不带'/' */
-AString af_path_absolute(const char* name);
+AStr af_path_absolute(const char* name);
 
-ALine_Define(AString);
-ALine_Generate(AString);
-A_TYPE_REGISTER(ALine(AString));
+ALine_Define(AStr);
+ALine_Generate(AStr);
+A_TYPE_REGISTER(ALine(AStr));
 
 /* 获取文件/目录列表 */
 /* af_ls("/tmp/test_dir/"); ls -A */
-ALine(AString) af_ls(const char* dir);
+ALine(AStr) af_ls(const char* dir);
 
 /* file info */
 typedef int64_t stat_time_t;
@@ -180,7 +180,7 @@ static inline int AFileLock_unlock(AFileLock* self, Afd fd){
 
 
 typedef struct{
-    AString         name;       //绝对路径
+    AStr            name;       //绝对路径
     AFileLock       filelock;   //文件锁
     AMtx            fl_lock;    //文件锁保护锁
     AMtxRW          lock;       //进程内读写锁
@@ -218,7 +218,7 @@ __noused static inline void A_OBJ_INIT(AFileNode)(AFileNode* self){
     self->fd = A_INIT(Afd);
     self->pid = a_get_pid();
     self->tid = thrd_current();
-    self->name = A_INIT(AString);
+    self->name = A_INIT(AStr);
     self->lock = A_INIT(AMtxRW);
     self->fl_lock = A_INIT(AMtx);
     self->filelock= A_INIT(AFileLock);
@@ -237,7 +237,7 @@ __noused static inline void A_OBJ_DEST(AFileNode)(AFileNode* self){
     if(Afd_exist(self->fd)) a_close(self->fd);
     A_DEST(AMtx, self->fl_lock);
     A_DEST(ALine(Afd), self->fd_list);
-    A_DEST(AString, self->name);
+    A_DEST(AStr, self->name);
     A_DEST(AMtxRW, self->lock);
 }
 __noused static inline void A_OBJ_COPY(AFileNode)(__noused AFileNode* self, __noused const AFileNode* that){
@@ -245,7 +245,7 @@ __noused static inline void A_OBJ_COPY(AFileNode)(__noused AFileNode* self, __no
     aExcSet(AEXC_init_failed);
 }
 __noused static inline int A_OBJ_CMPD(AFileNode)(const AFileNode* self, const AFileNode* that){
-    return A_CMPD(AString, self->name, that->name);
+    return A_CMPD(AStr, self->name, that->name);
 }
 A_TYPE_REGISTER(AFileNode);
 /*
@@ -266,7 +266,7 @@ A_TYPE_REGISTER(AShPtr(AFileNode));
 AClass_Inherit(AFile);
 AClass_Struct(AFile,
     Afd                 fd;
-    AString             name;
+    AStr                name;
     AShPtr(AFileNode)   node;
 );
 AClass_Function(AFile,
@@ -284,7 +284,7 @@ uint32_t AFile_write_pos(AFile* self, uint64_t offset, size_t size, void* source
 AClass_Generate(AFile, AFile_ioctl, AFile_read, AFile_write, AFile_read_pos, AFile_write_pos);
 
 void AFile_close(AFile* self);
-void AFile_open(AFile* self, int type, const char* name, int mod);
+void AFile_open(AFile* self, int type, AStr name, int mod);
 /*
  *  AFile_open(&file, __aftype_file, "/tmp/test.txt", __afmod_read);
  *  AFile_open(&file, __aftype_file, "/tmp/test.txt", __afmod_write | __afmod_exclusive);
@@ -292,13 +292,13 @@ void AFile_open(AFile* self, int type, const char* name, int mod);
  *  AFile_open(&file, __aftype_device, "/dev/test", __afmod_read | __afmod_noblock);
  *  AFile_open(&file, __aftype_device, "/dev/test", __afmod_write | __afmod_exclusive);
  *  AFile_open(&file, __aftype_device, "/dev/test", __afmod_read | __afmod_write | __afmod_noblock | __afmod_exclusive);
- *  AFile_open(&file, __aftype_socket, "tcp|server|0.0.0.0|8290", __afmod_read | __afmod_write);
- *  AFile_open(&file, __aftype_socket, "tcp|client|192.168.0.1|8290", __afmod_read | __afmod_write);
- *  AFile_open(&file, __aftype_socket, "udp|server|0.0.0.0|8290", __afmod_read | __afmod_write);
- *  AFile_open(&file, __aftype_socket, "raw|server|192.168.0.1|8290", __afmod_read | __afmod_write);
- *  AFile_open(&file, __aftype_socket, "unix|server|/tmp/test.txt", __afmod_read | __afmod_write);
+ *  AFile_open(&file, __aftype_socket, "tcp|server|8290|0.0.0.0", __afmod_read | __afmod_write);
+ *  AFile_open(&file, __aftype_socket, "tcp|client|8290|www.name.com", __afmod_read | __afmod_write);
+ *  AFile_open(&file, __aftype_socket, "udp|server|8290|0.0.0.0", __afmod_read | __afmod_write);
+ *  AFile_open(&file, __aftype_socket, "raw|server|8290|192.168.0.1", __afmod_read | __afmod_write);
+ *  AFile_open(&file, __aftype_socket, "unix|server|0|/tmp/test.txt", __afmod_read | __afmod_write);
  */
-void AFile_register(AFile* self, Afd fd, int type, const char* name, int mod);
+void AFile_register(AFile* self, Afd fd, int type, AStr name, int mod);
 /*
  *  注册fd并构造file
  *  AFile_register(&file, fd, __aftype_file, "/tmp/test.txt", __afmod_w | __afmod_exclusive);
@@ -316,7 +316,7 @@ static inline int AFile_gettype(const AFile* self){
 
 __noused static inline void A_OBJ_INIT(AFile)(AFile* self){
     self->node = A_INIT(AShPtr(AFileNode));
-    self->name = A_INIT(AString);
+    self->name = A_INIT(AStr);
     self->fd = -1;
 }
 __noused static inline void A_OBJ_DEST(AFile)(AFile* self){
@@ -326,10 +326,10 @@ __noused static inline void A_OBJ_DEST(AFile)(AFile* self){
 __noused static inline void A_OBJ_COPY(AFile)(AFile* self, const AFile* that){
     int mod = AFile_getmod(that);
     int type = AFile_gettype(that);
-    AFile_open(self, type, that->name.s, mod);
+    AFile_open(self, type, self->name, mod);
 }
 __noused static inline int A_OBJ_CMPD(AFile)(const AFile* self, const AFile* that){
-    return A_CMPD(AString, self->name, that->name);
+    return A_CMPD(AStr, self->name, that->name);
 }
 A_CLASS_REGISTER(AFile);
 
@@ -344,16 +344,16 @@ AFile aDevInOpen(const char* name, bool noblock);
 AFile aDevOutOpen(const char* name, bool exclusive);
 AFile aDevInOutOpen(const char* name, bool noblock, bool exclusive);
 
-AFile aSocketTcpServerOpen(const char* name);
-AFile aSocketUdpServerOpen(const char* name);
-AFile aSocketUnixServerOpen(const char* name);
-AFile aSocketRawServerOpen(const char* name);
-AFile aSocketTcpClientOpen(const char* name);
-AFile aSocketUdpClientOpen(const char* name);
-AFile aSocketUnixClientOpen(const char* name);
-AFile aSocketRawClientOpen(const char* name);
-AFile aSocketTcpAccept(AFile* server);
-AFile aSocketUnixAccept(AFile* server);
+AFile aSocketTcpServerOpen(const char* ipstr, int port);
+AFile aSocketUdpServerOpen(const char* ipstr, int port);
+AFile aSocketRawServerOpen(const char* ipstr, int port);
+AFile aSocketUnixServerOpen(const char* ipstr);
+AFile aSocketTcpClientOpen(const char* ipstr, int port);
+AFile aSocketUdpClientOpen(const char* ipstr, int port);
+AFile aSocketRawClientOpen(const char* ipstr, int port);
+AFile aSocketUnixClientOpen(const char* ipstr);
+AFile aSocketTcpAccept(AFile server);
+AFile aSocketUnixAccept(AFile server);
 
 
 

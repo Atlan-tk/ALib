@@ -8,9 +8,9 @@ ADeque_Define(int);
 ADeque_Generate(int);
 A_TYPE_REGISTER(ADeque(int));
 
-ADeque_Define(AString);
-ADeque_Generate(AString);
-A_TYPE_REGISTER(ADeque(AString));
+ADeque_Define(AStr);
+ADeque_Generate(AStr);
+A_TYPE_REGISTER(ADeque(AStr));
 
 static void test_adeque_int(void) {
     RAII(ADeque(int)) dq = A_INIT(ADeque(int));
@@ -65,39 +65,39 @@ static void test_adeque_int(void) {
 }
 
 static void test_adeque_astring(void) {
-    RAII(ADeque(AString)) dq = A_INIT(ADeque(AString));
+    RAII(ADeque(AStr)) dq = A_INIT(ADeque(AStr));
     assert(!aExcOccur());
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     for (int i = 0; i < 10; i++) {
-        RAII(AString) tmp = AString_new("deque");
+        RAII(AStr) tmp = AStr_new("deque");
         dq.f->pushBack(&dq, tmp);
         assert(!aExcOccur());
     }
     assert(dq.f->getNumber(&dq) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
-    RAII(ADeque(AString)) dq2 = A_COPY(ADeque(AString), dq);
-    AString *ps2 = dq2.f->at(&dq2, 0);
-    ps2->f->pushBack(ps2, 'Z');
-    AString *ps1 = dq.f->at(&dq, 0);
+    RAII(ADeque(AStr)) dq2 = A_COPY(ADeque(AStr), dq);
+    AStr *ps2 = dq2.f->at(&dq2, 0);
+    AStr_pushBack(ps2, 'Z');
+    AStr *ps1 = dq.f->at(&dq, 0);
     assert(strcmp(ps1->s, "deque") == 0);
     assert(strcmp(ps2->s, "dequeZ") == 0);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
-    RAII(ADeque(AString)) empty = A_INIT(ADeque(AString));
+    RAII(ADeque(AStr)) empty = A_INIT(ADeque(AStr));
     empty.f->popBack(&empty, NULL);
     assert(aExcOccur());
     aExcClean();
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
-    RAII(ADeque(AString)) big = A_INIT(ADeque(AString));
+    RAII(ADeque(AStr)) big = A_INIT(ADeque(AStr));
     for (int i = 0; i < 600; i++) {
         char buf[32];
         snprintf(buf, sizeof(buf), "dq%d", i);
-        RAII(AString) tmp = AString_new(buf);
-        RAII(AString) elem = A_INIT(AString);
-        elem.f->addBack(&elem, tmp);
+        RAII(AStr) tmp = AStr_new(buf);
+        RAII(AStr) elem = A_INIT(AStr);
+        AStr_addBack(&elem, tmp.s);
         big.f->pushBack(&big, elem);
         assert(!aExcOccur());
     }
@@ -105,7 +105,7 @@ static void test_adeque_astring(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     for (int i = 0; i < 600; i++) {
-        AString *ps = big.f->at(&big, i);
+        AStr *ps = big.f->at(&big, i);
         char expected[32];
         snprintf(expected, sizeof(expected), "dq%d", i);
         assert(strcmp(ps->s, expected) == 0);

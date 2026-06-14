@@ -12,75 +12,63 @@ extern "C" {
 
 #include "alib.h"
 
-typedef struct AString AString;
-typedef struct A_FUNC(AString) A_FUNC(AString);
+typedef struct AStr AStr;
 
-struct AString{
-    const A_FUNC(AString)* f;
+struct AStr{
+    char* s;
     bool noLiteral;     //是否为字面量, false指向字面量
     uint32_t number;    //字符数量，不包括\0
     uint32_t capacity;
-    char* s;
 };
 
-struct A_FUNC(AString){
-    bool flag;
-    void (*dest)(void*);
-    void (*const rm)(AString* self, uint32_t index);
-    void (*const ins)(AString* self, uint32_t index, char c);
-    void (*const pushBack)(AString* self, char c);
-    void (*const pushFront)(AString* self, char c);
-    char (*const popBack)(AString* self);
-    char (*const popFront)(AString* self);
-    /* 拼接字符串*/
-    void (*const addBack)(AString* self, AString that);
-    void (*const addFront)(AString* self, AString that);
-    /* 截断字符串，仅保留前index个字符*/
-    void  (*const truncate)(AString* self, uint32_t index);
+char AStr_at(AStr* self, uint32_t index);
+void AStr_rm(AStr* self, uint32_t index);
+void AStr_set(AStr* self, uint32_t index, char c);
+void AStr_ins(AStr* self, uint32_t index, char c);
+void AStr_pushBack(AStr* self, char c);
+void AStr_pushFront(AStr* self, char c);
+char AStr_popBack(AStr* self);
+char AStr_popFront(AStr* self);
+void AStr_addBack(AStr* self, const char* s);
+void AStr_addFront(AStr* self, const char* s);
+void AStr_truncate(AStr* self, uint32_t index);
+int  AStr_reCap(AStr* self, uint32_t new_cap);
 
-    uint32_t (*const getNumber)(const AString* self);
-    uint32_t (*const getCapacity)(const AString* self);
-    bool (*const empty)(const AString* self);
-};
-
-void AString_rm(AString* self, uint32_t index);
-void AString_ins(AString* self, uint32_t index, char c);
-void AString_pushBack(AString* self, char c);
-void AString_pushFront(AString* self, char c);
-char AString_popBack(AString* self);
-char AString_popFront(AString* self);
-void AString_addBack(AString* self, AString that);
-void AString_addFront(AString* self, AString that);
-void AString_truncate(AString* self, uint32_t index);
-int  AString_reCap(AString* self, uint32_t new_cap);
-
-__noused static uint32_t AString_getNumber(const AString* self){
+__noused static uint32_t AStr_getNumber(const AStr* self){
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return 0;
+    }
     return self->number;
 }
-__noused static uint32_t AString_getCapacity(const AString* self){
+__noused static uint32_t AStr_getCapacity(const AStr* self){
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return 0;
+    }
     return self->capacity;
 }
-__noused static bool AString_empty(const AString* self){
+__noused static bool AStr_empty(const AStr* self){
+    if(__a_unlikely(self == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return true;
+    }
     return self->number == 0;
 }
 
-static const A_FUNC(AString) A_FUNC_TAB(AString);
-
-__noused static inline void A_OBJ_INIT(AString)(AString* self) {
-    memset(self, 0, sizeof(AString));
-    self->f = &A_FUNC_TAB(AString);
+__noused static inline void A_OBJ_INIT(AStr)(AStr* self) {
+    memset(self, 0, sizeof(AStr));
 }
 
-__noused static inline void A_OBJ_DEST(AString)(AString* self) {
+__noused static inline void A_OBJ_DEST(AStr)(AStr* self) {
     if (self->noLiteral) {
         alib_free(self->s);
     }
 }
 
-__noused static inline void A_OBJ_COPY(AString)(AString* self, const AString* that) {
-    self->f = that->f;
+__noused static inline void A_OBJ_COPY(AStr)(AStr* self, const AStr* that) {
     if (that->noLiteral) {
-        int ret = AString_reCap(self, that->number + 1);
+        int ret = AStr_reCap(self, that->number + 1);
         if(ret != 0){
             aExcSet(AEXC_init_failed);
             return;
@@ -96,7 +84,7 @@ __noused static inline void A_OBJ_COPY(AString)(AString* self, const AString* th
     self->noLiteral = that->noLiteral;
 }
 
-__noused static inline int A_OBJ_CMPD(AString)(const AString* self, const AString* that) {
+__noused static inline int A_OBJ_CMPD(AStr)(const AStr* self, const AStr* that) {
     if(self->s == that->s) return 0;
     if(self->s != nullptr && that->s != nullptr){
         return strcmp(self->s, that->s);
@@ -107,35 +95,17 @@ __noused static inline int A_OBJ_CMPD(AString)(const AString* self, const AStrin
     }
 }
 
-A_TYPE_REGISTER(AString);
-
-static const A_FUNC(AString) A_FUNC_TAB(AString) = {
-    true,
-    (void*)__A_OBJ_DEST_FUNC_SELF(AString),
-    AString_rm,
-    AString_ins,
-    AString_pushBack,
-    AString_pushFront,
-    AString_popBack,
-    AString_popFront,
-    AString_addBack,
-    AString_addFront,
-    AString_truncate,
-    AString_getNumber,
-    AString_getCapacity,
-    AString_empty,
-};
+A_TYPE_REGISTER(AStr);
 
 
 
-/* 将字面量转换为AString */
-static inline AString AString_new(const char* s){
-    return  (AString){
-        .f = &A_FUNC_TAB(AString),
+/* 将字面量转换为AStr */
+static inline AStr AStr_new(const char* s){
+    return  (AStr){
+        .s = (char*)s,
         .number = s ? strlen(s) : 0,
         .noLiteral = false,
         .capacity = 0,
-        .s = (char*)s,
     };
 }
 

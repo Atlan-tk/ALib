@@ -15,18 +15,18 @@ AHash_Define(int, int);
 AHash_Generate(int, int);
 A_TYPE_REGISTER(AHash(int, int));
 
-ATree_Define(AString, AString);
-ATree_Generate(AString, AString);
-A_TYPE_REGISTER(ATree(AString, AString));
+ATree_Define(AStr, AStr);
+ATree_Generate(AStr, AStr);
+A_TYPE_REGISTER(ATree(AStr, AStr));
 
-AHash_Define(AString, AString);
-AHash_Generate(AString, AString);
-A_TYPE_REGISTER(AHash(AString, AString));
+AHash_Define(AStr, AStr);
+AHash_Generate(AStr, AStr);
+A_TYPE_REGISTER(AHash(AStr, AStr));
 
-static AString owned_string(const char *s) {
-    AString out = A_INIT(AString);
-    AString lit = AString_new((char *)s);
-    out.f->addBack(&out, lit);
+static AStr owned_string(const char *s) {
+    AStr out = A_INIT(AStr);
+    AStr lit = AStr_new((char *)s);
+    AStr_addBack(&out, lit.s);
     return out;
 }
 
@@ -139,36 +139,36 @@ static void test_ahash_int_api(void) {
 }
 
 static void test_atree_astring_override(void) {
-    RAII(ATree(AString, AString)) tr = A_INIT(ATree(AString, AString));
-    RAII(AString) key0 = owned_string("k");
-    RAII(AString) val0 = owned_string("v0");
-    RAII(AString) key1 = owned_string("k");
-    RAII(AString) val1 = owned_string("v1");
+    RAII(ATree(AStr, AStr)) tr = A_INIT(ATree(AStr, AStr));
+    RAII(AStr) key0 = owned_string("k");
+    RAII(AStr) val0 = owned_string("v0");
+    RAII(AStr) key1 = owned_string("k");
+    RAII(AStr) val1 = owned_string("v1");
 
     tr.f->ins(&tr, key0, val0);
     tr.f->ins(&tr, key1, val1);
     assert(tr.f->getNumber(&tr) == 1);
     assert(strcmp(tr.f->at(&tr, key1)->s, "v1") == 0);
 
-    RAII(AString) taken = A_INIT(AString);
+    RAII(AStr) taken = A_INIT(AStr);
     tr.f->take(&tr, key1, &taken);
     assert(strcmp(taken.s, "v1") == 0);
     assert(tr.f->empty(&tr));
 }
 
 static void test_ahash_astring_override(void) {
-    RAII(AHash(AString, AString)) hs = A_INIT(AHash(AString, AString));
-    RAII(AString) key0 = owned_string("k");
-    RAII(AString) val0 = owned_string("v0");
-    RAII(AString) key1 = owned_string("k");
-    RAII(AString) val1 = owned_string("v1");
+    RAII(AHash(AStr, AStr)) hs = A_INIT(AHash(AStr, AStr));
+    RAII(AStr) key0 = owned_string("k");
+    RAII(AStr) val0 = owned_string("v0");
+    RAII(AStr) key1 = owned_string("k");
+    RAII(AStr) val1 = owned_string("v1");
 
     hs.f->ins(&hs, key0, val0);
     hs.f->ins(&hs, key1, val1);
     assert(hs.f->getNumber(&hs) == 1);
     assert(strcmp(hs.f->at(&hs, key1)->s, "v1") == 0);
 
-    RAII(AString) taken = A_INIT(AString);
+    RAII(AStr) taken = A_INIT(AStr);
     hs.f->take(&hs, key1, &taken);
     assert(strcmp(taken.s, "v1") == 0);
     assert(hs.f->empty(&hs));

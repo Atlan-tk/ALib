@@ -530,6 +530,9 @@ __noused static inline void a_class_dest(void* _self){
 }
 
 
+#define AEND ((uint32_t)0xffffffff)
+
+
 
 #ifdef __cplusplus
 }

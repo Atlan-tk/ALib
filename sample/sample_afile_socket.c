@@ -36,7 +36,7 @@ static int server_thread(void* arg) {
     SocketTestState* state = arg;
     char buf[32] = {0};
 
-    RAII(AFile) server = aSocketTcpServerOpen("127.0.0.1|8290");
+    RAII(AFile) server = aSocketTcpServerOpen("127.0.0.1", 8290);
     if(aExcOccur()) {
         fprintf(stderr, "server open failed: exception=%d\n", aExcGet());
         aExcClean();
@@ -47,7 +47,7 @@ static int server_thread(void* arg) {
     notify_server_state(state, SERVER_READY);
     printf("[server] listening on 127.0.0.1:8290\n");
 
-    RAII(AFile) client = aSocketTcpAccept(&server);
+    RAII(AFile) client = aSocketTcpAccept(server);
     fatal_if_exception("server accept");
     printf("[server] client connected\n");
 
@@ -89,7 +89,7 @@ static int client_thread(void* arg) {
         return 1;
     }
 
-    RAII(AFile) client = aSocketTcpClientOpen("127.0.0.1|8290");
+    RAII(AFile) client = aSocketTcpClientOpen("127.0.0.1", 8290);
     fatal_if_exception("client open");
     printf("[client] connected to 127.0.0.1:8290\n");
 

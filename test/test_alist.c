@@ -9,9 +9,9 @@ AList_Define(int);
 AList_Generate(int);
 A_TYPE_REGISTER(AList(int));
 
-AList_Define(AString);
-AList_Generate(AString);
-A_TYPE_REGISTER(AList(AString));
+AList_Define(AStr);
+AList_Generate(AStr);
+A_TYPE_REGISTER(AList(AStr));
 
 static void install_tracked_allocators(void) {
 }
@@ -25,19 +25,19 @@ static void assert_int_list_eq(const AList(int) *list, const int *expected, uint
     }
 }
 
-static void assert_astring_list_eq(const AList(AString) *list, const char *const *expected, uint32_t n) {
+static void assert_astring_list_eq(const AList(AStr) *list, const char *const *expected, uint32_t n) {
     assert(list->f->getNumber(list) == n);
     for (uint32_t i = 0; i < n; i++) {
-        AString *p = list->f->at(list, i);
+        AStr *p = list->f->at(list, i);
         assert(p != NULL);
         assert(strcmp(p->s, expected[i]) == 0);
     }
 }
 
-static AString make_owned_astring(const char *s) {
-    AString out = A_INIT(AString);
-    AString literal = AString_new((char *)s);
-    out.f->addBack(&out, literal);
+static AStr make_owned_astring(const char *s) {
+    AStr out = A_INIT(AStr);
+    AStr literal = AStr_new((char *)s);
+    AStr_addBack(&out, literal.s);
     return out;
 }
 
@@ -210,40 +210,40 @@ static void test_alist_take_p(void) {
 }
 
 static void test_alist_astring(void) {
-    RAII(AList(AString)) list = A_INIT(AList(AString));
+    RAII(AList(AStr)) list = A_INIT(AList(AStr));
     assert(!aExcOccur());
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     for (int i = 0; i < 10; i++) {
-        RAII(AString) tmp = AString_new("hello");
+        RAII(AStr) tmp = AStr_new("hello");
         list.f->pushBack(&list, tmp);
         assert(!aExcOccur());
     }
     assert(list.f->getNumber(&list) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
-    RAII(AList(AString)) list2 = A_COPY(AList(AString), list);
+    RAII(AList(AStr)) list2 = A_COPY(AList(AStr), list);
     assert(!aExcOccur());
-    AString *ps2 = list2.f->at(&list2, 0);
-    ps2->f->pushBack(ps2, '!');
-    AString *ps1 = list.f->at(&list, 0);
+    AStr *ps2 = list2.f->at(&list2, 0);
+    AStr_pushBack(ps2, '!');
+    AStr *ps1 = list.f->at(&list, 0);
     assert(strcmp(ps1->s, "hello") == 0);
     assert(strcmp(ps2->s, "hello!") == 0);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
-    RAII(AList(AString)) empty = A_INIT(AList(AString));
+    RAII(AList(AStr)) empty = A_INIT(AList(AStr));
     empty.f->popBack(&empty, NULL);
     assert(aExcOccur());
     aExcClean();
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
-    RAII(AList(AString)) big = A_INIT(AList(AString));
+    RAII(AList(AStr)) big = A_INIT(AList(AStr));
     for (int i = 0; i < 600; i++) {
         char buf[32];
         snprintf(buf, sizeof(buf), "item%d", i);
-        RAII(AString) tmp = AString_new(buf);
-        RAII(AString) elem = A_INIT(AString);
-        elem.f->addBack(&elem, tmp);
+        RAII(AStr) tmp = AStr_new(buf);
+        RAII(AStr) elem = A_INIT(AStr);
+        AStr_addBack(&elem, tmp.s);
         big.f->pushBack(&big, elem);
         assert(!aExcOccur());
     }
@@ -251,7 +251,7 @@ static void test_alist_astring(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     for (int i = 0; i < 600; i++) {
-        AString *ps = big.f->at(&big, i);
+        AStr *ps = big.f->at(&big, i);
         char expected[32];
         snprintf(expected, sizeof(expected), "item%d", i);
         assert(strcmp(ps->s, expected) == 0);
@@ -260,30 +260,30 @@ static void test_alist_astring(void) {
 }
 
 static void test_alist_astring_rm_p(void) {
-    RAII(AList(AString)) list = A_INIT(AList(AString));
+    RAII(AList(AStr)) list = A_INIT(AList(AStr));
     assert(!aExcOccur());
 
     {
-        RAII(AString) tmp = make_owned_astring("alpha");
+        RAII(AStr) tmp = make_owned_astring("alpha");
         assert(!aExcOccur());
         list.f->pushBack(&list, tmp);
         assert(!aExcOccur());
     }
     {
-        RAII(AString) tmp = make_owned_astring("beta");
+        RAII(AStr) tmp = make_owned_astring("beta");
         assert(!aExcOccur());
         list.f->pushBack(&list, tmp);
         assert(!aExcOccur());
     }
     {
-        RAII(AString) tmp = make_owned_astring("gamma");
+        RAII(AStr) tmp = make_owned_astring("gamma");
         assert(!aExcOccur());
         list.f->pushBack(&list, tmp);
         assert(!aExcOccur());
     }
 
     {
-        AString *mid = list.f->at(&list, 1);
+        AStr *mid = list.f->at(&list, 1);
         list.f->rm_p(&list, mid);
         assert(!aExcOccur());
         {
@@ -294,7 +294,7 @@ static void test_alist_astring_rm_p(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     {
-        AString *head = list.f->at(&list, 0);
+        AStr *head = list.f->at(&list, 0);
         list.f->rm_p(&list, head);
         assert(!aExcOccur());
         {
@@ -305,12 +305,12 @@ static void test_alist_astring_rm_p(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     {
-        AString literal = AString_new("literal");
+        AStr literal = AStr_new("literal");
         list.f->pushBack(&list, literal);
         assert(!aExcOccur());
     }
     {
-        AString *tail = list.f->at(&list, 1);
+        AStr *tail = list.f->at(&list, 1);
         list.f->rm_p(&list, tail);
         assert(!aExcOccur());
         {
@@ -321,13 +321,13 @@ static void test_alist_astring_rm_p(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     {
-        RAII(AString) tmp = make_owned_astring("delta");
+        RAII(AStr) tmp = make_owned_astring("delta");
         assert(!aExcOccur());
         list.f->pushBack(&list, tmp);
         assert(!aExcOccur());
     }
     {
-        AString *tail = list.f->at(&list, 1);
+        AStr *tail = list.f->at(&list, 1);
         list.f->rm_p(&list, tail);
         assert(!aExcOccur());
         {
@@ -338,7 +338,7 @@ static void test_alist_astring_rm_p(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     {
-        AString *last = list.f->at(&list, 0);
+        AStr *last = list.f->at(&list, 0);
         list.f->rm_p(&list, last);
         assert(!aExcOccur());
         assert(list.f->empty(&list));
@@ -347,30 +347,30 @@ static void test_alist_astring_rm_p(void) {
 }
 
 static void test_alist_astring_take_p(void) {
-    RAII(AList(AString)) list = A_INIT(AList(AString));
+    RAII(AList(AStr)) list = A_INIT(AList(AStr));
     assert(!aExcOccur());
 
     {
-        RAII(AString) tmp = make_owned_astring("alpha");
+        RAII(AStr) tmp = make_owned_astring("alpha");
         assert(!aExcOccur());
         list.f->pushBack(&list, tmp);
         assert(!aExcOccur());
     }
     {
-        RAII(AString) tmp = make_owned_astring("beta");
+        RAII(AStr) tmp = make_owned_astring("beta");
         assert(!aExcOccur());
         list.f->pushBack(&list, tmp);
         assert(!aExcOccur());
     }
     {
-        RAII(AString) tmp = make_owned_astring("gamma");
+        RAII(AStr) tmp = make_owned_astring("gamma");
         assert(!aExcOccur());
         list.f->pushBack(&list, tmp);
         assert(!aExcOccur());
     }
 
     {
-        RAII(AString) taken = A_INIT(AString);
+        RAII(AStr) taken = A_INIT(AStr);
         list.f->take_p(&list, list.f->at(&list, 1), &taken);
         assert(!aExcOccur());
         assert(strcmp(taken.s, "beta") == 0);
@@ -382,12 +382,12 @@ static void test_alist_astring_take_p(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     {
-        AString literal = AString_new("literal");
+        AStr literal = AStr_new("literal");
         list.f->pushBack(&list, literal);
         assert(!aExcOccur());
     }
     {
-        RAII(AString) taken = A_INIT(AString);
+        RAII(AStr) taken = A_INIT(AStr);
         list.f->take_p(&list, list.f->at(&list, 2), &taken);
         assert(!aExcOccur());
         assert(strcmp(taken.s, "literal") == 0);
@@ -409,7 +409,7 @@ static void test_alist_astring_take_p(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     {
-        RAII(AString) taken = A_INIT(AString);
+        RAII(AStr) taken = A_INIT(AStr);
         list.f->take_p(&list, list.f->at(&list, 0), &taken);
         assert(!aExcOccur());
         assert(strcmp(taken.s, "gamma") == 0);
@@ -418,7 +418,7 @@ static void test_alist_astring_take_p(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     {
-        RAII(AString) taken = A_INIT(AString);
+        RAII(AStr) taken = A_INIT(AStr);
         list.f->take_p(&list, NULL, &taken);
         assert(aExcGet() == AEXC_overstep);
         assert(taken.s == NULL);
