@@ -4,6 +4,7 @@
  */
 
 #include <astring.h>
+#include <iconv.h>
 
 static inline uint32_t AStr_calCap(uint32_t cap){
     if(__a_unlikely(cap >= __aPagSize)){
@@ -324,39 +325,138 @@ static inline void AStr_pushAchar(AStr* self, Achar ch){
     if(__a_unlikely(ch == 0)){
         return;
     }
-    char* p = &ch;
+    char* p = (char*)&ch;
     if(*p != 0){ AStr_pushBack(self, *p); p++; }
     if(*p != 0){ AStr_pushBack(self, *p); p++; }
     if(*p != 0){ AStr_pushBack(self, *p); p++; }
     if(*p != 0){ AStr_pushBack(self, *p); p++; }
+}
+static inline void AStr_pushAchar_s(AStr* self, Achar* s){
+    if(__a_unlikely(self == nullptr || s == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return;
+    }
+    for(int i = 0; s[i] != 0; i++){
+        aExcClean();
+        AStr_pushAchar(self, s[i]);
+        if(aExcOccur()){
+            return;
+        }
+    }
+}
+
+/* 计算u8字符字节数 */
+static inline uint32_t autf8_len(const char* s){
+    if(__a_unlikely(s == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return 0;
+    }
+
+    unsigned char c = (unsigned char)*s;
+    if (c <= 0x7F) return 1;                // 0xxxxxxx
+    if (c >= 0xC0 && c <= 0xDF) return 2;   // 110xxxxx
+    if (c >= 0xE0 && c <= 0xEF) return 3;   // 1110xxxx
+    if (c >= 0xF0 && c <= 0xF7) return 4;   // 11110xxx
+
+    aExcSet(AEXC_outdomain);
+    return 0;
 }
 
 /* 计算u8字符数 */
 uint32_t autf8_num(const char* s){
+
+    if(__a_unlikely(s == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return 0;
+    }
+
+    uint32_t n = 0;
+    uint32_t len = 0;
+    const char* p = s;
+    while((size_t)p < (size_t)(s + strlen(s))){
+        aExcClean(); len += autf8_len(p); if(aExcOccur()){
+            return n;
+        }
+        p = s + len; n++;
+    }
+    return n;
 }
 
 /* 第index个u8字符位置 */
 uint32_t autf8_index(const char* s, uint32_t index){
+    if(__a_unlikely(s == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return 0;
+    }
+
+    uint32_t n = 0;
+    uint32_t len = 0;
+    const char* p = s;
+    while(n < index){
+        if(!((size_t)p < (size_t)(s + strlen(s)))){
+            aExcSet(AEXC_outdomain);
+            return 0;
+        }
+        aExcClean(); len += autf8_len(p); if(aExcOccur()){
+            return 0;
+        }
+        p = s + len; n++;
+    }
+    return len;
 }
 
 /* 字符编码转换 */
-AStr autf8_foru32(char* s){
+static AStr a_iconv(const char* s, const char* tar_name, const char* src_name){
+    RAII(AStr) str = A_INIT(AStr);
+    if(__a_unlikely(s == nullptr)){
+        aExcSet(AEXC_nullptr);
+        return A_INIT(AStr);
+    }
+    Achar buf[64];
+
+    iconv_t fd = iconv_open(tar_name, src_name);
+    if(__a_unlikely(fd == (iconv_t)-1)){
+        aExcSet(AEXC_system_error);
+        return A_INIT(AStr);
+    }
+
+    int ret = 0;
+    char* src = (char*)s; char* tar = (void*)buf;
+    while((size_t)src < (size_t)(s + strlen(s))){
+        memset(buf, 0, sizeof(buf));
+        size_t len_src = 63; size_t len_tar = sizeof(Achar) * 63;
+
+        ret = iconv(fd, &src, &len_src, &tar, &len_tar);
+        if(ret != 0){
+            iconv_close(fd);
+            return A_INIT(AStr);
+        }
+        aExcClean(); AStr_pushAchar_s(&str, buf); if(aExcOccur()){
+            iconv_close(fd);
+            return A_INIT(AStr);
+        }
+    }
+    iconv_close(fd);
+    return A_MOVE(str);
 }
 
-AStr autf8_foru16(char* s){
+AStr autf8_foru32(const char* s){
+    return a_iconv(s, "UTF8", "UTF32");
 }
-
-AStr autf8_forgbk(char* s){
+AStr autf8_foru16(const char* s){
+    return a_iconv(s, "UTF8", "UTF16");
 }
-
-/* 字符编码转换 */
+AStr autf8_forgbk(const char* s){
+    return a_iconv(s, "UTF8", "GBK");
+}
 AStr autf8_tou32(const char* s){
+    return a_iconv(s, "UTF32", "UTF8");
 }
-
 AStr autf8_tou16(const char* s){
+    return a_iconv(s, "UTF16", "UTF8");
 }
-
 AStr autf8_togbk(const char* s){
+    return a_iconv(s, "GBK", "UTF8");
 }
 
 

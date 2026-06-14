@@ -234,14 +234,15 @@ static inline Aaddr af_domain_parsing(const char* ipstr, int port, int kinds){
             default:
                 fd = A_INIT(Afd); break;
         }
-        if(Afd_exist(fd)){
-            if(connect(fd, &addr.ip, addr.len) == 0){
-                a_close(fd);
-                break;
-            }
-        }else{
+        if(!Afd_exist(fd)){
             memset(&addr, 0, sizeof(Aaddr));
             break;
+        }
+        if(connect(fd, &addr.ip, addr.len) == 0){
+            a_close(fd);
+            break;
+        }else{
+            a_close(fd);
         }
     }
 

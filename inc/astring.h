@@ -117,17 +117,16 @@ static inline AStr AStr_new(const char* s){
 
 
 /* 字符编码操作 */
-/* 第index个u8字符位置 */
-uint32_t autf8_index(const char* s, uint32_t index);
 /* 计算u8字符数 */
 uint32_t autf8_num(const char* s);
 
-/* 字符编码转换 */
-AStr autf8_foru32(char* s);
-AStr autf8_foru16(char* s);
-AStr autf8_forgbk(char* s);
+/* 第index个u8字符位置 */
+uint32_t autf8_index(const char* s, uint32_t index);
 
 /* 字符编码转换 */
+AStr autf8_foru32(const char* s);
+AStr autf8_foru16(const char* s);
+AStr autf8_forgbk(const char* s);
 AStr autf8_tou32(const char* s);
 AStr autf8_tou16(const char* s);
 AStr autf8_togbk(const char* s);
