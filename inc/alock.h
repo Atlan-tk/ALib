@@ -61,7 +61,7 @@ AClass_Function(AMtx);
 AClass_Generate(AMtx);
 __noused static inline void A_OBJ_INIT(AMtx)(AMtx* self){
     if(mtx_init(&((ALock*)self)->mtx, mtx_plain) != thrd_success) {
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
     }
 }
 __noused static inline void A_OBJ_DEST(AMtx)(AMtx* self){
@@ -69,7 +69,7 @@ __noused static inline void A_OBJ_DEST(AMtx)(AMtx* self){
 }
 __noused static inline void A_OBJ_COPY(AMtx)(AMtx* self, __noused const AMtx* that){
     if(mtx_init(&((ALock*)self)->mtx, mtx_plain) != thrd_success) {
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
     }
 }
 A_CLASS_REGISTER(AMtx);
@@ -83,7 +83,7 @@ AClass_Function(ARecursion);
 AClass_Generate(ARecursion);
 __noused static inline void A_OBJ_INIT(ARecursion)(ARecursion* self){
     if(mtx_init(&((ALock*)self)->mtx, mtx_plain | mtx_recursive) != thrd_success) {
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
     }
 }
 __noused static inline void A_OBJ_DEST(ARecursion)(ARecursion* self){
@@ -91,7 +91,7 @@ __noused static inline void A_OBJ_DEST(ARecursion)(ARecursion* self){
 }
 __noused static inline void A_OBJ_COPY(ARecursion)(ARecursion* self, __noused const ARecursion* that){
     if(mtx_init(&((ALock*)self)->mtx, mtx_plain | mtx_recursive) != thrd_success) {
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
     }
 }
 A_CLASS_REGISTER(ARecursion);
@@ -122,7 +122,7 @@ __noused static inline void A_OBJ_INIT(AMtxRW)(AMtxRW* self){
     __AMtxRW_reset(self);
 
     if(cnd_init(&self->read_cond) != thrd_success) {
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
         return;
     }
     self->read_cond_init = true;
@@ -130,7 +130,7 @@ __noused static inline void A_OBJ_INIT(AMtxRW)(AMtxRW* self){
     if(cnd_init(&self->write_cond) != thrd_success) {
         cnd_destroy(&self->read_cond);
         self->read_cond_init = false;
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
         return;
     }
     self->write_cond_init = true;
@@ -164,7 +164,7 @@ __noused static inline void __AMtxCnd_reset(AMtxCnd* self){
 __noused static inline void A_OBJ_INIT(AMtxCnd)(AMtxCnd* self){
     __AMtxCnd_reset(self);
     if(cnd_init(&self->cnd) != thrd_success){
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
         return;
     }
     self->cnd_ready = true;
@@ -182,42 +182,42 @@ A_CLASS_REGISTER(AMtxCnd);
 
 static inline void AMtxCnd_awake(AMtxCnd* self){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
     if(cnd_signal(&self->cnd) != thrd_success){
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
     }
 }
 static inline void AMtxCnd_awake_all(AMtxCnd* self){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
     if(cnd_broadcast(&self->cnd) != thrd_success){
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
     }
 }
 static inline void AMtxCnd_wait(AMtxCnd* self){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
     if(cnd_wait(&self->cnd, &((ALock*)self)->mtx) != thrd_success){
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
     }
 }
 static inline void AMtxCnd_timewait(AMtxCnd* self, AClock clock){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
     auto ret = cnd_timedwait(&self->cnd, &((ALock*)self)->mtx, &clock.clock);
     if(ret == thrd_timedout){
-        aExcSet(AEXC_timedout);
+        aErrSet(AERR_timedout);
     }else{
         if(ret != thrd_success){
-            aExcSet(AEXC_system_error);
+            aErrSet(AERR_system_error);
         }
     }
 }

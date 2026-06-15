@@ -19,8 +19,8 @@ typedef struct {
 } SocketTestState;
 
 static void fatal_if_exception(const char* phase) {
-    if(aExcOccur()) {
-        fprintf(stderr, "%s failed: exception=%d\n", phase, aExcGet());
+    if(aErrOccur()) {
+        fprintf(stderr, "%s failed: exception=%d\n", phase, aErrGet());
         exit(EXIT_FAILURE);
     }
 }
@@ -37,9 +37,9 @@ static int server_thread(void* arg) {
     char buf[32] = {0};
 
     RAII(AFile) server = aSocketTcpServerOpen("127.0.0.1", 8290);
-    if(aExcOccur()) {
-        fprintf(stderr, "server open failed: exception=%d\n", aExcGet());
-        aExcClean();
+    if(aErrOccur()) {
+        fprintf(stderr, "server open failed: exception=%d\n", aErrGet());
+        aTry((void)0;)aExc{}
         notify_server_state(state, SERVER_FAILED);
         return 1;
     }

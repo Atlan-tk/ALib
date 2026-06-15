@@ -41,21 +41,21 @@ int  AStr_reCap(AStr* self, uint32_t new_cap);
 
 __noused static uint32_t AStr_getNumber(const AStr* self){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return 0;
     }
     return self->number;
 }
 __noused static uint32_t AStr_getCapacity(const AStr* self){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return 0;
     }
     return self->capacity;
 }
 __noused static bool AStr_empty(const AStr* self){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return true;
     }
     return self->number == 0;
@@ -75,7 +75,7 @@ __noused static inline void A_OBJ_COPY(AStr)(AStr* self, const AStr* that) {
     if (that->noLiteral) {
         int ret = AStr_reCap(self, that->number + 1);
         if(ret != 0){
-            aExcSet(AEXC_init_failed);
+            aErrSet(AERR_init_failed);
             return;
         }
         memcpy(self->s, that->s, that->number + 1);
@@ -124,9 +124,9 @@ uint32_t autf8_num(const char* s);
 uint32_t autf8_index(const char* s, uint32_t index);
 
 /* 字符编码转换 */
-AStr autf8_foru32(const char* s);
-AStr autf8_foru16(const char* s);
-AStr autf8_forgbk(const char* s);
+AStr autf8_foru32(const char* s, uint32_t len);
+AStr autf8_foru16(const char* s, uint32_t len);
+AStr autf8_forgbk(const char* s, uint32_t len);
 AStr autf8_tou32(const char* s);
 AStr autf8_tou16(const char* s);
 AStr autf8_togbk(const char* s);

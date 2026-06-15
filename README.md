@@ -25,7 +25,7 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib�
 | 容器语义 | 容器元素默认按值拷贝、按值析构 | 更常见的是指针/句柄语义，由调用方维护元素对象 |
 | 类型信息来源 | `A_TYPE_REGISTER` / `A_CLASS_REGISTER` 约定 init/copy/dest/cmpd/hash | 由 API 约定、回调、`GType`/`GObject` 等运行时机制承担 |
 | 对象系统 | 轻量单继承 + 虚函数表，无属性系统、无反射 | GObject 提供更完整的类型系统、信号、属性和 introspection |
-| 字符串能力 | `AString` 处理字节串，`AText` 处理 UTF-8 文本与基础编码转换 | GLib 提供 `GString`、更完整的 UTF-8/Unicode、路径和文本工具 |
+| 字符串能力 | `AStr` 处理字节串，并提供基于 `iconv` 的 UTF-8 / UTF-16 / UTF-32 / GBK 基础转换 | GLib 提供 `GString`、更完整的 UTF-8/Unicode、路径和文本工具 |
 | 并发能力 | `athrd.h` 提供兼容 C11 `<threads.h>` 的线程原语，`alock.h` 再封装锁对象 | GLib 线程、主循环、异步设施更成熟 |
 | 功能边界 | 容器、指针、类、信号、线程兼容层、锁、基础文件读写 | 还覆盖主循环、IO、文件路径、模块装载、字符集等 |
 
@@ -48,8 +48,7 @@ ALib 是一个面向 C11 + GNU 扩展的底层工具库，定位上对标 GLib�
 - `asortque.h`：有序数组队列
 - `atree.h`：红黑树映射
 - `ahash.h`：哈希映射
-- `astring.h`：字符串对象
-- `atext.h`：UTF-8 文本对象与 UTF-16/UTF-32/GBK 转换
+- `astring.h`：字符串对象、UTF-8 辅助函数与 UTF-16/UTF-32/GBK 基础转换
 - `aptr.h`：独占指针包装和共享指针包装
 - `atimer.h`：`AClock` 时间点辅助和全局毫秒级定时任务调度
 - `asignal.h`：进程内信号连接/派发系统
@@ -155,14 +154,13 @@ ALine_Generate(int);
 A_TYPE_REGISTER(ALine(int));
 
 int main(void) {
-    RAII(ALine(int)) line = A_INIT(ALine(int));
-    if (aExcOccur()) {
+    RAII(ALine(int)) line = {};
+    aTry(line = A_INIT(ALine(int));)aExc{
         return 1;
     }
 
     for (int i = 0; i < 5; ++i) {
-        line.f->pushBack(&line, i * 10);
-        if (aExcOccur()) {
+        aTry(line.f->pushBack(&line, i * 10);)aExc{
             return 1;
         }
     }
@@ -209,17 +207,17 @@ ALib 的容器和指针包装依赖类型注册。对自定义类型，通常至
 序列容器和映射容器都按“定义 + 生成 + 注册”三步走：
 
 ```c
-AList_Define(AString);
-AList_Generate(AString);
-A_TYPE_REGISTER(AList(AString));
+AList_Define(AStr);
+AList_Generate(AStr);
+A_TYPE_REGISTER(AList(AStr));
 ```
 
 映射容器使用键值双类型：
 
 ```c
-ATree_Define(int, AString);
-ATree_Generate(int, AString);
-A_TYPE_REGISTER(ATree(int, AString));
+ATree_Define(int, AStr);
+ATree_Generate(int, AStr);
+A_TYPE_REGISTER(ATree(int, AStr));
 ```
 
 ### 3. 统一使用对象语义
@@ -259,7 +257,7 @@ out.f->write(&out, n, buf);
 
 ## 需要特别注意的语义
 
-- `AString_new()` 和 `AText_new()` 都只是“包装已有 `char*`”，不会立刻拷贝；传入栈缓冲区或临时内存时，必须在其失效前复制到一个真正拥有内存的对象。
+- `AStr_new()` 只是“包装已有 `char*`”，不会立刻拷贝；传入栈缓冲区或临时内存时，必须在其失效前复制到一个真正拥有内存的对象。`AStr` 的字符级能力仅适合 UTF-8 字符串；GBK、UTF-16、UTF-32 等非 UTF-8 内容只适合作为字节串存储。UTF-16/UTF-32 转换结果可能包含内嵌 `\0`，长度应看 `AStr.number`。
 - `AFile` 是 POSIX-only 值对象，推荐配合 `RAII(AFile)` 使用；同一个 `AFile*` 不应和 `AFile_close()` 并发使用。
 - `AFile` 的 IO 线程安全/进程安全语义建立在所有参与方都通过 ALib 的 `AFile` API 打开和读写同一路径的前提上；绕过 ALib 直接使用 POSIX fd、`FILE*` 或其他库访问同一文件时，ALib 无法协调这些外部操作。
 - `af_*` 文件系统工具函数只在当前进程内使用全局锁串行化调用，不保证跨进程安全；如果其他进程同时移动、删除、复制或 chmod 同一路径，调用方需要自行协调。
@@ -267,7 +265,7 @@ out.f->write(&out, n, buf);
 - `aFileInOpen()` 不创建不存在的文件；`aFileOutOpen()` 会截断普通文件；`aFileEndOpen()` 只追加。
 - `AFile_open(self, type, name, mod)` 是低层入口：`type` 使用 `__aftype_file`、`__aftype_device` 或 `__aftype_socket`，`mod` 使用 `__afmod_read/write/creat/appent/truncate/noblock/exclusive` 位组合。
 - `sample/sample_afile_socket.c` 是长期运行的 TCP 回显示例，服务端和客户端会循环收发 `hello` / `yes`，需要手动停止；它不是自动退出型测试。
-- 顺序容器的 `at(index)` 在“容器非空但 index 越界”时，通常会截断到尾元素；只有空容器访问才会设置 `AEXC_overstep`。
+- 顺序容器的 `at(index)` 在“容器非空但 index 越界”时，通常会截断到尾元素；只有空容器访问才会设置 `AERR_overstep`。
 - `AHash(K,V)` 和 `ATree(K,V)` 的 `ins()` 是 upsert 语义：同键再次插入会替换已有值。
 - `a_signal_connection(id, addressee, call)` 对同一个 `(id, addressee)` 重复连接时，会覆盖原有回调，而不是忽略此次连接。
 - `AHash(K,V)` 的遍历顺序依赖桶布局与插入路径，不应把它当成稳定顺序容器。

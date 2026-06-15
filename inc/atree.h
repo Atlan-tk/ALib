@@ -119,8 +119,8 @@ void      __Atree_take(__Atree* tree, void* data);
     static inline void __Atrf(TK,TV,data_copy)(__Atr_data(TK,TV)* data,                         \
             const __Atr_data(TK,TV)* that_data){                                                \
         data->k = A_COPY(TK, that_data->k);                                                     \
-        if(!aExcOccur()){ data->v=A_COPY(TV,that_data->v); }                                    \
-        if(aExcOccur()){ A_DEST(TK, data->k); }                                                 \
+        if(!aErrOccur()){ data->v=A_COPY(TV,that_data->v); }                                    \
+        if(aErrOccur()){ A_DEST(TK, data->k); }                                                 \
     }                                                                                           \
     static inline int  __Atrf(TK,TV,data_cmpd)(const __Atr_data(TK,TV)* data,                   \
             const __Atr_data(TK,TV)* that_data){                                                \
@@ -131,7 +131,7 @@ void      __Atree_take(__Atree* tree, void* data);
     /******************************************************************************************/\
     static inline TV* __Atrf(TK,TV,at)(const ATree(TK,TV)* self, const TK k){                   \
         __AtrNode* node = __Atree_at(&self->tree, (const void*)&k);                             \
-        if(__a_unlikely(node == nullptr)){ aExcSet(AEXC_overstep); return nullptr; }            \
+        if(__a_unlikely(node == nullptr)){ aErrSet(AERR_overstep); return nullptr; }            \
         return &(((__Atr_data(TK,TV)*)&(node->data[0]))->v);                                    \
     }                                                                                           \
     static inline void __Atrf(TK,TV,rm)(ATree(TK,TV)* self, const TK k){                        \
@@ -139,20 +139,17 @@ void      __Atree_take(__Atree* tree, void* data);
         __Atree_rm(&self->tree, node);                                                          \
     }                                                                                           \
     static inline void __Atrf(TK,TV,ins)(ATree(TK,TV)* self, const TK k, const TV v){           \
-        aExcClean();                                                                            \
+        aErrClean();                                                                            \
         __AtrNode* node = __Atree_new_node(&self->tree, &(__Atr_data(TK,TV)){.k = k,.v = v});   \
-        if(__a_unlikely(node == nullptr)){ aExcSet(AEXC_alloc_failed); return; };               \
-        int ret = __Atree_ins(&self->tree, node); if(__a_unlikely(ret != 0)) aExcSet(ret);      \
+        if(__a_unlikely(node == nullptr)){ aErrSet(AERR_alloc_failed); return; };               \
+        int ret = __Atree_ins(&self->tree, node); if(__a_unlikely(ret != 0)) aErrSet(ret);      \
     }                                                                                           \
     static inline void __Atrf(TK,TV,take)(ATree(TK,TV)* self, const TK k, TV* tar){             \
         if(tar != nullptr) memset(tar, 0, sizeof(TV));                                          \
-        aExcClean();                                                                            \
-        __Atr_data(TK,TV) data = { .k = k }; __Atree_take(&self->tree, (void*)&data);           \
-        if(__a_unlikely(aExcOccur())){                                                          \
+        aTry(__Atr_data(TK,TV) data = { .k = k }; __Atree_take(&self->tree, (void*)&data);)aExc{\
             return;                                                                             \
-        }else{                                                                                  \
-            A_DEST(TK, data.k); if(tar != nullptr) *tar = data.v; else A_DEST(TV, data.v);      \
         }                                                                                       \
+        A_DEST(TK, data.k); if(tar != nullptr) *tar = data.v; else A_DEST(TV, data.v);          \
     }                                                                                           \
     static inline uint32_t __Atrf(TK,TV,getNumber)(const ATree(TK,TV)* self){                   \
         return self->tree.num;                                                                  \
@@ -194,7 +191,7 @@ void      __Atree_take(__Atree* tree, void* data);
     }                                                                                           \
     static inline TK __Atrf(TK,TV,iter_getk)(AIter(ATree(TK,TV)) it){                           \
         TK k; memset(&k, 0, sizeof(TK));                                                        \
-        if(__a_unlikely(it.p == nullptr)){ aExcSet(AEXC_overstep); return k; }                  \
+        if(__a_unlikely(it.p == nullptr)){ aErrSet(AERR_overstep); return k; }                  \
         return container_of(it.p,__Atr_data(TK,TV),v)->k;                                       \
     }                                                                                           \
                                                                                                 \

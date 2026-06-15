@@ -26,7 +26,7 @@ int __Aarr_add_cap_back(__Aarr* arr){
 
     char* p = alib_realloc(arr->data, cap * obj_size);
     if(__a_unlikely(p == nullptr)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
     arr->data = p, arr->cap = cap;
 
@@ -50,7 +50,7 @@ int __Aarr_add_cap_front(__Aarr* arr){
 
     char* p = alib_alloc(cap * obj_size);
     if(__a_unlikely(p == nullptr)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
 
     char* src = arr->data != nullptr ? (arr->data + arr->offset * obj_size) : nullptr;
@@ -113,7 +113,7 @@ int __Aarr_copy(__Aarr* arr, const __Aarr* that_arr){
 
     char* p = alib_alloc(obj_size * num);
     if(__a_unlikely(p == nullptr)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
     arr->data = p, arr->cap = num;
 
@@ -131,7 +131,7 @@ int __Aarr_ins(__Aarr* arr, uint32_t i){
     if(i < arr->num / 2){
         uint32_t red = arr->offset;
         if(__a_unlikely(red == 0 && __Aarr_add_cap_front(arr) != 0)){
-            return AEXC_alloc_failed;
+            return AERR_alloc_failed;
         }
 
         if(i != 0){
@@ -143,7 +143,7 @@ int __Aarr_ins(__Aarr* arr, uint32_t i){
     }else{
         uint32_t red = arr->cap - (arr->offset + arr->num);
         if(__a_unlikely(red == 0 && __Aarr_add_cap_back(arr) != 0)){
-            return AEXC_alloc_failed;
+            return AERR_alloc_failed;
         }
 
         if(i != arr->num){

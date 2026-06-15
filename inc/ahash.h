@@ -121,8 +121,8 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
     static inline void __Ahsf(TK,TV,data_copy)(__Ahs_data(TK,TV)* data,                         \
             const __Ahs_data(TK,TV)* that_data){                                                \
         data->k = A_COPY(TK, that_data->k);                                                     \
-        if(!aExcOccur()){ data->v=A_COPY(TV,that_data->v); }                                    \
-        if(aExcOccur()){ A_DEST(TK, data->k); }                                                 \
+        if(!aErrOccur()){ data->v=A_COPY(TV,that_data->v); }                                    \
+        if(aErrOccur()){ A_DEST(TK, data->k); }                                                 \
     }                                                                                           \
     static inline int  __Ahsf(TK,TV,data_cmpd)(const __Ahs_data(TK,TV)* data,                   \
             const __Ahs_data(TK,TV)* that_data){                                                \
@@ -131,25 +131,22 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
     /******************************************************************************************/\
     static inline TV* __Ahsf(TK,TV,at)(const AHash(TK,TV)* self, const TK k){                   \
         __Ahs_data(TK,TV)* data = __Ahash_at(&self->hash, (const void*)&k);                     \
-        if(__a_unlikely(data == nullptr)){ aExcSet(AEXC_overstep); return nullptr; }            \
+        if(__a_unlikely(data == nullptr)){ aErrSet(AERR_overstep); return nullptr; }            \
         return &(data->v);                                                                      \
     }                                                                                           \
     static inline void __Ahsf(TK,TV,rm)(AHash(TK,TV)* self, const TK k){                        \
         __Ahash_rm(&self->hash, (const void*)&k);                                               \
     }                                                                                           \
     static inline void __Ahsf(TK,TV,ins)(AHash(TK,TV)* self, const TK k, const TV v){           \
-        aExcClean();                                                                            \
+        aErrClean();                                                                            \
         __Ahs_data(TK,TV) data = {.k = k, .v = v }; __Ahash_ins(&self->hash, &data);            \
     }                                                                                           \
     static inline void __Ahsf(TK,TV,take)(AHash(TK,TV)* self, const TK k, TV* tar){             \
         if(tar != nullptr) memset(tar, 0, sizeof(TV));                                          \
-        aExcClean();                                                                            \
-        __Ahs_data(TK,TV) data = { .k = k }; __Ahash_take(&self->hash, (void*)&data);           \
-        if(__a_unlikely(aExcOccur())){                                                          \
+        aTry(__Ahs_data(TK,TV) data = { .k = k }; __Ahash_take(&self->hash, (void*)&data);)aExc{\
             return;                                                                             \
-        }else{                                                                                  \
-            A_DEST(TK, data.k); if(tar != nullptr) *tar = data.v; else A_DEST(TV, data.v);      \
         }                                                                                       \
+        A_DEST(TK, data.k); if(tar != nullptr) *tar = data.v; else A_DEST(TV, data.v);          \
     }                                                                                           \
     static inline uint32_t __Ahsf(TK,TV,getNumber)(const AHash(TK,TV)* self){                   \
         return self->hash.num;                                                                  \
@@ -183,7 +180,7 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
     }                                                                                           \
     static inline TK __Ahsf(TK,TV,iter_getk)(AIter(AHash(TK,TV)) it){                           \
         TK k; memset(&k, 0, sizeof(TK));                                                        \
-        if(__a_unlikely(it.p == nullptr)){ aExcSet(AEXC_overstep); return k; }                  \
+        if(__a_unlikely(it.p == nullptr)){ aErrSet(AERR_overstep); return k; }                  \
         return container_of(it.p,__Ahs_data(TK,TV),v)->k;                                       \
     }                                                                                           \
                                                                                                 \
@@ -206,7 +203,7 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
     (AHash(TK,TV)* self, const AHash(TK,TV)* that){                                             \
         self->f = that->f;                                                                      \
         int ret = __Ahash_copy(&self->hash, &that->hash);                                       \
-        if(__a_unlikely(ret != 0)) aExcSet(ret);                                                \
+        if(__a_unlikely(ret != 0)) aErrSet(ret);                                                \
     }                                                                                           \
     __noused static inline int  A_OBJ_CMPD(AHash(TK,TV))                                        \
     (const AHash(TK,TV)*self,const AHash(TK,TV)*that){                                          \

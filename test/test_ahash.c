@@ -14,14 +14,14 @@ A_TYPE_REGISTER(AHash(AStr, AStr));
 
 static void test_ahash_int(void) {
     RAII(AHash(int, int)) h = A_INIT(AHash(int, int));
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(h.f->empty(&h));
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 插入 */
     for (int i = 0; i < 10; i++) {
         h.f->ins(&h, i, i * 10);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(h.f->getNumber(&h) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -40,9 +40,9 @@ static void test_ahash_int(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 拷贝 */
-    aExcClean();
+    aTry((void)0;)aExc{}
     RAII(AHash(int, int)) h2 = A_COPY(AHash(int, int), h);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(h2.f->getNumber(&h2) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
     for (int i = 0; i < 10; i++) {
@@ -53,22 +53,22 @@ static void test_ahash_int(void) {
 
     /* 删除 */
     h.f->rm(&h, 5);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(h.f->at(&h, 5) == NULL);
     assert(h.f->getNumber(&h) == 9);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 删除不存在的键应设置异常 */
     h.f->rm(&h, 5);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 大量数据 */
     RAII(AHash(int, int)) big = A_INIT(AHash(int, int));
     for (int i = 0; i < 600; i++) {
         big.f->ins(&big, i, i + 1000);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(big.f->getNumber(&big) == 600);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -81,7 +81,7 @@ static void test_ahash_int(void) {
 
 static void test_ahash_astring(void) {
     RAII(AHash(AStr, AStr)) h = A_INIT(AHash(AStr, AStr));
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 准备键值对 */
@@ -98,7 +98,7 @@ static void test_ahash_astring(void) {
             AStr_addBack(&v, tv.s);
         }
         h.f->ins(&h, k, v);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(h.f->getNumber(&h) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -122,7 +122,7 @@ static void test_ahash_astring(void) {
 
     /* 拷贝 */
     RAII(AHash(AStr, AStr)) h2 = A_COPY(AHash(AStr, AStr), h);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(h2.f->getNumber(&h2) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
@@ -132,7 +132,7 @@ static void test_ahash_astring(void) {
         RAII(AStr) tmp = AStr_new("key5");
         AStr_addBack(&delkey, tmp.s);
         h.f->rm(&h, delkey);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
         assert(h.f->at(&h, delkey) == NULL);
     }
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);

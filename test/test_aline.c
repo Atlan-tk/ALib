@@ -17,7 +17,7 @@ A_TYPE_REGISTER(ALine(AStr));
 static void test_aline_int(void) {
     /* 基本构造与空容器 */
     RAII(ALine(int)) line = A_INIT(ALine(int));
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(line.f->empty(&line));
     assert(line.f->getNumber(&line) == 0);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -25,7 +25,7 @@ static void test_aline_int(void) {
     /* 插入元素 */
     for (int i = 0; i < 10; i++) {
         line.f->pushBack(&line, i);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(line.f->getNumber(&line) == 10);
     assert(!line.f->empty(&line));
@@ -41,7 +41,7 @@ static void test_aline_int(void) {
 
     /* 拷贝构造 */
     RAII(ALine(int)) line2 = A_COPY(ALine(int), line);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(line2.f->getNumber(&line2) == 10);
     for (int i = 0; i < 10; i++) {
         assert(*line2.f->at(&line2, i) == i);
@@ -56,22 +56,22 @@ static void test_aline_int(void) {
 
     /* 删除元素 */
     line.f->popBack(&line, NULL);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(line.f->getNumber(&line) == 9);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 空容器 popBack 应产生异常 */
     RAII(ALine(int)) empty_line = A_INIT(ALine(int));
     empty_line.f->popBack(&empty_line, NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 大量数据（>512） */
     RAII(ALine(int)) big = A_INIT(ALine(int));
     for (int i = 0; i < 600; i++) {
         big.f->pushBack(&big, i);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(big.f->getNumber(&big) == 600);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -85,7 +85,7 @@ static void test_aline_int(void) {
 /* 测试 AStr 元素 */
 static void test_aline_astring(void) {
     RAII(ALine(AStr)) line = A_INIT(ALine(AStr));
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(line.f->empty(&line));
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
@@ -93,7 +93,7 @@ static void test_aline_astring(void) {
     for (int i = 0; i < 10; i++) {
         RAII(AStr) tmp = AStr_new("constant");
         line.f->pushBack(&line, tmp);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(line.f->getNumber(&line) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -107,14 +107,14 @@ static void test_aline_astring(void) {
 
     /* 拷贝容器 */
     RAII(ALine(AStr)) line2 = A_COPY(ALine(AStr), line);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(line2.f->getNumber(&line2) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 修改拷贝容器中的元素（AStr 会触发写时拷贝） */
     AStr *ps2 = line2.f->at(&line2, 0);
     AStr_pushBack(ps2, 'X');
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 原容器元素不应受影响 */
@@ -126,8 +126,8 @@ static void test_aline_astring(void) {
     /* 空容器边界测试 */
     RAII(ALine(AStr)) empty_line = A_INIT(ALine(AStr));
     empty_line.f->popBack(&empty_line, NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 大量数据（>512） */
@@ -139,7 +139,7 @@ static void test_aline_astring(void) {
         RAII(AStr) elem = A_INIT(AStr);
         AStr_addBack(&elem, tmp.s);       /* 深拷贝到 elem */
         big.f->pushBack(&big, elem);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(big.f->getNumber(&big) == 600);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);

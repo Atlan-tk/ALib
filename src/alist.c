@@ -17,9 +17,9 @@ static inline __AlsNode* __Alist_newNode(__Alist* list, const void* src){
     }
     memset(node, 0, sizeof(__AlsNode));
 
-    aExcClean();
+    aErrClean();
     list->copy(__Alist_getObj(node), src);
-    if(aExcOccur()){
+    if(aErrOccur()){
         alib_free(node);
         node = nullptr;
     }
@@ -49,7 +49,7 @@ void __Alist_copy(__Alist* list, const __Alist* that_list){
         ret = __Alist_pushBack(list, __Alist_getObj(node));
     }
 
-    if(ret != 0) aExcSet(ret);
+    if(ret != 0) aErrSet(ret);
 }
 
 int __Alist_cmpd(const __Alist* list, const __Alist* that_list){
@@ -72,7 +72,7 @@ int __Alist_cmpd(const __Alist* list, const __Alist* that_list){
 
 static inline __AlsNode* __Alist_at_node(const __Alist* list, uint32_t index){
     if(__a_unlikely(list->num == 0)){
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
         return nullptr;
     }
 
@@ -108,14 +108,14 @@ int __Alist_ins(__Alist* list, uint32_t index, const void* source){
         __AlsNode* next = __Alist_at_node(list, index);
         __AlsNode* prev = next != nullptr ? next->prev : nullptr;
         if(__a_unlikely(next == nullptr)){
-            aExcSet(AEXC_overstep);
-            return AEXC_overstep;
+            aErrSet(AERR_overstep);
+            return AERR_overstep;
         }
 
         __AlsNode* node = __Alist_newNode(list, source);
         if(__a_unlikely(node == nullptr)){
-            aExcSet(AEXC_alloc_failed);
-            return AEXC_alloc_failed;
+            aErrSet(AERR_alloc_failed);
+            return AERR_alloc_failed;
         }
 
         node->next = next, node->prev = prev;
@@ -127,8 +127,8 @@ int __Alist_ins(__Alist* list, uint32_t index, const void* source){
 int __Alist_pushFront(__Alist* list, const void* source){
     __AlsNode* node = __Alist_newNode(list, source);
     if(__a_unlikely(node == nullptr)){
-        aExcSet(AEXC_alloc_failed);
-        return AEXC_alloc_failed;
+        aErrSet(AERR_alloc_failed);
+        return AERR_alloc_failed;
     }
 
     if(__a_unlikely(list->num == 0)){
@@ -146,8 +146,8 @@ int __Alist_pushFront(__Alist* list, const void* source){
 int __Alist_pushBack(__Alist* list, const void* source){
     __AlsNode* node = __Alist_newNode(list, source);
     if(__a_unlikely(node == nullptr)){
-        aExcSet(AEXC_alloc_failed);
-        return AEXC_alloc_failed;
+        aErrSet(AERR_alloc_failed);
+        return AERR_alloc_failed;
     }
 
     if(__a_unlikely(list->num == 0)){
@@ -164,7 +164,7 @@ int __Alist_pushBack(__Alist* list, const void* source){
 
 void __Alist_rm_node(__Alist* list, __AlsNode* node, bool de){
     if(__a_unlikely(node == nullptr)){
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
         return;
     }
 
@@ -197,7 +197,7 @@ void __Alist_popBack(__Alist* list, void* tar){
     if(tar != nullptr) memset(tar, 0, list->size);
 
     if(__a_unlikely(list->num == 0)){
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
         return;
     }
 
@@ -211,7 +211,7 @@ void __Alist_popBack(__Alist* list, void* tar){
         memcpy(tar, __Alist_getObj(node), list->size);
         __Alist_rm_node(list, node, false);
     }else{
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
     }
 }
 
@@ -219,7 +219,7 @@ void __Alist_popFront(__Alist* list, void* tar){
     if(tar != nullptr) memset(tar, 0, list->size);
 
     if(__a_unlikely(list->num == 0)){
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
         return;
     }
 
@@ -233,7 +233,7 @@ void __Alist_popFront(__Alist* list, void* tar){
         memcpy(tar, __Alist_getObj(node), list->size);
         __Alist_rm_node(list, node, false);
     }else{
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
     }
 }
 
@@ -241,7 +241,7 @@ void __Alist_take(__Alist* list, uint32_t index, void* tar){
     if(tar != nullptr) memset(tar, 0, list->size);
 
     if(__a_unlikely(list->num == 0)){
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
         return;
     }
     if(tar == nullptr){
@@ -253,7 +253,7 @@ void __Alist_take(__Alist* list, uint32_t index, void* tar){
         memcpy(tar, __Alist_getObj(node), list->size);
         __Alist_rm_node(list, node, false);
     }else{
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
     }
 }
 
@@ -261,12 +261,12 @@ void __Alist_take_node(__Alist* list, __AlsNode* node, void* tar){
     if(tar != nullptr) memset(tar, 0, list->size);
 
     if(__a_unlikely(node == nullptr)){
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
         return;
     }
 
     if(__a_unlikely(list->num == 0)){
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
         return;
     }
     if(tar == nullptr){

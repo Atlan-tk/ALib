@@ -45,17 +45,17 @@ __weak void A_OBJ_INIT(PingReceiver)(PingReceiver* self) {
 A_CLASS_REGISTER(PingReceiver);
 
 static int print_exc(const char* step) {
-    if (!aExcOccur()) {
+    if (!aErrOccur()) {
         return 0;
     }
 
-    fprintf(stderr, "%s failed, aExc=%d\n", step, aExcGet());
+    fprintf(stderr, "%s failed, aErr=%d\n", step, aErrGet());
     return -1;
 }
 
 static int ping_source_init(PingSource* source, const char* name) {
     if (source == NULL) {
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return -1;
     }
 
@@ -66,7 +66,7 @@ static int ping_source_init(PingSource* source, const char* name) {
 
 static int64_t ping_id(const PingSource* source) {
     if (source == NULL) {
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return -1;
     }
     return source->id;
@@ -80,7 +80,7 @@ static void ping_target(const ASignal* base, void* addressee) {
     if (receiver->reject_negative && signal->payload < 0) {
         printf("[%s] reject payload %d from %s\n",
                 receiver->name, signal->payload, source->name);
-        aExcSet(AEXC_outdomain);
+        aErrSet(AERR_outdomain);
         return;
     }
 
@@ -114,7 +114,7 @@ static int emit_ping(PingSource* source, int payload, bool collect_exc) {
         RAII(AExcCollector) collector = A_INIT(AExcCollector);
 
         int ret = a_signal_transmit(base, &collector);
-        if (ret == AEXC_response_exc) {
+        if (ret == AERR_response_exc) {
             printf("emit_ping(payload=%d) collected callback errors for id=%" PRId64 ":\n",
                     payload, (int64_t)collector.id);
             drain_signal_exceptions(&collector);
@@ -125,7 +125,7 @@ static int emit_ping(PingSource* source, int payload, bool collect_exc) {
     }
 
     int ret = a_signal_transmit(base);
-    return ret == AEXC_response_exc ? 0 : print_exc("a_signal_transmit");
+    return ret == AERR_response_exc ? 0 : print_exc("a_signal_transmit");
 }
 
 int main(void) {

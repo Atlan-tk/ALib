@@ -145,14 +145,14 @@ __noused static void A_OBJ_INIT(AFileLock)(AFileLock* self){
 }
 __noused static void A_OBJ_COPY(AFileLock)(__noused AFileLock* self, __noused const AFileLock* that){
     //不可复制
-    aExcSet(AEXC_init_failed);
+    aErrSet(AERR_init_failed);
 }
 A_TYPE_REGISTER(AFileLock);
 static inline int AFileLock_uplock_read(AFileLock* self, Afd fd){
     self->l_type = F_RDLCK;
     int ret = fcntl(fd, F_SETLKW, self);
     if(ret == -1){
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
     }
     return ret;
 }
@@ -161,7 +161,7 @@ static inline int AFileLock_uplock_write(AFileLock* self, Afd fd){
     self->l_type = F_WRLCK;
     int ret = fcntl(fd, F_SETLKW, self);
     if(ret == -1){
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
     }
     return ret;
 }
@@ -170,7 +170,7 @@ static inline int AFileLock_unlock(AFileLock* self, Afd fd){
     self->l_type = F_UNLCK;
     int ret = fcntl(fd, F_SETLKW, self);
     if(ret == -1){
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
     }
     return ret;
 }
@@ -242,7 +242,7 @@ __noused static inline void A_OBJ_DEST(AFileNode)(AFileNode* self){
 }
 __noused static inline void A_OBJ_COPY(AFileNode)(__noused AFileNode* self, __noused const AFileNode* that){
     //不可复制
-    aExcSet(AEXC_init_failed);
+    aErrSet(AERR_init_failed);
 }
 __noused static inline int A_OBJ_CMPD(AFileNode)(const AFileNode* self, const AFileNode* that){
     return A_CMPD(AStr, self->name, that->name);
@@ -321,7 +321,7 @@ __noused static inline void A_OBJ_INIT(AFile)(AFile* self){
 }
 __noused static inline void A_OBJ_DEST(AFile)(AFile* self){
     AFile_close(self);
-    aExcClean();
+    aErrClean();
 }
 __noused static inline void A_OBJ_COPY(AFile)(AFile* self, const AFile* that){
     int mod = AFile_getmod(that);

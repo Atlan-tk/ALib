@@ -23,7 +23,7 @@ typedef struct {
 static void test_signal_type_helpers(void) {
     RAII(TestSignal) sig = A_INIT(TestSignal);
     ASignal *base = (void *)&sig;
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(sig.f != NULL);
     base->id = 7;
     base->value = 9;
@@ -55,25 +55,25 @@ static void duplicate_target(const ASignal *signal, void *addressee) {
 
 static void test_signal_transmit_basic(void) {
     int64_t id = a_signal_alloc();
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(id >= 0);
 
     Counter receiver0 = {0};
     Counter receiver1 = {0};
 
     RAII(ASignal) sig = A_INIT(ASignal);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     sig.id = id;
     sig.value = 42;
     sig.sender = &receiver0;
 
     a_signal_connection(id, &receiver0, count_target);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     a_signal_connection(id, &receiver1, count_target);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     a_signal_transmit(&sig);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(receiver0.hits == 1);
     assert(receiver0.last_id == id);
     assert(receiver0.last_value == 42);
@@ -84,54 +84,54 @@ static void test_signal_transmit_basic(void) {
     assert(receiver1.last_sender == &receiver0);
 
     a_signal_disconnect(id, &receiver0);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     a_signal_transmit(&sig);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(receiver0.hits == 1);
     assert(receiver1.hits == 2);
 
     a_target_disconnect(&receiver1, id);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     a_signal_transmit(&sig);
-    assert(aExcGet() == AEXC_outdomain);
-    aExcClean();
+    assert(aErrGet() == AERR_outdomain);
+    aTry((void)0;)aExc{}
     assert(receiver0.hits == 1);
     assert(receiver1.hits == 2);
 }
 
 static void test_signal_duplicate_addressee_replaced(void) {
     int64_t id = a_signal_alloc();
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(id >= 0);
 
     Counter receiver = {0};
     g_duplicate_target_hits = 0;
 
     a_signal_connection(id, &receiver, count_target);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     a_signal_connection(id, &receiver, duplicate_target);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     RAII(ASignal) sig = A_INIT(ASignal);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     sig.id = id;
     sig.value = 7;
     sig.sender = &receiver;
 
     a_signal_transmit(&sig);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(receiver.hits == 0);
     assert(g_duplicate_target_hits == 1);
 
     a_signal_disconnect_all(id);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     a_signal_transmit(&sig);
-    assert(aExcGet() == AEXC_outdomain);
-    aExcClean();
+    assert(aErrGet() == AERR_outdomain);
+    aTry((void)0;)aExc{}
     assert(receiver.hits == 0);
     assert(g_duplicate_target_hits == 1);
 }
@@ -139,7 +139,7 @@ static void test_signal_duplicate_addressee_replaced(void) {
 static void test_disconnect_all_helpers(void) {
     int64_t id0 = a_signal_alloc();
     int64_t id1 = a_signal_alloc();
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(id0 >= 0);
     assert(id1 >= 0);
 
@@ -147,76 +147,76 @@ static void test_disconnect_all_helpers(void) {
     Counter receiver = {0};
 
     a_signal_disconnect_all(id0);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     a_target_disconnect_all(&unknown);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     a_signal_connection(id0, &receiver, count_target);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     a_signal_connection(id1, &receiver, count_target);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     RAII(ASignal) sig0 = A_INIT(ASignal);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     sig0.id = id0;
     sig0.value = 3;
     sig0.sender = &id0;
 
     RAII(ASignal) sig1 = A_INIT(ASignal);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     sig1.id = id1;
     sig1.value = 5;
     sig1.sender = &id1;
 
     a_signal_transmit(&sig0);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     a_signal_transmit(&sig1);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(receiver.hits == 2);
 
     a_target_disconnect_all(&receiver);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     a_signal_transmit(&sig0);
-    assert(aExcGet() == AEXC_outdomain);
-    aExcClean();
+    assert(aErrGet() == AERR_outdomain);
+    aTry((void)0;)aExc{}
     a_signal_transmit(&sig1);
-    assert(aExcGet() == AEXC_outdomain);
-    aExcClean();
+    assert(aErrGet() == AERR_outdomain);
+    aTry((void)0;)aExc{}
     assert(receiver.hits == 2);
 
     a_signal_disconnect_all(id1);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 }
 
 static void test_invalid_id_rejected(void) {
     int64_t id = a_signal_alloc();
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     int64_t invalid_id = id + 1;
     Counter receiver = {0};
 
     a_signal_connection(invalid_id, &receiver, count_target);
-    assert(aExcGet() == AEXC_outdomain);
-    aExcClean();
+    assert(aErrGet() == AERR_outdomain);
+    aTry((void)0;)aExc{}
 
     a_signal_disconnect(invalid_id, &receiver);
-    assert(aExcGet() == AEXC_outdomain);
-    aExcClean();
+    assert(aErrGet() == AERR_outdomain);
+    aTry((void)0;)aExc{}
 
     a_target_disconnect(&receiver, invalid_id);
-    assert(aExcGet() == AEXC_outdomain);
-    aExcClean();
+    assert(aErrGet() == AERR_outdomain);
+    aTry((void)0;)aExc{}
 
     a_signal_disconnect_all(invalid_id);
-    assert(aExcGet() == AEXC_outdomain);
-    aExcClean();
+    assert(aErrGet() == AERR_outdomain);
+    aTry((void)0;)aExc{}
 
     RAII(ASignal) sig = A_INIT(ASignal);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     sig.id = invalid_id;
     a_signal_transmit(&sig);
-    assert(aExcGet() == AEXC_outdomain);
-    aExcClean();
+    assert(aErrGet() == AERR_outdomain);
+    aTry((void)0;)aExc{}
 }
 
 static int g_nested_hits = 0;
@@ -233,33 +233,33 @@ static void outer_target(const ASignal *signal, void *addressee) {
     (void)signal;
 
     RAII(ASignal) nested = A_INIT(ASignal);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     nested.id = g_inner_id;
     nested.value = 99;
     nested.sender = addressee;
     a_signal_transmit(&nested);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 }
 
 static void test_signal_transmit_reentrant(void) {
     int64_t outer_id = a_signal_alloc();
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     g_inner_id = a_signal_alloc();
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     Counter receiver = {0};
     g_nested_hits = 0;
     a_signal_connection(outer_id, &receiver, outer_target);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     a_signal_connection(g_inner_id, &receiver, nested_target);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     RAII(ASignal) outer = A_INIT(ASignal);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     outer.id = outer_id;
     outer.sender = &receiver;
     a_signal_transmit(&outer);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(g_nested_hits == 1);
 }
 
@@ -277,11 +277,11 @@ static void alloc_register_target(const ASignal *signal, void *addressee) {
     (void)signal;
 
     int64_t nested_id = a_signal_alloc();
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(nested_id >= 0);
 
     a_signal_connection(g_register_target_id, addressee, registered_target);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 }
 
 static void collect_target(const ASignal *signal, void *addressee) {
@@ -290,75 +290,75 @@ static void collect_target(const ASignal *signal, void *addressee) {
 
     (*hit_counter)++;
     g_collect_target_hits++;
-    aExcSet(AEXC_outdomain);
+    aErrSet(AERR_outdomain);
 }
 
 static void test_signal_callback_alloc_and_register(void) {
     int receiver = 0;
     int64_t outer_id = a_signal_alloc();
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     g_register_target_id = a_signal_alloc();
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     g_registered_hits = 0;
     a_signal_connection(outer_id, &receiver, alloc_register_target);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     RAII(ASignal) outer = A_INIT(ASignal);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     outer.id = outer_id;
     outer.sender = &receiver;
     a_signal_transmit(&outer);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     RAII(ASignal) registered = A_INIT(ASignal);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     registered.id = g_register_target_id;
     registered.sender = &receiver;
     a_signal_transmit(&registered);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(g_registered_hits == 1);
 }
 
 static void test_signal_collect_exceptions(void) {
     int64_t id = a_signal_alloc();
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(id >= 0);
 
     int receiver = 0;
     g_collect_target_hits = 0;
 
     a_signal_connection(id, &receiver, collect_target);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     RAII(ASignal) sig = A_INIT(ASignal);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     sig.id = id;
     sig.sender = &receiver;
 
     RAII(AExcCollector) collector = A_INIT(AExcCollector);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     int ret = a_signal_transmit(&sig, &collector);
-    assert(ret == AEXC_response_exc);
+    assert(ret == AERR_response_exc);
     assert(collector.id == id);
     assert(g_collect_target_hits == 1);
     assert(receiver == 1);
     assert(collector.list.f->getNumber(&collector.list) == 1);
 
     AExcEnd ev = AExcCollector_pop(&collector);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(ev.addressee == &receiver);
-    assert(ev.exc_value == AEXC_outdomain);
+    assert(ev.exc_value == AERR_outdomain);
     assert(collector.list.f->empty(&collector.list));
 
     ret = a_signal_transmit(&sig);
-    assert(ret == AEXC_response_exc);
+    assert(ret == AERR_response_exc);
     assert(g_collect_target_hits == 2);
     assert(receiver == 2);
 
     a_signal_disconnect_all(id);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 }
 
 int main(void) {

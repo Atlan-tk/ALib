@@ -15,11 +15,11 @@ static void on_timeout(int sig) {
 }
 
 static void expect_clean_at(const char* phase, int iter) {
-    if(aExcOccur()) {
+    if(aErrOccur()) {
         fprintf(stderr, "[afile-open-write] iter=%d phase=%s exception=%d\n",
-                iter, phase, aExcGet());
+                iter, phase, aErrGet());
     }
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 }
 
 static void make_path(char* out, size_t out_size, const char* dir, int iter) {

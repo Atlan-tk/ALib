@@ -76,17 +76,16 @@ extern "C" {
     }                                                                               \
                                                                                     \
     static inline void __Aquf(T,pushBack)(AQueue(T)* self, const T obj){            \
-        aExcClean();                                                                \
-        T objx = A_COPY(T, obj); if(__a_unlikely(aExcOccur())){ return; }           \
+        aTry(T objx = A_COPY(T, obj);)aExc{ return; }                               \
         int ret = __Adeq_push_back(&self->deq); uint32_t i = self->deq.num - 1;     \
-        if(__a_unlikely(ret != 0)){ aExcSet(ret); A_DEST(T,objx); return; }         \
+        if(__a_unlikely(ret != 0)){ aErrSet(ret); A_DEST(T,objx); return; }         \
         *__Aquf(T,at)(self, i) = objx;                                              \
     }                                                                               \
                                                                                     \
     static inline void __Aquf(T,popFront)(AQueue(T)* self, T* tar){                 \
         if(tar != nullptr) memset(tar, 0, sizeof(T));                               \
         uint32_t i = 0;                                                             \
-        if(__a_unlikely(self->deq.num == 0)){ aExcSet(AEXC_overstep); return; }     \
+        if(__a_unlikely(self->deq.num == 0)){ aErrSet(AERR_overstep); return; }     \
         T obj = *((T*)__Adeq_at(&self->deq, i)); __Adeq_pop_front(&self->deq);      \
         if(tar != nullptr) *tar = obj; else A_DEST(T, obj);                         \
     }                                                                               \
@@ -142,9 +141,9 @@ extern "C" {
         self->f = that->f;                                                          \
         __Adeq_init(&self->deq, sizeof(T));                                         \
         for(uint32_t i = 0; i < that->deq.num; i++){                                \
-            aExcClean();                                                            \
-            __Aquf(T,pushBack)(self, *__Aquf(T,at)(that, i));                       \
-            if(aExcOccur()) return;                                                 \
+            aTry(__Aquf(T,pushBack)(self, *__Aquf(T,at)(that, i));)aExc{            \
+                return;                                                             \
+            }                                                                       \
         }                                                                           \
     }                                                                               \
     __noused static inline int A_OBJ_CMPD(AQueue(T))                                \

@@ -39,7 +39,7 @@ int __Aarr_ins(__Aarr* arr, uint32_t index);
 static inline int __Aarr_push_front(__Aarr* arr){
     uint32_t red = arr->offset;
     if(__a_unlikely(red == 0 && __Aarr_add_cap_front(arr) != 0)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
     arr->offset--, arr->num++;
     return 0;
@@ -47,7 +47,7 @@ static inline int __Aarr_push_front(__Aarr* arr){
 static inline int __Aarr_push_back(__Aarr* arr){
     uint32_t red = arr->cap - (arr->offset + arr->num);
     if(__a_unlikely(red == 0 && __Aarr_add_cap_back(arr) != 0)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
     arr->num++;
     return 0;
@@ -144,7 +144,7 @@ static inline void __Aarr_pop_back(__Aarr* arr){
 
 #define ALine_Generate(T)                                                               \
     static inline T* __Alnf(T,at)(const ALine(T)* self, uint32_t i){                    \
-        if(__a_unlikely(self->arr.num == 0)){ aExcSet(AEXC_overstep); return nullptr; } \
+        if(__a_unlikely(self->arr.num == 0)){ aErrSet(AERR_overstep); return nullptr; } \
         if(__a_unlikely(i >= self->arr.num)) i = self->arr.num - 1 ;                    \
         return &(self->p[i]);                                                           \
     }                                                                                   \
@@ -157,39 +157,37 @@ static inline void __Aarr_pop_back(__Aarr* arr){
                                                                                         \
     static inline void __Alnf(T,ins)(ALine(T)*self, uint32_t i, const T obj){           \
         if(i > self->arr.num) i = self->arr.num ;                                       \
-        aExcClean(); T objx = A_COPY(T, obj); if(aExcOccur()){ return; }                \
+        aTry(T objx = A_COPY(T, obj);)aExc{ return; }                                   \
         int ret = __Aarr_ins(&self->arr, i); self->p = __Aarr_get_strat(&self->arr);    \
-        if(__a_unlikely(ret != 0)){ aExcSet(ret); A_DEST(T, objx); return; }            \
+        if(__a_unlikely(ret != 0)){ aErrSet(ret); A_DEST(T, objx); return; }            \
         self->p[i] = objx;                                                              \
     }                                                                                   \
                                                                                         \
     static inline void __Alnf(T,take)(ALine(T)* self, uint32_t i, T* tar){              \
         if(tar != nullptr) memset(tar, 0, sizeof(T));                                   \
-        if(__a_unlikely(self->arr.num == 0)){ aExcSet(AEXC_overstep); return; }         \
+        if(__a_unlikely(self->arr.num == 0)){ aErrSet(AERR_overstep); return; }         \
         if(i >= self->arr.num){ i = self->arr.num - 1; } T obj = self->p[i];            \
         __Aarr_rm(&self->arr, i);self->p = __Aarr_get_strat(&self->arr);                \
         if(tar != nullptr) *tar = obj; else A_DEST(T, obj);                             \
     }                                                                                   \
                                                                                         \
     static inline void __Alnf(T,pushBack)(ALine(T)* self, const T obj){                 \
-        aExcClean();                                                                    \
-        uint32_t i = self->arr.num; T objx = A_COPY(T,obj);if(aExcOccur())return;       \
+        aTry(uint32_t i = self->arr.num; T objx = A_COPY(T,obj);)aExc{ return; }        \
         int ret = __Aarr_push_back(&self->arr); self->p = __Aarr_get_strat(&self->arr); \
-        if(__a_unlikely(ret != 0)){ aExcSet(ret); A_DEST(T, objx); return; }            \
+        if(__a_unlikely(ret != 0)){ aErrSet(ret); A_DEST(T, objx); return; }            \
         self->p[i] = objx;                                                              \
     }                                                                                   \
                                                                                         \
     static inline void __Alnf(T,pushFront)(ALine(T)* self, const T obj){                \
-        aExcClean();                                                                    \
-        uint32_t i = 0; T objx = A_COPY(T, obj); if(aExcOccur()) return;                \
+        aTry(uint32_t i = 0; T objx = A_COPY(T, obj);)aExc{ return; }                   \
         int ret = __Aarr_push_front(&self->arr); self->p = __Aarr_get_strat(&self->arr);\
-        if(__a_unlikely(ret != 0)){ aExcSet(ret); A_DEST(T, objx); return; }            \
+        if(__a_unlikely(ret != 0)){ aErrSet(ret); A_DEST(T, objx); return; }            \
         self->p[i] = objx;                                                              \
     }                                                                                   \
                                                                                         \
     static inline void __Alnf(T,popBack)(ALine(T)* self, T* tar){                       \
         if(tar != nullptr) memset(tar, 0, sizeof(T));                                   \
-        if(__a_unlikely(self->arr.num == 0)){ aExcSet(AEXC_overstep); return; }         \
+        if(__a_unlikely(self->arr.num == 0)){ aErrSet(AERR_overstep); return; }         \
         uint32_t i = self->arr.num - 1; T obj = self->p[i];                             \
         __Aarr_pop_back(&self->arr); self->p = __Aarr_get_strat(&self->arr);            \
         if(tar != nullptr) *tar = obj; else A_DEST(T, obj);                             \
@@ -197,7 +195,7 @@ static inline void __Aarr_pop_back(__Aarr* arr){
                                                                                         \
     static inline void __Alnf(T,popFront)(ALine(T)* self, T* tar){                      \
         if(tar != nullptr) memset(tar, 0, sizeof(T));                                   \
-        if(__a_unlikely(self->arr.num == 0)){ aExcSet(AEXC_overstep); return; }         \
+        if(__a_unlikely(self->arr.num == 0)){ aErrSet(AERR_overstep); return; }         \
         uint32_t i = 0; T obj = self->p[i];                                             \
         __Aarr_pop_front(&self->arr); self->p = __Aarr_get_strat(&self->arr);           \
         if(tar != nullptr) *tar = obj; else A_DEST(T, obj);                             \
@@ -246,9 +244,9 @@ static inline void __Aarr_pop_back(__Aarr* arr){
         self->f = that->f;                                                              \
         int ret = __Aarr_copy(&self->arr, &that->arr);                                  \
         self->p = __Aarr_get_strat(&self->arr);                                         \
-        if(ret != 0){ aExcSet(AEXC_alloc_failed); return; }                             \
+        if(ret != 0){ aErrSet(AERR_alloc_failed); return; }                             \
         for(uint32_t i = 0; i < that->arr.num; i++){                                    \
-            aExcClean(); self->p[i] = A_COPY(T, that->p[i]); if(aExcOccur()){ return; } \
+            aTry(self->p[i] = A_COPY(T, that->p[i]);)aExc{ return; }                    \
             self->arr.num++;                                                            \
         }                                                                               \
     }                                                                                   \

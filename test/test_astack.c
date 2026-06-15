@@ -26,12 +26,12 @@ static void test_astack_int(void) {
     assert(st.f->getNumber(&st) == 0);
 
     assert(st.f->at(&st, 0) == NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
 
     for (int i = 1; i <= 5; ++i) {
         st.f->push(&st, i);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
 
     assert(!st.f->empty(&st));
@@ -73,8 +73,8 @@ static void test_astack_int(void) {
     assert(st.f->empty(&st));
 
     st.f->pop(&st, NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
 }
 
 static void test_astack_astring(void) {

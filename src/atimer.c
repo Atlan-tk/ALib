@@ -71,7 +71,7 @@ A_TYPE_REGISTER(ATWork);
 
 static inline void ATWork_call(ATWork* self){
     if(self == nullptr){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
     if(0 == atomic_load_explicit(&self->rm_flag, memory_order_relaxed)){
@@ -86,14 +86,14 @@ static inline void ATWork_call(ATWork* self){
 }
 static inline void ATWork_set_rm(ATWork* self){
     if(self == nullptr){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
     atomic_store_explicit(&self->rm_flag, 1, memory_order_relaxed);
 }
 __noused static inline void ATWork_clean_rm(ATWork* self){
     if(self == nullptr){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
     atomic_store_explicit(&self->rm_flag, 0, memory_order_relaxed);
@@ -124,11 +124,11 @@ A_TYPE_REGISTER(ATWorkQue);
 
 static inline void ATWorkQue_rm(ATWorkQue* self, int64_t id){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
     if(__a_unlikely(id < 0)){
-        aExcSet(AEXC_outdomain);
+        aErrSet(AERR_outdomain);
         return;
     }
 
@@ -143,7 +143,7 @@ static inline void ATWorkQue_rm(ATWorkQue* self, int64_t id){
 }
 static inline void ATWorkQue_push(ATWorkQue* self, ATWork work){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
 
@@ -153,7 +153,7 @@ static inline void ATWorkQue_push(ATWorkQue* self, ATWork work){
 static inline ATWork ATWorkQue_pop(ATWorkQue* self){
     ATWork work = {};
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return work;
     }
 
@@ -163,7 +163,7 @@ static inline ATWork ATWorkQue_pop(ATWorkQue* self){
 }
 static inline void ATWorkQue_updataWait(ATWorkQue* self, uint32_t time){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
     if(__a_unlikely(time < 1)){
@@ -185,14 +185,14 @@ static inline ATWorkQue ATWorkQue_getCallQue(ATWorkQue* self){
     auto wq = A_INIT(ATWorkQue);
 
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return wq;
     }
     uint32_t n = self->que.f->getNumber(&self->que);
     for(uint32_t i = 0; i < n; i++){
-        aExcClean();
+        aErrClean();
         ATWork work = ATWorkQue_pop(self);
-        if(aExcOccur()){
+        if(aErrOccur()){
             break;
         }
 
@@ -201,7 +201,7 @@ static inline ATWorkQue ATWorkQue_getCallQue(ATWorkQue* self){
             break;
         }else{
             ATWorkQue_push(&wq, work);
-            if(aExcOccur()){
+            if(aErrOccur()){
                 break;
             }
         }
@@ -211,21 +211,21 @@ static inline ATWorkQue ATWorkQue_getCallQue(ATWorkQue* self){
 }
 static inline void ATWorkQue_putQue(ATWorkQue* self, ATWorkQue* that){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
 
     uint32_t n = that->que.f->getNumber(&that->que);
     for(uint32_t i = 0; i < n; i++){
-        aExcClean();
+        aErrClean();
         ATWork work = ATWorkQue_pop(that);
-        if(aExcOccur()){
+        if(aErrOccur()){
             break;
         }
 
         if(work.rm_flag == 0 && work.num != 0){
             ATWorkQue_push(self, work);
-            if(aExcOccur()){
+            if(aErrOccur()){
                 break;
             }
         }
@@ -233,7 +233,7 @@ static inline void ATWorkQue_putQue(ATWorkQue* self, ATWorkQue* that){
 }
 static inline bool ATWorkQue_empty(const ATWorkQue* self){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return true;
     }
     auto que = &self->que;
@@ -241,7 +241,7 @@ static inline bool ATWorkQue_empty(const ATWorkQue* self){
 }
 static inline uint32_t ATWorkQue_next(const ATWorkQue* self){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return true;
     }
     auto que = &self->que;
@@ -253,16 +253,16 @@ static inline uint32_t ATWorkQue_next(const ATWorkQue* self){
 }
 static inline void ATWorkQue_call(const ATWorkQue* self){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
 
     auto que = &self->que;
     forEach(it, *que){
         auto work = it.p;
-        aExcClean();
+        aErrClean();
         ATWork_call(work);
-        aExcClean();
+        aErrClean();
     }
 }
 
@@ -279,11 +279,11 @@ typedef struct{
     int thret;
 }ATimer;
 __noused static inline void A_OBJ_INIT(ATimer)(ATimer* self){
-    aExcClean();
-    self->lock = A_INIT(AMtxCnd); if(aExcOccur()){ return; }
-    self->clock = A_INIT(AClock); if(aExcOccur()){ return; }
-    self->queue = A_INIT(ATWorkQue); if(aExcOccur()){ return; }
-    self->call_queue = A_INIT(ATWorkQue); if(aExcOccur()){ return; }
+    aErrClean();
+    self->lock = A_INIT(AMtxCnd); if(aErrOccur()){ return; }
+    self->clock = A_INIT(AClock); if(aErrOccur()){ return; }
+    self->queue = A_INIT(ATWorkQue); if(aErrOccur()){ return; }
+    self->call_queue = A_INIT(ATWorkQue); if(aErrOccur()){ return; }
     self->stat = false;
     self->thret = 0;
 }
@@ -296,10 +296,10 @@ __noused static inline void A_OBJ_DEST(ATimer)(ATimer* self){
     self->thret = 0;
 }
 __noused static inline void A_OBJ_COPY(ATimer)(ATimer* self, const ATimer* that){
-    self->lock = A_INIT(AMtxCnd); if(aExcOccur()){ return; }
-    self->clock = A_INIT(AClock); if(aExcOccur()){ return; }
-    self->queue = A_COPY(ATWorkQue, that->queue); if(aExcOccur()){ return; }
-    self->call_queue = A_COPY(ATWorkQue, that->call_queue); if(aExcOccur()){ return; }
+    self->lock = A_INIT(AMtxCnd); if(aErrOccur()){ return; }
+    self->clock = A_INIT(AClock); if(aErrOccur()){ return; }
+    self->queue = A_COPY(ATWorkQue, that->queue); if(aErrOccur()){ return; }
+    self->call_queue = A_COPY(ATWorkQue, that->call_queue); if(aErrOccur()){ return; }
     self->stat = false;
     self->thret = 0;
 }
@@ -310,11 +310,11 @@ A_TYPE_REGISTER(ATimer);
 
 static inline void ATimer_main(ATimer* self){
     if(self == nullptr){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
     while(1){
-        aExcClean();auto key = AMtxCnd_lock(&self->lock);if(aExcOccur()){
+        aTry(auto key = AMtxCnd_lock(&self->lock);)aExc{
             return;
         }
 
@@ -324,7 +324,7 @@ static inline void ATimer_main(ATimer* self){
         }
 
         while(self->stat && ATWorkQue_empty(&self->queue)){
-            aExcClean(); AMtxCnd_wait(&self->lock); if(aExcOccur()){
+            aTry(AMtxCnd_wait(&self->lock);)aExc{
                 A_DEST(AAutoKey, key);
                 return;
             }
@@ -335,15 +335,15 @@ static inline void ATimer_main(ATimer* self){
         self->clock = now;
 
         ATWorkQue_updataWait(&self->queue, (uint32_t)(AClock_usDiff(now, start) / 1000));
-        if(aExcOccur()){ return; }
+        if(aErrOccur()){ return; }
 
         self->call_queue = ATWorkQue_getCallQue(&self->queue);
-        if(aExcOccur()){ return; }
+        if(aErrOccur()){ return; }
 
         /* call start */
         A_DEST(AAutoKey, key);
         ATWorkQue_call(&self->call_queue);
-        aExcClean(); key = AMtxCnd_lock(&self->lock);if(aExcOccur()){
+        aTry(key = AMtxCnd_lock(&self->lock);)aExc{
             A_DEST(ATWorkQue, self->call_queue);
             return;
         }
@@ -351,7 +351,7 @@ static inline void ATimer_main(ATimer* self){
 
         ATWorkQue_putQue(&self->queue, &self->call_queue);
         A_DEST(ATWorkQue, self->call_queue);
-        if(aExcOccur()){ return; }
+        if(aErrOccur()){ return; }
 
         start = self->clock; now = A_INIT(AClock);
         auto awaken = ((int64_t)ATWorkQue_next(&self->queue)) * 1000;
@@ -359,12 +359,10 @@ static inline void ATimer_main(ATimer* self){
         if(AClock_usDiff(now, start) >= awaken){
         }else{
             while(self->stat){
-                aExcClean(); AMtxCnd_timewait(&self->lock, awaken_clk); if(aExcOccur()){
-                    if(aExcGet() == AEXC_timedout){
-                        aExcClean();
-                    }else{
-                        return;
-                    }
+                aTry(AMtxCnd_timewait(&self->lock, awaken_clk);)aHit(AERR_timedout){
+                    aErrClean();
+                }aExc{
+                    return;
                 }
 
                 start = self->clock; now = A_INIT(AClock);
@@ -382,16 +380,16 @@ static inline void ATimer_main(ATimer* self){
 
 static inline void ATimer_add(ATimer* self, ATWork work){
     if(self == nullptr){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
 
-    aExcClean();RAII(AAutoKey) key = AMtxCnd_lock(&self->lock);if(aExcOccur()){
+    aTry(RAII(AAutoKey) key = AMtxCnd_lock(&self->lock);)aExc{
         return;
     }
 
     if(!self->stat){
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
         return;
     }
 
@@ -411,16 +409,16 @@ static inline void ATimer_add(ATimer* self, ATWork work){
 
 static inline void ATimer_rm(ATimer* self, int64_t id){
     if(self == nullptr){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
 
-    aExcClean(); RAII(AAutoKey) key = AMtxCnd_lock(&self->lock);if(aExcOccur()){
+    aTry(RAII(AAutoKey) key = AMtxCnd_lock(&self->lock);)aExc{
         return;
     }
 
     if(!self->stat){
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
         return;
     }
 
@@ -435,17 +433,17 @@ static inline void ATimer_rm(ATimer* self, int64_t id){
     ATWorkQue_rm(&self->queue, id);
 }
 static inline int ATimer_thread(void* arg){
-    aExcClean();
+    aErrClean();
     ATimer* self = arg;
     ATimer_main(self);
-    return aExcGet();
+    return aErrGet();
 }
 static inline void ATimer_start(ATimer* self){
      if(self == nullptr){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
-    aExcClean();RAII(AAutoKey) key = AMtxCnd_lock(&self->lock);if(aExcOccur()){
+    aTry(RAII(AAutoKey) key = AMtxCnd_lock(&self->lock);)aExc{
         return;
     }
 
@@ -455,16 +453,16 @@ static inline void ATimer_start(ATimer* self){
 
     self->stat = true;
     if (thrd_create(&self->tid, ATimer_thread, self) != thrd_success) {
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
         self->stat = false;
     }
 }
 static inline void ATimer_poweroff(ATimer* self){
      if(self == nullptr){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
-    aExcClean();auto key = AMtxCnd_lock(&self->lock);if(aExcOccur()){
+    aTry(auto key = AMtxCnd_lock(&self->lock);)aExc{
         return;
     }
 
@@ -490,10 +488,10 @@ static ATimer a_timer_0;
 /* 毫秒级定时器 */
 bool a_mstimer_start(void){
     atomic_store_explicit(&a_work_count, 1, memory_order_relaxed);
-    aExcClean(); a_timer_0 = A_INIT(ATimer);if(aExcOccur()){
+    aTry(a_timer_0 = A_INIT(ATimer);)aExc{
         return false;
     }
-    aExcClean(); ATimer_start(&a_timer_0); if(aExcOccur()){
+    aTry(ATimer_start(&a_timer_0);)aExc{
         return false;
     }
     return true;
@@ -510,7 +508,7 @@ void a_timer_rmwork(int64_t id){
 
 int64_t a_timer_addwork(uint32_t cycle, uint32_t num, void(*call)(void*), void* data){
     if(call == nullptr || cycle == 0 || num == 0){
-        aExcSet(AEXC_outdomain); return -1;
+        aErrSet(AERR_outdomain); return -1;
     }
     ATWork work = {
         .id = atomic_fetch_add(&a_work_count, 1),
@@ -518,7 +516,7 @@ int64_t a_timer_addwork(uint32_t cycle, uint32_t num, void(*call)(void*), void* 
         .call = call, .data = data,
         .num = num,
     };
-    aExcClean(); ATimer_add(&a_timer_0, work); if(aExcOccur()){
+    aTry(ATimer_add(&a_timer_0, work);)aExc{
         return -1;
     }
     return work.id;

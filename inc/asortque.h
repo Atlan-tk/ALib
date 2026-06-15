@@ -123,9 +123,9 @@ extern "C" {
                                                                                         \
     static inline void __Asqf(T,ins_i)(ASortque(T)*self, uint32_t i, const T obj){      \
         if(i > self->arr.num) i = self->arr.num ;                                       \
-        aExcClean(); T objx = A_COPY(T, obj); if(aExcOccur()){ return; }                \
+        aTry(T objx = A_COPY(T, obj);)aExc{ return; }                                   \
         int ret = __Aarr_ins(&self->arr, i); self->p = __Aarr_get_strat(&self->arr);    \
-        if(__a_unlikely(ret != 0)){ aExcSet(ret); A_DEST(T, objx); return; }            \
+        if(__a_unlikely(ret != 0)){ aErrSet(ret); A_DEST(T, objx); return; }            \
         self->p[i] = objx;                                                              \
     }                                                                                   \
                                                                                         \
@@ -135,7 +135,7 @@ extern "C" {
     }                                                                                   \
                                                                                         \
     static inline T* __Asqf(T,at)(const ASortque(T)* self, uint32_t i){                 \
-        if(__a_unlikely(self->arr.num == 0)){ aExcSet(AEXC_overstep); return nullptr; } \
+        if(__a_unlikely(self->arr.num == 0)){ aErrSet(AERR_overstep); return nullptr; } \
         if(__a_unlikely(i >= self->arr.num)) i = self->arr.num - 1 ;                    \
         return &(self->p[i]);                                                           \
     }                                                                                   \
@@ -149,7 +149,7 @@ extern "C" {
                                                                                         \
     static inline void __Asqf(T,take)(ASortque(T)* self, uint32_t i, T* tar){           \
         if(tar != nullptr) memset(tar, 0, sizeof(T));                                   \
-        if(__a_unlikely(self->arr.num == 0)){ aExcSet(AEXC_overstep); return; }         \
+        if(__a_unlikely(self->arr.num == 0)){ aErrSet(AERR_overstep); return; }         \
         if(i >= self->arr.num){ i = self->arr.num - 1; } T obj = self->p[i];            \
         __Aarr_rm(&self->arr, i);self->p = __Aarr_get_strat(&self->arr);                \
         if(tar != nullptr) *tar = obj; else A_DEST(T, obj);                             \
@@ -157,7 +157,7 @@ extern "C" {
                                                                                         \
     static inline void __Asqf(T,popBack)(ASortque(T)* self, T* tar){                    \
         if(tar != nullptr) memset(tar, 0, sizeof(T));                                   \
-        if(__a_unlikely(self->arr.num == 0)){ aExcSet(AEXC_overstep); return; }         \
+        if(__a_unlikely(self->arr.num == 0)){ aErrSet(AERR_overstep); return; }         \
         uint32_t i = self->arr.num - 1; T obj = self->p[i];                             \
         __Aarr_pop_back(&self->arr); self->p = __Aarr_get_strat(&self->arr);            \
         if(tar != nullptr) *tar = obj; else A_DEST(T, obj);                             \
@@ -165,7 +165,7 @@ extern "C" {
                                                                                         \
     static inline void __Asqf(T,popFront)(ASortque(T)* self, T* tar){                   \
         if(tar != nullptr) memset(tar, 0, sizeof(T));                                   \
-        if(__a_unlikely(self->arr.num == 0)){ aExcSet(AEXC_overstep); return; }         \
+        if(__a_unlikely(self->arr.num == 0)){ aErrSet(AERR_overstep); return; }         \
         uint32_t i = 0; T obj = self->p[i];                                             \
         __Aarr_pop_front(&self->arr); self->p = __Aarr_get_strat(&self->arr);           \
         if(tar != nullptr) *tar = obj; else A_DEST(T, obj);                             \
@@ -216,9 +216,9 @@ extern "C" {
         self->f = that->f;                                                              \
         int ret = __Aarr_copy(&self->arr, &that->arr);                                  \
         self->p = __Aarr_get_strat(&self->arr);                                         \
-        if(ret != 0){ aExcSet(AEXC_alloc_failed); return; }                             \
+        if(ret != 0){ aErrSet(AERR_alloc_failed); return; }                             \
         for(uint32_t i = 0; i < that->arr.num; i++){                                    \
-            aExcClean(); self->p[i] = A_COPY(T, that->p[i]); if(aExcOccur()){ return; } \
+            aTry(self->p[i] = A_COPY(T, that->p[i]);)aExc{ return; }                    \
             self->arr.num++;                                                            \
         }                                                                               \
     }                                                                                   \

@@ -26,12 +26,12 @@ static void test_aqueue_int(void) {
     assert(qu.f->getNumber(&qu) == 0);
 
     assert(qu.f->at(&qu, 0) == NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
 
     for (int i = 1; i <= 5; ++i) {
         qu.f->push(&qu, i);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
 
     assert(!qu.f->empty(&qu));
@@ -78,8 +78,8 @@ static void test_aqueue_int(void) {
     assert(qu.f->empty(&qu));
 
     qu.f->pop(&qu, NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
 }
 
 static void test_aqueue_astring(void) {

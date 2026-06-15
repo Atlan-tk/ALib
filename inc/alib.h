@@ -212,29 +212,33 @@ uint32_t alib_hash_str(const char* k);
 
 /* exception handling */
 /********************************************************************/
+thread_local extern int __a_err_value__;
 typedef enum{
-    AEXC_NORMAL = 0,                //正常
+    AERR_NORMAL = 0,            //正常
 
-    AEXC_nullptr = -1,              //self指针为空
-    AEXC_overstep = -2,             //越界访问
-    AEXC_outdomain = -3,            //函数参数超出预定范围
-    AEXC_init_failed = -4,          //初始化失败
-    AEXC_file_noexist = -5,         //文件不存在
-    AEXC_alloc_failed = -6,         //内存分配失败
-    AEXC_no_permissions = -7,       //无操作权限，常用于文件系统或设备
-    AEXC_invalid_function = -8,     //已废弃的函数
-    AEXC_repeat_write = -9,         //重复写入
-    AEXC_system_error = -10,        //系统错误
-    AEXC_response_exc = -11,        //信号响应异常
-    AEXC_matching_failed = -12,     //常用于信号匹配失败
-    AEXC_timedout = -13,            //超时
-    AEXC_thrd_err = -14,            //线程错误返回
-}AEXC_t;
-extern thread_local int __A_EXC_VALUE__;
-static inline void aExcClean(void)  { __A_EXC_VALUE__ = 0; }
-static inline bool aExcOccur(void)  { return __A_EXC_VALUE__ != 0; };
-static inline void aExcSet(AEXC_t v){ __A_EXC_VALUE__ = v; };
-static inline int  aExcGet(void)    { return __A_EXC_VALUE__; };
+    AERR_nullptr = 65536,       //self指针为空
+    AERR_overstep,              //越界访问
+    AERR_outdomain,             //函数参数超出预定范围
+    AERR_init_failed,           //初始化失败
+    AERR_file_noexist,          //文件不存在
+    AERR_alloc_failed,          //内存分配失败
+    AERR_no_permissions,        //无操作权限，常用于文件系统或设备
+    AERR_invalid_function,      //已废弃的函数
+    AERR_repeat_write,          //重复写入
+    AERR_system_error,          //系统错误
+    AERR_response_exc,          //信号响应异常
+    AERR_matching_failed,       //常用于信号匹配失败
+    AERR_timedout,              //超时
+    AERR_thrd_err,              //线程错误返回
+}AERR_t;
+static inline void aErrClean(void)  { __a_err_value__ = 0; }
+static inline bool aErrOccur(void)  { return __a_err_value__ != 0; };
+static inline void aErrSet(AERR_t v){ __a_err_value__ = v; };
+static inline int  aErrGet(void)    { return __a_err_value__; };
+
+#define aTry(...)   aErrClean(); __VA_ARGS__; if(!aErrOccur()){}
+#define aHit(ev)    else if(aErrGet() == (ev))
+#define aExc        else
 
 
 
@@ -296,21 +300,21 @@ static inline int  aExcGet(void)    { return __A_EXC_VALUE__; };
         memset(self, 0, sizeof(T));                                                                         \
     }                                                                                                       \
     __noused static inline void __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                         \
-        aExcClean();                                                                                        \
-        if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
+        aErrClean();                                                                                        \
+        if(__a_unlikely(self == nullptr)) { aErrSet(AERR_nullptr); return; }                                \
         memset(self, 0, sizeof(T)); if(__A_OBJ_INIT(T) != nullptr) __A_OBJ_INIT(T)(self);                   \
-        if(aExcOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
+        if(aErrOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
     }                                                                                                       \
     __noused static inline void __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){                          \
-        aExcClean();                                                                                        \
-        if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }                                \
+        aErrClean();                                                                                        \
+        if(__a_unlikely(self == nullptr)) { aErrSet(AERR_nullptr); return; }                                \
         if(__a_unlikely(that == nullptr)) { __A_OBJ_INIT_FUNC_SELF(T)(self); return; }                      \
         memset(self, 0, sizeof(T)); if(__A_OBJ_COPY(T) != nullptr){                                         \
             __A_OBJ_COPY(T)(self, that);                                                                    \
         }else{                                                                                              \
             memcpy(self, that, sizeof(T));                                                                  \
         }                                                                                                   \
-        if(aExcOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
+        if(aErrOccur()) __A_OBJ_DEST_FUNC_SELF(T)(self);                                                    \
     }                                                                                                       \
     __noused static inline int __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){                     \
         if(self == that || (self == nullptr && that == nullptr)) return 0;                                  \
@@ -446,11 +450,11 @@ __noused static inline int  __A_OBJ_CMPD_FUNC_SELF(void)(__noused const void* se
         memset(self, 0, sizeof(T));                                                                         \
     }                                                                                                       \
     __noused static void  __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                               \
-        if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }                                 \
+        if(__a_unlikely(self == nullptr)){ aErrSet(AERR_nullptr); return; }                                 \
         memset(self, 0, sizeof(T));                                                                         \
     }                                                                                                       \
     __noused static void  __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){                                \
-        if(__a_unlikely(self == nullptr)){ aExcSet(AEXC_nullptr); return; }                                 \
+        if(__a_unlikely(self == nullptr)){ aErrSet(AERR_nullptr); return; }                                 \
         memset(self, 0, sizeof(T)); if(that != nullptr) *self = *that;                                      \
     }                                                                                                       \
     __noused static int __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){                            \
@@ -505,12 +509,12 @@ __noused static inline void A_SET_VTAB(Atlan)(__noused Atlan* self){}
 __noused static inline void __A_OBJ_DEST_FUNC_SELF(Atlan)(__noused Atlan* self){}
 
 __noused static inline void __A_OBJ_INIT_FUNC_SELF(Atlan)(Atlan* self){
-    if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }
+    if(__a_unlikely(self == nullptr)) { aErrSet(AERR_nullptr); return; }
     self->f = &A_FUNC_TAB(Atlan);
 }
 
 __noused static inline void __A_OBJ_COPY_FUNC_SELF(Atlan)(Atlan* self, const Atlan* that){
-    if(__a_unlikely(self == nullptr)) { aExcSet(AEXC_nullptr); return; }
+    if(__a_unlikely(self == nullptr)) { aErrSet(AERR_nullptr); return; }
     memset(self, 0, sizeof(Atlan)); if(that != nullptr) *self = *that;
 }
 

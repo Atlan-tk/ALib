@@ -50,11 +50,11 @@ A_TYPE_REGISTER(My_struct);
 
 int main(){
     RAII(My_struct) my_struct = A_INIT(My_struct);
-    if(aExcOccur()){
+    if(aErrOccur()){
     }
 
     RAII(My_struct) my_struct_1 = A_COPY(My_struct, my_struct);
-    if(aExcOccur()){
+    if(aErrOccur()){
     }
 
     printf("%s\n", my_struct.s);

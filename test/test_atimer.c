@@ -25,7 +25,7 @@ static void timer_probe_reset(TimerProbe *probe) {
         atomic_store(&probe->fired_ms[i], -1);
     }
     probe->start = A_INIT(AClock);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 }
 
 static void timer_probe_cb(void *data) {
@@ -42,7 +42,7 @@ static void test_one_shot(void) {
     timer_probe_reset(&probe);
 
     int64_t id = a_timer_addwork_one(80, timer_probe_cb, &probe);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(id > 0);
 
     sleep_ms(180);
@@ -55,7 +55,7 @@ static void test_repeat_count(void) {
     timer_probe_reset(&probe);
 
     int64_t id = a_timer_addwork(60, 3, timer_probe_cb, &probe);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(id > 0);
 
     sleep_ms(320);
@@ -70,12 +70,12 @@ static void test_add_while_waiting(void) {
     timer_probe_reset(&probe);
 
     int64_t first = a_timer_addwork_one(1000, timer_probe_cb, &probe);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(first > 0);
 
     sleep_ms(500);
     int64_t second = a_timer_addwork_one(300, timer_probe_cb, &probe);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(second > 0);
 
     sleep_ms(700);
@@ -95,7 +95,7 @@ static void test_remove_long_work(void) {
     timer_probe_reset(&probe);
 
     int64_t id = a_timer_addwork_long(40, timer_probe_cb, &probe);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(id > 0);
 
     sleep_ms(170);
@@ -103,7 +103,7 @@ static void test_remove_long_work(void) {
     assert(before_remove >= 1);
 
     a_timer_rmwork(id);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     int after_remove = atomic_load(&probe.fired);
     sleep_ms(180);

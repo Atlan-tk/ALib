@@ -41,7 +41,7 @@ A_CLASS_REGISTER(ASignal);
 /* 异常收集器 */
 typedef struct{
     const void* addressee;
-    AEXC_t      exc_value;
+    AERR_t      exc_value;
 }AExcEnd;
 A_TYPE_REGISTER(AExcEnd);
 
@@ -52,7 +52,7 @@ A_TYPE_REGISTER(ALine(AExcEnd));
 AClass_Inherit(AExcCollector);
 AClass_Struct(AExcCollector,
     int64_t         id;
-    AEXC_t          exc;            //收集器异常标志
+    AERR_t          exc;            //收集器异常标志
     const void*     sender;         //发送者
     const char*     signal_name;    //信号名
     ALine(AExcEnd)  list;           //异常列表
@@ -100,7 +100,7 @@ int64_t a_signal_alloc(void);
 /* 发送信号 */
 /* 信号发出后后调用对应的靶函数 */
 /* collector用于收集靶函数抛出的异常 */
-/* 返回值表示靶函数是否抛出了异常，其取值仅为0或AEXC_response_exc */
+/* 返回值表示靶函数是否抛出了异常，其取值仅为0或AERR_response_exc */
 int __a_signal_transmit(const ASignal* signal, AExcCollector* collector);
 
 #define _a_signal_transmit(signal, collector, ...)({                                \
@@ -160,14 +160,14 @@ AClass_Function(AReceEnd,
 
 __noused static inline void AReceEnd_connection(const AReceEnd* self, int64_t id, void(*call)(const ASignal* signal, void* addressee)){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
     a_signal_connection(id, self, call);
 }
 __noused static inline void AReceEnd_disconnect(const AReceEnd* self, int64_t id){
     if(__a_unlikely(self == nullptr)){
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         return;
     }
     a_target_disconnect(self, id);

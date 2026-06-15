@@ -63,7 +63,7 @@ static int cnd_wait_worker(void* arg) {
     CndWakeState* state = arg;
 
     RAII(AAutoKey) key = AMtxCnd_lock(state->lock);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     assert(mtx_lock(&state->state_mutex) == thrd_success);
     state->waiting++;
@@ -71,7 +71,7 @@ static int cnd_wait_worker(void* arg) {
 
     while (!state->go) {
         AMtxCnd_wait(state->lock);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
 
     assert(mtx_lock(&state->state_mutex) == thrd_success);
@@ -84,7 +84,7 @@ static int semaphore_limit_worker(void* arg) {
     SemaphoreLimitState* state = arg;
 
     RAII(AAutoKey) key = ASemaphore_lock(state->sem);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     assert(mtx_lock(&state->state_mutex) == thrd_success);
     state->active++;
@@ -110,7 +110,7 @@ static int semaphore_resize_worker(void* arg) {
     assert(mtx_unlock(&state->state_mutex) == thrd_success);
 
     RAII(AAutoKey) key = ASemaphore_lock(state->sem);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     assert(mtx_lock(&state->state_mutex) == thrd_success);
     state->acquired = 1;
@@ -119,19 +119,19 @@ static int semaphore_resize_worker(void* arg) {
 }
 
 static void test_amtxcnd_nullptr_guards(void) {
-    aExcClean();
+    aTry((void)0;)aExc{}
     AMtxCnd_awake(NULL);
-    assert(aExcGet() == AEXC_nullptr);
+    assert(aErrGet() == AERR_nullptr);
 
-    aExcClean();
+    aTry((void)0;)aExc{}
     AMtxCnd_awake_all(NULL);
-    assert(aExcGet() == AEXC_nullptr);
+    assert(aErrGet() == AERR_nullptr);
 
-    aExcClean();
+    aTry((void)0;)aExc{}
     AMtxCnd_wait(NULL);
-    assert(aExcGet() == AEXC_nullptr);
+    assert(aErrGet() == AERR_nullptr);
 
-    aExcClean();
+    aTry((void)0;)aExc{}
 }
 
 static void test_amtxcnd_awake_all(void) {
@@ -142,7 +142,7 @@ static void test_amtxcnd_awake_all(void) {
     thrd_t workers[2] = {0};
     int results[2] = {0};
 
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(mtx_init(&state.state_mutex, mtx_plain) == thrd_success);
 
     for (int i = 0; i < 2; ++i) {
@@ -153,10 +153,10 @@ static void test_amtxcnd_awake_all(void) {
 
     {
         RAII(AAutoKey) key = AMtxCnd_lock(&lock);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
         state.go = 1;
         AMtxCnd_awake_all(&lock);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
 
     wait_until_at_least(&state.state_mutex, &state.woke, 2, 500);
@@ -177,11 +177,11 @@ static void test_semaphore_limits_concurrency(void) {
     thrd_t workers[4] = {0};
     int results[4] = {0};
 
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(mtx_init(&state.state_mutex, mtx_plain) == thrd_success);
 
     ASemaphore_setMax(&sem, 2);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     for (int i = 0; i < 4; ++i) {
         assert(thrd_create(&workers[i], semaphore_limit_worker, &state) == thrd_success);
@@ -210,15 +210,15 @@ static void test_semaphore_setmax_wakes_waiter(void) {
     thrd_t worker = {0};
     int worker_result = -1;
 
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(mtx_init(&state.state_mutex, mtx_plain) == thrd_success);
 
     ASemaphore_setMax(&sem, 1);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 
     {
         RAII(AAutoKey) hold = ASemaphore_lock(&sem);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
 
         assert(thrd_create(&worker, semaphore_resize_worker, &state) == thrd_success);
         wait_until_at_least(&state.state_mutex, &state.ready, 1, 500);
@@ -227,7 +227,7 @@ static void test_semaphore_setmax_wakes_waiter(void) {
         assert(locked_read(&state.state_mutex, &state.acquired) == 0);
 
         ASemaphore_setMax(&sem, 2);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
 
         wait_until_at_least(&state.state_mutex, &state.acquired, 1, 500);
     }

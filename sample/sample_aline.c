@@ -42,14 +42,14 @@ ALine_Define(My_struct);ALine_Generate(My_struct);A_TYPE_REGISTER(ALine(My_struc
 
 int main(){
     RAII(ALine(My_struct)) line = A_INIT(ALine(My_struct));
-    if(aExcOccur()){
+    if(aErrOccur()){
         printf("create ALine(%s) AOM err\n", __A_Str(My_struct));
         return -1;
     }
 
     for(int i = 0; i < 10; i++){
         RAII(My_struct) obj = A_INIT(My_struct);
-        if(aExcOccur()){
+        if(aErrOccur()){
             return -1;
         }
 
@@ -58,7 +58,7 @@ int main(){
     }
 
     RAII(ALine(int)) line_int = A_INIT(ALine(int));
-    if(aExcOccur()){
+    if(aErrOccur()){
         printf("create ALine(%s) AOM err\n", __A_Str(int));
         return -1;
     }

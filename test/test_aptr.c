@@ -23,19 +23,19 @@ A_TYPE_REGISTER(AShPtr(AStr));
 
 static void test_aptr_int(void) {
     RAII(APtr(int)) p = APtrNew(int);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(p.p != NULL);
     assert(p.strong_flag);
     assert(*p.p == 0);
 
     RAII(APtr(int)) cp = APtrCPNew(int, 7);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(cp.p != NULL);
     assert(cp.strong_flag);
     assert(*cp.p == 7);
 
     RAII(APtr(int)) weak = A_COPY(APtr(int), cp);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(weak.p == cp.p);
     assert(!weak.strong_flag);
 
@@ -52,32 +52,32 @@ static void test_aptr_astring(void) {
     RAII(AStr) src = AStr_new("hello");
     RAII(APtr(AStr)) p = APtrCPNew(AStr, src);
 
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(p.p != NULL);
     assert(p.strong_flag);
     assert(strcmp(p.p->s, "hello") == 0);
 
     AStr_pushBack(&src, '!');
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(strcmp(src.s, "hello!") == 0);
     assert(strcmp(p.p->s, "hello") == 0);
 
     AStr_pushBack(p.p, '?');
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(strcmp(p.p->s, "hello?") == 0);
     assert(strcmp(src.s, "hello!") == 0);
 }
 
 static void test_ashptr_int(void) {
     RAII(AShPtr(int)) owner = AShPtrNew(int);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(owner.p != NULL);
     assert(*owner.p == 0);
 
     *owner.p = 11;
 
     RAII(AShPtr(int)) alias = A_COPY(AShPtr(int), owner);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(alias.p == owner.p);
     assert(*alias.p == 11);
 
@@ -89,7 +89,7 @@ static void test_ashptr_int(void) {
     assert(*owner.p == 23);
 
     RAII(AShPtr(int)) cp = AShPtrCPNew(int, 7);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(cp.p != NULL);
     assert(*cp.p == 7);
 }
@@ -98,21 +98,21 @@ static void test_ashptr_astring(void) {
     RAII(AStr) src = AStr_new("share");
     RAII(AShPtr(AStr)) owner = AShPtrCPNew(AStr, src);
 
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(owner.p != NULL);
     assert(strcmp(owner.p->s, "share") == 0);
 
     AStr_pushBack(&src, '!');
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(strcmp(src.s, "share!") == 0);
     assert(strcmp(owner.p->s, "share") == 0);
 
     RAII(AShPtr(AStr)) alias = A_COPY(AShPtr(AStr), owner);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(alias.p == owner.p);
 
     AStr_pushBack(alias.p, '?');
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(strcmp(alias.p->s, "share?") == 0);
     assert(strcmp(owner.p->s, "share?") == 0);
     assert(strcmp(src.s, "share!") == 0);

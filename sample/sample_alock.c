@@ -77,11 +77,11 @@ static int wait_until_at_least(mtx_t* mutex, const int* value, int expected, lon
 }
 
 static int print_exc(const char* step) {
-    if (!aExcOccur()) {
+    if (!aErrOccur()) {
         return 0;
     }
 
-    fprintf(stderr, "%s failed, aExc=%d\n", step, aExcGet());
+    fprintf(stderr, "%s failed, aErr=%d\n", step, aErrGet());
     return -1;
 }
 
@@ -90,7 +90,7 @@ static int counter_worker(void* arg) {
 
     for (int i = 0; i < task->iterations; ++i) {
         RAII(AAutoKey) key = AMtx_lock(task->lock);
-        if (aExcOccur()) {
+        if (aErrOccur()) {
             return -1;
         }
 
@@ -102,7 +102,7 @@ static int counter_worker(void* arg) {
 
 static int recursive_sum(ARecursion* lock, int n) {
     RAII(AAutoKey) key = ARecursion_lock(lock);
-    if (aExcOccur()) {
+    if (aErrOccur()) {
         return -1;
     }
 
@@ -120,7 +120,7 @@ static int recursive_sum(ARecursion* lock, int n) {
 
 static int pair_write(AMtxRW* lock, int* left, int* right, int new_left, int new_right) {
     RAII(AAutoKey) key = AMtxRW_wlock(lock);
-    if (aExcOccur()) {
+    if (aErrOccur()) {
         return -1;
     }
 
@@ -131,7 +131,7 @@ static int pair_write(AMtxRW* lock, int* left, int* right, int new_left, int new
 
 static int pair_read(AMtxRW* lock, const int* left, const int* right, int* out_left, int* out_right) {
     RAII(AAutoKey) key = AMtxRW_rlock(lock);
-    if (aExcOccur()) {
+    if (aErrOccur()) {
         return -1;
     }
 
@@ -144,7 +144,7 @@ static int ready_worker(void* arg) {
     ReadyTask* task = arg;
 
     RAII(AAutoKey) key = AMtxCnd_lock(task->lock);
-    if (aExcOccur()) {
+    if (aErrOccur()) {
         return -1;
     }
 
@@ -158,7 +158,7 @@ static int ready_worker(void* arg) {
 
     while (!task->ready) {
         AMtxCnd_wait(task->lock);
-        if (aExcOccur()) {
+        if (aErrOccur()) {
             return -1;
         }
     }
@@ -188,7 +188,7 @@ static int resize_worker(void* arg) {
     }
 
     RAII(AAutoKey) permit = ASemaphore_lock(task->sem);
-    if (aExcOccur()) {
+    if (aErrOccur()) {
         return -1;
     }
 
@@ -313,7 +313,7 @@ int main(void) {
 
     {
         RAII(AAutoKey) key = AMtxCnd_lock(&ready_lock);
-        if (aExcOccur()) {
+        if (aErrOccur()) {
             mtx_destroy(&ready_task.state_mutex);
             return 1;
         }

@@ -57,7 +57,7 @@ static inline int __AhsBucket_expand(__AhsBucket* bt, uint32_t ele_size){
 
         char* p = bt->p == nullptr ? alib_alloc(ele_size * cap) : alib_realloc(bt->p, ele_size * cap);
         if(__a_unlikely(p == nullptr)){
-            return AEXC_alloc_failed;
+            return AERR_alloc_failed;
         }
         bt->p = p, bt->cap = cap;
     }
@@ -117,7 +117,7 @@ static inline int __Ahash_reHash(__Ahash* hash, uint32_t cap){
 
     __AhsBucket* arr = alib_alloc(cap * sizeof(__AhsBucket));
     if(__a_unlikely(arr == nullptr)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
     memset(arr, 0, cap * sizeof(__AhsBucket));
 
@@ -138,7 +138,7 @@ static inline int __Ahash_reHash(__Ahash* hash, uint32_t cap){
             char* new_element = __AhsBucket_push(new_bt, hash->size);
             if(new_element == nullptr){
                 __Ahash_freeTab(arr, cap);
-                return AEXC_alloc_failed;
+                return AERR_alloc_failed;
             }
 
             memcpy(new_element, element, hash->size);
@@ -172,9 +172,9 @@ static inline int __Ahash_add(__Ahash* hash, void* obj){
             char buf[obj_size]; memset(buf, 0, obj_size);
             memcpy(buf, element, obj_size);
             hash->copy(element, obj);
-            if(aExcOccur()){
+            if(aErrOccur()){
                 memcpy(element, buf, obj_size);
-                return aExcGet();
+                return aErrGet();
             }else{
                 hash->dest(buf);
                 return 0;
@@ -185,12 +185,12 @@ static inline int __Ahash_add(__Ahash* hash, void* obj){
     //新添加
     char* element = __AhsBucket_push(bt, obj_size);
     if(__a_unlikely(element == nullptr)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
     hash->copy(element, obj);
-    if(aExcOccur()){
+    if(aErrOccur()){
         __AhsBucket_rm(bt, obj_size, bt->num - 1);
-        return aExcGet();
+        return aErrGet();
     }else{
         hash->num++;
         return 0;
@@ -202,17 +202,17 @@ static inline int __Ahash_del(__Ahash* hash, const void* k){
     __AhsBucket* bt = __Ahash_at_bt(hash, hv);
 
     if(__a_unlikely(hash->num == 0)){
-        return AEXC_overstep;
+        return AERR_overstep;
     }
 
     uint32_t y = __AhsBucket_find(bt, obj_size, k, hash->cmpd_k);
     if(y == 0xffffffff){
         //不存在
-        return AEXC_overstep;
+        return AERR_overstep;
     }else{
         char* element = __AhsBucket_at(bt, obj_size, y);
         if(__a_unlikely(element == nullptr)){
-            return AEXC_overstep;
+            return AERR_overstep;
         }
 
         hash->dest(element);
@@ -257,20 +257,20 @@ void* __Ahash_at(const __Ahash* hash, const void* k){
 }
 void __Ahash_rm(__Ahash* hash, const void* k){
     if(__a_unlikely(__Ahash_del(hash, k) != 0)){
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
     }
 }
 void __Ahash_ins(__Ahash* hash, void* data){
     int ret = __Ahash_reCap(hash);
     if(__a_unlikely(ret != 0)){
-        aExcSet(ret);
+        aErrSet(ret);
         return;
     }
 
     ret = __Ahash_add(hash, data);
 
     if(__a_unlikely(ret != 0)){
-        aExcSet(ret);
+        aErrSet(ret);
     }
 }
 
@@ -282,19 +282,19 @@ void __Ahash_take(__Ahash* hash, void* data){
     __AhsBucket* bt = __Ahash_at_bt(hash, hv);
 
     if(__a_unlikely(hash->num == 0)){
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
         return;
     }
 
     uint32_t y = __AhsBucket_find(bt, obj_size, k, hash->cmpd_k);
     if(y == 0xffffffff){
         //不存在
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
         return;
     }else{
         char* element = __AhsBucket_at(bt, obj_size, y);
         if(__a_unlikely(element == nullptr)){
-            aExcSet(AEXC_overstep);
+            aErrSet(AERR_overstep);
             return;
         }
 
@@ -448,7 +448,7 @@ int __Ahash_copy(__Ahash* self, const __Ahash* that){
 
     __AhsBucket* arr = alib_alloc(cap * sizeof(__AhsBucket));
     if(__a_unlikely(arr == nullptr)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
     memset(arr, 0, cap * sizeof(__AhsBucket));
     self->bucket_arr = arr;
@@ -462,13 +462,13 @@ int __Ahash_copy(__Ahash* self, const __Ahash* that){
             char* element_that = __AhsBucket_at(bt_that, self->size, j);
             char* element_self = __AhsBucket_push(bt_self, self->size);
             if(element_self == nullptr){
-                return AEXC_alloc_failed;
+                return AERR_alloc_failed;
             }
 
             self->copy(element_self, element_that);
-            if(aExcOccur()){
+            if(aErrOccur()){
                 __AhsBucket_rm(bt_self, self->size, bt_self->num - 1);
-                return aExcGet();
+                return aErrGet();
             }
             self->num++;
         }

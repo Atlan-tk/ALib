@@ -131,7 +131,7 @@ static inline bool __a_ref_count_sub(atomic_uint* ref_count){
             if(__a_likely(__a_ref_count_add(that->ref_count))){                         \
                 *self = *that;                                                          \
             }else{                                                                      \
-                aExcSet(AEXC_init_failed);                                              \
+                aErrSet(AERR_init_failed);                                              \
             }                                                                           \
         }                                                                               \
     }                                                                                   \
@@ -146,7 +146,7 @@ static inline bool __a_ref_count_sub(atomic_uint* ref_count){
         AShPtr(T) ptr; A_OBJ_INIT(AShPtr(T))(&ptr);                                     \
         ptr.ref_count = alib_alloc(sizeof(atomic_uint));                                \
         if(__a_unlikely(ptr.ref_count == nullptr)){                                     \
-            aExcSet(AEXC_alloc_failed); return ptr;                                     \
+            aErrSet(AERR_alloc_failed); return ptr;                                     \
         }                                                                               \
         ptr.p = A_NEW(T); if(__a_unlikely(ptr.p == nullptr)){                           \
             alib_free(ptr.ref_count);                                                   \
@@ -159,7 +159,7 @@ static inline bool __a_ref_count_sub(atomic_uint* ref_count){
         AShPtr(T) ptr; A_OBJ_INIT(AShPtr(T))(&ptr);                                     \
         ptr.ref_count = alib_alloc(sizeof(atomic_uint));                                \
         if(__a_unlikely(ptr.ref_count == nullptr)){                                     \
-            aExcSet(AEXC_alloc_failed); return ptr;                                     \
+            aErrSet(AERR_alloc_failed); return ptr;                                     \
         }                                                                               \
         ptr.p = A_CPNEW(T, obj); if(__a_unlikely(ptr.p == nullptr)){                    \
             alib_free(ptr.ref_count);                                                   \

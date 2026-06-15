@@ -14,13 +14,13 @@ A_TYPE_REGISTER(ADeque(AStr));
 
 static void test_adeque_int(void) {
     RAII(ADeque(int)) dq = A_INIT(ADeque(int));
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(dq.f->empty(&dq));
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     for (int i = 0; i < 10; i++) {
         dq.f->pushBack(&dq, i);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(dq.f->getNumber(&dq) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -33,27 +33,27 @@ static void test_adeque_int(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     RAII(ADeque(int)) dq2 = A_COPY(ADeque(int), dq);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(dq2.f->getNumber(&dq2) == 10);
     *dq2.f->at(&dq2, 0) = 999;
     assert(*dq.f->at(&dq, 0) == 0);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     dq.f->popBack(&dq, NULL);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(dq.f->getNumber(&dq) == 9);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     RAII(ADeque(int)) empty = A_INIT(ADeque(int));
     empty.f->popBack(&empty, NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     RAII(ADeque(int)) big = A_INIT(ADeque(int));
     for (int i = 0; i < 600; i++) {
         big.f->pushBack(&big, i);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(big.f->getNumber(&big) == 600);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -66,13 +66,13 @@ static void test_adeque_int(void) {
 
 static void test_adeque_astring(void) {
     RAII(ADeque(AStr)) dq = A_INIT(ADeque(AStr));
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     for (int i = 0; i < 10; i++) {
         RAII(AStr) tmp = AStr_new("deque");
         dq.f->pushBack(&dq, tmp);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(dq.f->getNumber(&dq) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -87,8 +87,8 @@ static void test_adeque_astring(void) {
 
     RAII(ADeque(AStr)) empty = A_INIT(ADeque(AStr));
     empty.f->popBack(&empty, NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     RAII(ADeque(AStr)) big = A_INIT(ADeque(AStr));
@@ -99,7 +99,7 @@ static void test_adeque_astring(void) {
         RAII(AStr) elem = A_INIT(AStr);
         AStr_addBack(&elem, tmp.s);
         big.f->pushBack(&big, elem);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(big.f->getNumber(&big) == 600);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);

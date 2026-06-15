@@ -18,7 +18,7 @@ A_TYPE_REGISTER(ASortque(AStr));
 static void test_asortque_int(void) {
     /* 1. 基本构造与空容器 */
     RAII(ASortque(int)) sq = A_INIT(ASortque(int));
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(sq.f->empty(&sq));
     assert((int)sq.f->getNumber(&sq) == 0);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -28,7 +28,7 @@ static void test_asortque_int(void) {
     int n = sizeof(values) / sizeof(values[0]);
     for (int i = 0; i < n; i++) {
         sq.f->ins(&sq, values[i]);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert((int)sq.f->getNumber(&sq) == n);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -52,23 +52,23 @@ static void test_asortque_int(void) {
     RAII(ASortque(int)) empty_sq = A_INIT(ASortque(int));
     int *null_p = empty_sq.f->at(&empty_sq, 0);
     assert(null_p == NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* popMin/popMax 在空容器上应设置异常 */
     int tmp = 0;
     empty_sq.f->popMin(&empty_sq, &tmp);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
     empty_sq.f->popMax(&empty_sq, &tmp);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 5. 拷贝构造 */
     RAII(ASortque(int)) sq2 = A_COPY(ASortque(int), sq);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert((int)sq2.f->getNumber(&sq2) == n);
     for (int i = 0; i < n; i++) {
         assert(*sq2.f->at(&sq2, i) == *sq.f->at(&sq, i));
@@ -83,7 +83,7 @@ static void test_asortque_int(void) {
     /* 6. 删除元素 */
     int before_rm = (int)sq.f->getNumber(&sq);
     sq.f->rm(&sq, 0);  // 删除最小元素
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert((int)sq.f->getNumber(&sq) == before_rm - 1);
     /* 新最小应 >= 原来次小 */
     assert(*sq.f->at(&sq, 0) >= 2);
@@ -92,11 +92,11 @@ static void test_asortque_int(void) {
     /* 7. popMin / popMax */
     int min_val = 0;
     sq.f->popMin(&sq, &min_val);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(min_val <= *sq.f->at(&sq, 0)); // 删掉了当前最小，min_val应<=剩下的最小
     int max_val = 0;
     sq.f->popMax(&sq, &max_val);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(max_val >= *sq.f->at(&sq, (int)sq.f->getNumber(&sq) - 1));
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
@@ -113,7 +113,7 @@ static void test_asortque_int(void) {
     const int BIG_N = 600;
     for (int i = 0; i < BIG_N; i++) {
         big.f->ins(&big, BIG_N - i);  // 降序插入
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert((int)big.f->getNumber(&big) == BIG_N);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -131,7 +131,7 @@ static void test_asortque_int(void) {
 static void test_asortque_astring(void) {
     /* 1. 基本构造 */
     RAII(ASortque(AStr)) sq = A_INIT(ASortque(AStr));
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(sq.f->empty(&sq));
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
@@ -141,7 +141,7 @@ static void test_asortque_astring(void) {
     for (int i = 0; i < n; i++) {
         RAII(AStr) elem = AStr_new(words[i]);  // 字面量包装
         sq.f->ins(&sq, elem);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert((int)sq.f->getNumber(&sq) == n);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -159,23 +159,23 @@ static void test_asortque_astring(void) {
     RAII(ASortque(AStr)) empty_sq = A_INIT(ASortque(AStr));
     AStr *null_s = empty_sq.f->at(&empty_sq, 0);
     assert(null_s == NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 空容器 popMin/popMax 触发异常 */
     AStr dummy = AStr_new("");
     empty_sq.f->popMin(&empty_sq, &dummy);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
     empty_sq.f->popMax(&empty_sq, &dummy);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 3. 拷贝构造 */
     RAII(ASortque(AStr)) sq2 = A_COPY(ASortque(AStr), sq);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert((int)sq2.f->getNumber(&sq2) == n);
     for (int i = 0; i < n; i++) {
         AStr *orig = sq.f->at(&sq, i);
@@ -203,11 +203,11 @@ static void test_asortque_astring(void) {
     /* 6. popMin / popMax */
     AStr min_val = A_INIT(AStr);
     sq.f->popMin(&sq, &min_val);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(strcmp(min_val.s, sq.f->at(&sq, 0)->s) <= 0);
     AStr max_val = A_INIT(AStr);
     sq.f->popMax(&sq, &max_val);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     int last_idx = (int)sq.f->getNumber(&sq) - 1;
@@ -223,7 +223,7 @@ static void test_asortque_astring(void) {
         snprintf(buf, sizeof(buf), "str%d", i);
         RAII(AStr) elem = AStr_new(buf);
         big.f->ins(&big, elem);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert((int)big.f->getNumber(&big) == BIG_N);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);

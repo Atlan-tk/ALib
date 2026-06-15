@@ -21,12 +21,12 @@ static void* __alib_default_realloc(void* p, uint32_t size){
 }
 
 static void* __alib_default_new(uint32_t size, void(*init_func)(void*)){
-    aExcClean();
+    aErrClean();
     void* p = alib_alloc(size);
 
     if(__a_unlikely(p == nullptr)){
         if(__a_likely(size != 0))
-            aExcSet(AEXC_alloc_failed);
+            aErrSet(AERR_alloc_failed);
         return nullptr;
     }
 
@@ -36,7 +36,7 @@ static void* __alib_default_new(uint32_t size, void(*init_func)(void*)){
         memset(p, 0, size);
     }
 
-    if(aExcOccur()){
+    if(aErrOccur()){
         alib_free(p); p = nullptr;
     }
 
@@ -44,12 +44,12 @@ static void* __alib_default_new(uint32_t size, void(*init_func)(void*)){
 }
 
 static void* __alib_default_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*)){
-    aExcClean();
+    aErrClean();
     void* p = alib_alloc(size);
 
     if(__a_unlikely(p == nullptr)){
         if(__a_likely(size != 0))
-            aExcSet(AEXC_alloc_failed);
+            aErrSet(AERR_alloc_failed);
         return nullptr;
     }
 
@@ -59,7 +59,7 @@ static void* __alib_default_cpnew(uint32_t size, const void* that, void(*copy_fu
         memset(p, 0, size);
     }
 
-    if(aExcOccur()){
+    if(aErrOccur()){
         alib_free(p); p = nullptr;
     }
 
@@ -166,8 +166,9 @@ uint32_t A_OBJ_HASH(astr_t)(const astr_t* self){
 uint32_t A_OBJ_HASH(void)(__noused const void* self){ return 0; };
 uint32_t A_OBJ_HASH(Atlan)(__noused const Atlan* self){ return 0; }
 
-/* exception handling */
-thread_local int __A_EXC_VALUE__ = 0;
+
+
+thread_local int __a_err_value__ = 0;
 
 
 

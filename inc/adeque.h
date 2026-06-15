@@ -48,7 +48,7 @@ typedef struct{
 __noused static inline void* __Adeq_at(const __Adeq* deq, uint32_t i){
     if(__a_unlikely(i >= deq->num)) i = deq->num - 1 ;
     if(__a_unlikely(deq->num == 0)){
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
         return nullptr;
     }
     return __A2arr_at(&deq->arr, i + deq->offset);
@@ -65,7 +65,7 @@ static inline int __Adeq_push_back(__Adeq* deq){
     uint32_t num = deq->offset + deq->num;
     if(__a_unlikely(num == __A2arr_cap(&deq->arr))){
         ret = __A2arr_add_blk_back(&deq->arr);
-        if(__a_unlikely(ret != 0)) return AEXC_alloc_failed;
+        if(__a_unlikely(ret != 0)) return AERR_alloc_failed;
     }
     deq->num++;
     return 0;
@@ -74,7 +74,7 @@ static inline int __Adeq_push_front(__Adeq* deq){
     int ret = 0;
     if(__a_unlikely(deq->offset == 0)){
         ret = __A2arr_add_blk_front(&deq->arr);
-        if(__a_unlikely(ret != 0)) return AEXC_alloc_failed;
+        if(__a_unlikely(ret != 0)) return AERR_alloc_failed;
         deq->offset = deq->arr.blk_size;
     }
     deq->offset--, deq->num++;
@@ -165,25 +165,23 @@ static inline void __Adeq_pop_front(__Adeq* deq){
     }                                                                               \
                                                                                     \
     static inline void __Adqf(T,pushBack)(ADeque(T)* self, const T obj){            \
-        aExcClean();                                                                \
-        T objx = A_COPY(T, obj); if(__a_unlikely(aExcOccur())){ return; }           \
+        aTry(T objx = A_COPY(T, obj);)aExc{ return; }                               \
         int ret = __Adeq_push_back(&self->deq); uint32_t i = self->deq.num - 1;     \
-        if(__a_unlikely(ret != 0)){ aExcSet(ret); A_DEST(T,objx); return; }         \
+        if(__a_unlikely(ret != 0)){ aErrSet(ret); A_DEST(T,objx); return; }         \
         *__Adqf(T,at)(self, i) = objx;                                              \
     }                                                                               \
                                                                                     \
     static inline void __Adqf(T,pushFront)(ADeque(T)* self, const T obj){           \
-        aExcClean();                                                                \
-        T objx = A_COPY(T, obj); if(__a_unlikely(aExcOccur())){ return; }           \
+        aTry(T objx = A_COPY(T, obj);)aExc{ return; }                               \
         int ret = __Adeq_push_front(&self->deq); uint32_t i = 0;                    \
-        if(__a_unlikely(ret != 0)){ aExcSet(ret); A_DEST(T,objx); return; }         \
+        if(__a_unlikely(ret != 0)){ aErrSet(ret); A_DEST(T,objx); return; }         \
         *__Adqf(T,at)(self, i) = objx;                                              \
     }                                                                               \
                                                                                     \
     static inline void __Adqf(T,popBack)(ADeque(T)* self, T* tar){                  \
         if(tar != nullptr) memset(tar, 0, sizeof(T));                               \
         uint32_t i = self->deq.num - 1;                                             \
-        if(__a_unlikely(self->deq.num == 0)){ aExcSet(AEXC_overstep); return; }     \
+        if(__a_unlikely(self->deq.num == 0)){ aErrSet(AERR_overstep); return; }     \
         T obj = *((T*)__Adeq_at(&self->deq, i)); __Adeq_pop_back(&self->deq);       \
         if(tar != nullptr) *tar = obj; else A_DEST(T, obj);                         \
     }                                                                               \
@@ -191,7 +189,7 @@ static inline void __Adeq_pop_front(__Adeq* deq){
     static inline void __Adqf(T,popFront)(ADeque(T)* self, T* tar){                 \
         if(tar != nullptr) memset(tar, 0, sizeof(T));                               \
         uint32_t i = 0;                                                             \
-        if(__a_unlikely(self->deq.num == 0)){ aExcSet(AEXC_overstep); return; }     \
+        if(__a_unlikely(self->deq.num == 0)){ aErrSet(AERR_overstep); return; }     \
         T obj = *((T*)__Adeq_at(&self->deq, i)); __Adeq_pop_front(&self->deq);      \
         if(tar != nullptr) *tar = obj; else A_DEST(T, obj);                         \
     }                                                                               \
@@ -247,9 +245,9 @@ static inline void __Adeq_pop_front(__Adeq* deq){
         self->f = that->f;                                                          \
         __Adeq_init(&self->deq, sizeof(T));                                         \
         for(uint32_t i = 0; i < that->deq.num; i++){                                \
-            aExcClean();                                                            \
-            __Adqf(T,pushBack)(self, *__Adqf(T,at)(that, i));                       \
-            if(aExcOccur()) return;                                                 \
+            aTry(__Adqf(T,pushBack)(self, *__Adqf(T,at)(that, i)); )aExc{           \
+                return;                                                             \
+            }                                                                       \
         }                                                                           \
     }                                                                               \
     __noused static inline int A_OBJ_CMPD(ADeque(T))                                \

@@ -30,7 +30,7 @@ static inline void My_class_print(const My_class* self){
     if(self != nullptr && self->s != nullptr){
         printf("My_class:%s\n", self->s);
     }else{
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         printf("nullptr\n");
     }
 }
@@ -84,7 +84,7 @@ static inline void My_class_sub_print(const My_class_sub* _self){
     if(self != nullptr && self->s != nullptr){
         printf("My_class_sub:%s\n", self->s);
     }else{
-        aExcSet(AEXC_nullptr);
+        aErrSet(AERR_nullptr);
         printf("nullptr\n");
     }
 }
@@ -111,17 +111,17 @@ A_CLASS_REGISTER(My_class_sub);
 
 int main(){
     RAII(My_class) my_class = A_INIT(My_class);
-    if(aExcOccur()){
+    if(aErrOccur()){
     }
 
     A_CALL(my_class).print(&my_class);
 
     RAII(My_class) my_class_1 = A_COPY(My_class, my_class);
-    if(aExcOccur()){
+    if(aErrOccur()){
     }
 
     RAII(My_class_sub) sub_class = A_INIT(My_class_sub);
-    if(aExcOccur()){
+    if(aErrOccur()){
     }
 
     //调用父类函数

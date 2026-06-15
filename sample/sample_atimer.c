@@ -38,8 +38,8 @@ int main(void) {
 
     int64_t once_id = a_timer_addwork_one(120, print_timer_event, &once);
     int64_t repeat_id = a_timer_addwork(80, 3, print_timer_event, &repeat);
-    if (aExcOccur() || once_id < 0 || repeat_id < 0) {
-        fprintf(stderr, "failed to schedule timer work: %d\n", aExcGet());
+    if (aErrOccur() || once_id < 0 || repeat_id < 0) {
+        fprintf(stderr, "failed to schedule timer work: %d\n", aErrGet());
         return 1;
     }
 

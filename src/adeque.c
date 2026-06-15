@@ -35,7 +35,7 @@ int __A2arr_add_cap_back(__A2arr* arr){
 
     char** p = alib_realloc(arr->data, cap * obj_size);
     if(__a_unlikely(p == nullptr)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
     arr->data = p, arr->cap = cap;
 
@@ -59,7 +59,7 @@ int __A2arr_add_cap_front(__A2arr* arr){
 
     char** p = alib_alloc(cap * obj_size);
     if(__a_unlikely(p == nullptr)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
 
     char** src = arr->data != nullptr ? (arr->data + arr->offset) : nullptr;
@@ -73,7 +73,7 @@ int __A2arr_add_cap_front(__A2arr* arr){
 }
 int __A2arr_sub_cap_back(__A2arr* arr){
     if(__a_unlikely(arr->cap == 0)){
-        return AEXC_overstep;
+        return AERR_overstep;
     }
 
     uint32_t cap = 0;
@@ -92,7 +92,7 @@ int __A2arr_sub_cap_back(__A2arr* arr){
 
     char** p = alib_realloc(arr->data, cap * obj_size);
     if(__a_unlikely(p == nullptr)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
     arr->data = p, arr->cap = cap;
 
@@ -100,7 +100,7 @@ int __A2arr_sub_cap_back(__A2arr* arr){
 }
 int __A2arr_sub_cap_front(__A2arr* arr){
     if(__a_unlikely(arr->cap == 0)){
-        return AEXC_overstep;
+        return AERR_overstep;
     }
 
     uint32_t cap = 0;
@@ -118,7 +118,7 @@ int __A2arr_sub_cap_front(__A2arr* arr){
 
     char** p = alib_realloc(arr->data, cap * obj_size);
     if(__a_unlikely(p == nullptr)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
     arr->data = p, arr->cap = cap, arr->offset = 0;
 
@@ -128,12 +128,12 @@ int __A2arr_sub_cap_front(__A2arr* arr){
 int __A2arr_add_blk_back (__A2arr* arr){
     uint32_t red = arr->cap - (arr->offset + arr->num);
     if(__a_unlikely(red == 0 && __A2arr_add_cap_back(arr) != 0)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
 
     char* p = alib_alloc(arr->size * arr->blk_size);
     if(p == nullptr){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
 
     arr->num++;
@@ -143,12 +143,12 @@ int __A2arr_add_blk_back (__A2arr* arr){
 int __A2arr_add_blk_front(__A2arr* arr){
     uint32_t red = arr->offset;
     if(__a_unlikely(red == 0 && __A2arr_add_cap_front(arr) != 0)){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
 
     char* p = alib_alloc(arr->size * arr->blk_size);
     if(p == nullptr){
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
 
     arr->offset--, arr->num++;

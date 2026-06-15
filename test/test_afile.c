@@ -20,15 +20,15 @@ static void test_mark(const char* name) {
 }
 
 static void expect_clean(void) {
-    if(aExcOccur()) {
-        fprintf(stderr, "unexpected exception: %d\n", aExcGet());
+    if(aErrOccur()) {
+        fprintf(stderr, "unexpected exception: %d\n", aErrGet());
     }
-    assert(!aExcOccur());
+    assert(!aErrOccur());
 }
 
 static void expect_error(void) {
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
 }
 
 static void make_path(char* out, size_t out_size, const char* dir, const char* name) {
@@ -220,8 +220,8 @@ static void test_file_object_io(const char* root) {
     make_path(missing, sizeof(missing), root, "missing.txt");
     {
         RAII(AFile) in = aFileInOpen(missing);
-        assert(aExcOccur());
-        aExcClean();
+        assert(aErrOccur());
+        aTry((void)0;)aExc{}
         assert(in.fd < 0);
     }
     assert(!af_isfile(missing));

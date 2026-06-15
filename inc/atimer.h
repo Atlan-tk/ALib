@@ -50,7 +50,7 @@ typedef struct{
 }AClock;
 __noused static inline void A_OBJ_INIT(AClock)(AClock* self){
    if(TIME_UTC != timespec_get(&self->clock, TIME_UTC)){
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
    }
 }
 __noused static inline void A_OBJ_COPY(AClock)(AClock* self, __noused const AClock* that){
@@ -80,7 +80,7 @@ static inline int64_t AClock_sDiff(AClock self, AClock that){
 }
 static inline void AClock_refresh(AClock* self){
    if(TIME_UTC != timespec_get(&self->clock, TIME_UTC)){
-        aExcSet(AEXC_system_error);
+        aErrSet(AERR_system_error);
    }
 }
 

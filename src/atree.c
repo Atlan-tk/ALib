@@ -47,7 +47,7 @@ static inline int __Astc_add_cap(__Astc* stc) {
     uint32_t cap = stc->cap != 0 ? stc->cap * 2 : 8;
     __AtrNode** p = alib_realloc(stc->p, sizeof(__AtrNode*) * cap);
     if (__a_unlikely(p == nullptr)) {
-        return AEXC_alloc_failed;
+        return AERR_alloc_failed;
     }
     stc->p = p;
     stc->cap = cap;
@@ -131,7 +131,7 @@ __AtrNode* __Atree_new_node(__Atree* tree, const void* data){
 
     __AtrNode_set_red(node);
     tree->copy(__AtrNode_get_data(node), data);
-    if(aExcOccur()){
+    if(aErrOccur()){
         alib_free(node); node = nullptr;
     }
     return node;
@@ -322,7 +322,7 @@ void __Atree_copy(__Atree* tree, const __Atree* that_tree){
 
         __AtrNode* new_node = __Atree_new_node(tree, __AtrNode_get_data(node));
         if(__a_unlikely(new_node == nullptr)){
-            ret = AEXC_alloc_failed;
+            ret = AERR_alloc_failed;
         }else{
             ret = __Atree_ins(tree, new_node);
         }
@@ -331,7 +331,7 @@ void __Atree_copy(__Atree* tree, const __Atree* that_tree){
     __Astc_dest(&stc);
 
     if(__a_unlikely(ret != 0)){
-        aExcSet(AEXC_init_failed);
+        aErrSet(AERR_init_failed);
     }
 }
 
@@ -381,7 +381,7 @@ __AtrNode* __Atree_at(const __Atree* tree, const void* data){
 static inline void __Atree_remove(__Atree* tree, __AtrNode* node, bool de);
 void __Atree_rm(__Atree* tree, __AtrNode* node){
     if(__a_unlikely(node == nullptr)){
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
         return;
     }
 
@@ -390,7 +390,7 @@ void __Atree_rm(__Atree* tree, __AtrNode* node){
 }
 static inline void __Atree_tk(__Atree* tree, __AtrNode* node){
     if(__a_unlikely(node == nullptr)){
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
         return;
     }
 
@@ -412,7 +412,7 @@ int __Atree_ins(__Atree* tree, __AtrNode* node){
     }
 
     if(__a_unlikely(ret != 0)){
-        aExcSet(AEXC_alloc_failed);
+        aErrSet(AERR_alloc_failed);
     }
 
     return ret;
@@ -422,7 +422,7 @@ static inline void __Atree_tk(__Atree* tree, __AtrNode* node);
 void __Atree_take(__Atree* tree, void* data){
     __AtrNode* node = __Atree_find(tree, data);
     if(__a_unlikely(node == nullptr)){
-        aExcSet(AEXC_overstep);
+        aErrSet(AERR_overstep);
         return;
     }
 

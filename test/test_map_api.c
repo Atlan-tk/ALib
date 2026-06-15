@@ -33,8 +33,8 @@ static AStr owned_string(const char *s) {
 static void test_atree_int_api(void) {
     RAII(ATree(int, int)) tr = A_INIT(ATree(int, int));
     assert(tr.f->at(&tr, 1) == NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
 
     tr.f->ins(&tr, 3, 30);
     tr.f->ins(&tr, 1, 10);
@@ -70,19 +70,19 @@ static void test_atree_int_api(void) {
     assert(taken == 200);
     assert(tr.f->getNumber(&tr) == 2);
     assert(tr.f->at(&tr, 2) == NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
 
     tr.f->rm(&tr, 42);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
 }
 
 static void test_ahash_int_api(void) {
     RAII(AHash(int, int)) hs = A_INIT(AHash(int, int));
     assert(hs.f->at(&hs, 1) == NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
 
     hs.f->ins(&hs, 1, 10);
     hs.f->ins(&hs, 2, 20);
@@ -130,12 +130,12 @@ static void test_ahash_int_api(void) {
     assert(taken == 200);
     assert(hs.f->getNumber(&hs) == 2);
     assert(hs.f->at(&hs, 2) == NULL);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
 
     hs.f->rm(&hs, 42);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
 }
 
 static void test_atree_astring_override(void) {

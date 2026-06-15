@@ -14,14 +14,14 @@ A_TYPE_REGISTER(ATree(AStr, AStr));
 
 static void test_atree_int(void) {
     RAII(ATree(int, int)) t = A_INIT(ATree(int, int));
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(t.f->empty(&t));
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 插入 */
     for (int i = 0; i < 10; i++) {
         t.f->ins(&t, i, i * 10);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(t.f->getNumber(&t) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -36,7 +36,7 @@ static void test_atree_int(void) {
 
     /* 拷贝 */
     RAII(ATree(int, int)) t2 = A_COPY(ATree(int, int), t);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(t2.f->getNumber(&t2) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
     for (int i = 0; i < 10; i++) {
@@ -55,22 +55,22 @@ static void test_atree_int(void) {
 
     /* 删除 */
     t.f->rm(&t, 5);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(t.f->at(&t, 5) == NULL);
     assert(t.f->getNumber(&t) == 9);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 删除不存在的键应产生异常 */
     t.f->rm(&t, 5);
-    assert(aExcOccur());
-    aExcClean();
+    assert(aErrOccur());
+    aTry((void)0;)aExc{}
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 大量数据 */
     RAII(ATree(int, int)) big = A_INIT(ATree(int, int));
     for (int i = 0; i < 600; i++) {
         big.f->ins(&big, i, i + 100);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(big.f->getNumber(&big) == 600);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -86,7 +86,7 @@ static void test_atree_int(void) {
 
 static void test_atree_astring(void) {
     RAII(ATree(AStr, AStr)) t = A_INIT(ATree(AStr, AStr));
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     for (int i = 0; i < 10; i++) {
@@ -102,14 +102,14 @@ static void test_atree_astring(void) {
             AStr_addBack(&v, tv.s);
         }
         t.f->ins(&t, k, v);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(t.f->getNumber(&t) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 拷贝 */
     RAII(ATree(AStr, AStr)) t2 = A_COPY(ATree(AStr, AStr), t);
-    assert(!aExcOccur());
+    assert(!aErrOccur());
     assert(t2.f->getNumber(&t2) == 10);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
@@ -121,7 +121,7 @@ static void test_atree_astring(void) {
             AStr_addBack(&delkey, tmp.s);
         }
         t.f->rm(&t, delkey);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
@@ -150,7 +150,7 @@ static void test_atree_astring(void) {
             AStr_addBack(&v, tv.s);
         }
         big.f->ins(&big, k, v);
-        assert(!aExcOccur());
+        assert(!aErrOccur());
     }
     assert(big.f->getNumber(&big) == 600);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
