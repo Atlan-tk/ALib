@@ -119,8 +119,8 @@ static inline void __Aarr_pop_back(__Aarr* arr){
     static inline void __Alnf(T, iter_next)(AIter(ALine(T))* it);                       \
     static inline void __Alnf(T, iter_prev)(AIter(ALine(T))* it);                       \
     static inline void __A_OBJ_DEST_FUNC_SELF(ALine(T))(ALine(T)*);                     \
-    static inline void __A_OBJ_INIT_FUNC_SELF(ALine(T))(ALine(T)*);                     \
-    static inline void __A_OBJ_COPY_FUNC_SELF(ALine(T))(ALine(T)*, const ALine(T)*);    \
+    static inline bool __A_OBJ_INIT_FUNC_SELF(ALine(T))(ALine(T)*);                     \
+    static inline bool __A_OBJ_COPY_FUNC_SELF(ALine(T))(ALine(T)*, const ALine(T)*);    \
     static inline int __A_OBJ_CMPD_FUNC_SELF(ALine(T))(const ALine(T)*,const ALine(T)*);\
                                                                                         \
     static const A_FUNC(ALine(T)) A_FUNC_TAB(ALine(T)) = {                              \
@@ -144,7 +144,7 @@ static inline void __Aarr_pop_back(__Aarr* arr){
 
 #define ALine_Generate(T)                                                               \
     static inline T* __Alnf(T,at)(const ALine(T)* self, uint32_t i){                    \
-        if(__a_unlikely(self->arr.num == 0)){ aErrSet(AERR_overstep); return nullptr; } \
+        if(__a_unlikely(self->arr.num == 0)){ return nullptr; }                         \
         if(__a_unlikely(i >= self->arr.num)) i = self->arr.num - 1 ;                    \
         return &(self->p[i]);                                                           \
     }                                                                                   \

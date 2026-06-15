@@ -26,8 +26,7 @@ static void test_aqueue_int(void) {
     assert(qu.f->getNumber(&qu) == 0);
 
     assert(qu.f->at(&qu, 0) == NULL);
-    assert(aErrOccur());
-    aTry((void)0;)aExc{}
+    assert(!aErrOccur());
 
     for (int i = 1; i <= 5; ++i) {
         qu.f->push(&qu, i);

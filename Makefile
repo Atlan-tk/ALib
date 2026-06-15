@@ -50,7 +50,7 @@ disclean:
 
 $(BUILD):
 	mkdir -p $(BUILD) $(OUTDIR) $(INCLUDE)
-	ln -s $(ALIB)inc $(INCLUDE)alib
+	ln -sfn $(ALIB)inc $(INCLUDE)alib
 
 install: $(TARLIB) $(INSTALL_LIB) $(INSTALL_INC)
 	cp $(ALIB)inc/*.h $(INSTALL_INC)
@@ -67,4 +67,3 @@ $(INSTALL_INC):
 
 $(TARLIB): $(BUILD)
 	$(MAKE) -C $(ALIB)src DIR=$(ALIB)src/
-

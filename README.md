@@ -257,7 +257,7 @@ out.f->write(&out, n, buf);
 
 ## 需要特别注意的语义
 
-- `AStr_new()` 只是“包装已有 `char*`”，不会立刻拷贝；传入栈缓冲区或临时内存时，必须在其失效前复制到一个真正拥有内存的对象。`AStr` 的字符级能力仅适合 UTF-8 字符串；GBK、UTF-16、UTF-32 等非 UTF-8 内容只适合作为字节串存储。UTF-16/UTF-32 转换结果可能包含内嵌 `\0`，长度应看 `AStr.number`。
+- `AStr_new()` 只是“包装已有 `char*`”，不会立刻拷贝；传入栈缓冲区或临时内存时，必须在其失效前复制到一个真正拥有内存的对象。`AStr` 的字符级能力仅适合 UTF-8 字符串；GBK、UTF-16、UTF-32 等非 UTF-8 内容只适合作为字节串存储。UTF-16/UTF-32 转换结果可能包含内嵌 `\0`，长度应看 `AStr.length` 或 `AStr_len(&str)`。
 - `AFile` 是 POSIX-only 值对象，推荐配合 `RAII(AFile)` 使用；同一个 `AFile*` 不应和 `AFile_close()` 并发使用。
 - `AFile` 的 IO 线程安全/进程安全语义建立在所有参与方都通过 ALib 的 `AFile` API 打开和读写同一路径的前提上；绕过 ALib 直接使用 POSIX fd、`FILE*` 或其他库访问同一文件时，ALib 无法协调这些外部操作。
 - `af_*` 文件系统工具函数只在当前进程内使用全局锁串行化调用，不保证跨进程安全；如果其他进程同时移动、删除、复制或 chmod 同一路径，调用方需要自行协调。
@@ -265,7 +265,7 @@ out.f->write(&out, n, buf);
 - `aFileInOpen()` 不创建不存在的文件；`aFileOutOpen()` 会截断普通文件；`aFileEndOpen()` 只追加。
 - `AFile_open(self, type, name, mod)` 是低层入口：`type` 使用 `__aftype_file`、`__aftype_device` 或 `__aftype_socket`，`mod` 使用 `__afmod_read/write/creat/appent/truncate/noblock/exclusive` 位组合。
 - `sample/sample_afile_socket.c` 是长期运行的 TCP 回显示例，服务端和客户端会循环收发 `hello` / `yes`，需要手动停止；它不是自动退出型测试。
-- 顺序容器的 `at(index)` 在“容器非空但 index 越界”时，通常会截断到尾元素；只有空容器访问才会设置 `AERR_overstep`。
+- 顺序容器的 `at(index)` 在空容器上返回 `NULL` 且不设置异常；容器非空但 `index` 越界时，通常会截断到尾元素。
 - `AHash(K,V)` 和 `ATree(K,V)` 的 `ins()` 是 upsert 语义：同键再次插入会替换已有值。
 - `a_signal_connection(id, addressee, call)` 对同一个 `(id, addressee)` 重复连接时，会覆盖原有回调，而不是忽略此次连接。
 - `AHash(K,V)` 的遍历顺序依赖桶布局与插入路径，不应把它当成稳定顺序容器。

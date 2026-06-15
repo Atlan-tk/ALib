@@ -26,8 +26,7 @@ static void test_astack_int(void) {
     assert(st.f->getNumber(&st) == 0);
 
     assert(st.f->at(&st, 0) == NULL);
-    assert(aErrOccur());
-    aTry((void)0;)aExc{}
+    assert(!aErrOccur());
 
     for (int i = 1; i <= 5; ++i) {
         st.f->push(&st, i);

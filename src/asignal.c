@@ -371,14 +371,18 @@ typedef struct{
     AHash(const_ptr_t,ASignalRadio)     adMap;
 }ASignalSystem;
 __noused static inline void A_OBJ_INIT(ASignalSystem)(ASignalSystem* self){
-    aErrClean();
-    atomic_store_explicit(&self->count, 1, memory_order_relaxed);
-    self->linkPool = A_INIT(AList(ASignalLink));
-    if(aErrOccur()) return;
-    self->idMap = A_INIT(AHash(int64_t, ASignalTower));
-    if(aErrOccur()) return;
-    self->adMap = A_INIT(AHash(const_ptr_t,ASignalRadio));
-    if(aErrOccur()) return;
+    aTry(atomic_store_explicit(&self->count, 1, memory_order_relaxed);)aExc{
+        return;
+    }
+    aTry(self->linkPool = A_INIT(AList(ASignalLink));)aExc{
+        return;
+    }
+    aTry(self->idMap = A_INIT(AHash(int64_t, ASignalTower));)aExc{
+        return;
+    }
+    aTry(self->adMap = A_INIT(AHash(const_ptr_t,ASignalRadio));)aExc{
+        return;
+    }
 }
 __noused static inline void A_OBJ_DEST(ASignalSystem)(ASignalSystem* self){
     atomic_store_explicit(&self->count, 0, memory_order_relaxed);
@@ -414,12 +418,8 @@ static inline ASignalRadio* ASignalSystem_find_forad(const ASignalSystem* self, 
         return nullptr;
     }
 
-    aErrClean();
     auto map = &self->adMap;
     auto radio = map->f->at(map, addressee);
-    if(aErrOccur() && aErrGet() == AERR_overstep){
-        aErrClean();
-    }
     return radio;
 }
 static inline ASignalTower* ASignalSystem_find_forid(const ASignalSystem* self, int64_t id){
@@ -432,12 +432,8 @@ static inline ASignalTower* ASignalSystem_find_forid(const ASignalSystem* self, 
         return nullptr;
     }
 
-    aErrClean();
     auto map = &self->idMap;
     auto tower = map->f->at(map, id);
-    if(aErrOccur() && aErrGet() == AERR_overstep){
-        aErrClean();
-    }
     return tower;
 }
 static inline ASignalLink* ASignalSystem_find(const ASignalSystem* self, int64_t id, const void* addressee){
@@ -477,35 +473,28 @@ static inline void ASignalSystem_add(ASignalSystem* self, int64_t id, const void
         return;
     }
 
-    aErrClean();
-
     auto idmap = &self->idMap;
     auto admap = &self->adMap;
-
     auto tower = idmap->f->at(idmap, id);
     if(tower == nullptr){
-        RAII(ASignalTower) x = A_INIT(ASignalTower);
-        if(aErrOccur()){
+        aTry(RAII(ASignalTower) x = A_INIT(ASignalTower);)aExc{
             return;
         }
         x.id = id;
 
-        idmap->f->ins(idmap, id, x);
-        if(aErrOccur()){
+        aTry(idmap->f->ins(idmap, id, x);)aExc{
             return;
         }
         tower = idmap->f->at(idmap, id);
     }
     auto radio = admap->f->at(admap, addressee);
     if(radio == nullptr){
-        RAII(ASignalRadio) x = A_INIT(ASignalRadio);
-        if(aErrOccur()){
+        aTry(RAII(ASignalRadio) x = A_INIT(ASignalRadio);)aExc{
             return;
         }
         x.addressee = addressee;
 
-        admap->f->ins(admap, addressee, x);
-        if(aErrOccur()){
+        aTry(admap->f->ins(admap, addressee, x);)aExc{
             return;
         }
         radio = admap->f->at(admap, addressee);
@@ -513,8 +502,7 @@ static inline void ASignalSystem_add(ASignalSystem* self, int64_t id, const void
 
     auto pool = &self->linkPool;
     {
-        pool->f->pushFront(pool, (ASignalLink){ .id = id, .addressee = addressee, .call = call });
-        if(aErrOccur()){
+        aTry(pool->f->pushFront(pool, (ASignalLink){ .id = id, .addressee = addressee, .call = call });)aExc{
             return;
         }
         link = pool->f->at(pool, 0);
@@ -687,29 +675,23 @@ static thread_local int  a_call_num = 0;
 static ASignalSystem a_signal_system;
 
 bool a_signal_system_start(void){
-    aErrClean();
-
-    a_call_lock = A_INIT(AMtxRW);
-    if(aErrOccur()){
+    aTry(a_call_lock = A_INIT(AMtxRW);)aExc{
         return false;
     }
 
-    a_global_lock = A_INIT(AMtxRW);
-    if(aErrOccur()){
+    aTry(a_global_lock = A_INIT(AMtxRW);)aExc{
         A_DEST(AMtxRW, a_call_lock);
         return false;
     }
 
-    a_signal_system = A_INIT(ASignalSystem);
-
-    if(aErrOccur()){
+    aTry(a_signal_system = A_INIT(ASignalSystem);)aExc{
         A_DEST(AMtxRW, a_global_lock);
         A_DEST(AMtxRW, a_call_lock);
         a_system_flag = false;
-    }else{
-        a_system_flag = true;
+        return false;
     }
 
+    a_system_flag = true;
     return a_system_flag;
 }
 void a_signal_system_poweroff(void){

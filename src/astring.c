@@ -21,7 +21,7 @@ static inline uint32_t AStr_calCap(uint32_t cap){
 static inline int AStr_ensure_writable(AStr* self) {
     if(__a_likely(self->noLiteral)) return 0;
 
-    uint32_t new_cap = self->number + 1;  /* 至少容纳字符和'\0' */
+    uint32_t new_cap = self->length + 1;  /* 至少容纳字符和'\0' */
     new_cap = AStr_calCap(new_cap);
 
     char* new_s = alib_alloc(new_cap);
@@ -30,9 +30,9 @@ static inline int AStr_ensure_writable(AStr* self) {
     }
 
     if(__a_likely(self->s != nullptr)){
-        memcpy(new_s, self->s, self->number);
+        memcpy(new_s, self->s, self->length);
     }
-    new_s[self->number] = '\0';
+    new_s[self->length] = '\0';
 
     self->s = new_s;
     self->noLiteral = true;
@@ -56,9 +56,9 @@ static inline int AStr_grow(AStr* self, uint32_t new_cap) {
 
 /* 收缩容量（假设已可写） */
 static int AStr_sub(AStr* self) {
-    if (__a_likely(self->number + 1 >= (self->capacity + 1) / 2)) return 0;
+    if (__a_likely(self->length + 1 >= (self->capacity + 1) / 2)) return 0;
 
-    uint32_t new_cap = self->number + 1;
+    uint32_t new_cap = self->length + 1;
     new_cap = AStr_calCap(new_cap);
 
     char * new_s = alib_realloc(self->s, new_cap);
@@ -70,20 +70,20 @@ static int AStr_sub(AStr* self) {
 }
 
 
-/* ---------- 虚函数实现 ---------- */
-char AStr_at(AStr* self, uint32_t index) {
+
+char AStr_at(const AStr* self, uint32_t index) {
     if(__a_unlikely(self == nullptr)){
         aErrSet(AERR_nullptr);
         return 0;
     }
 
-    if(__a_unlikely(self->number == 0)){
+    if(__a_unlikely(self->length == 0)){
         aErrSet(AERR_overstep);
         return 0;
     }
 
-    if (__a_unlikely(index >= self->number)) {
-        index = self->number - 1;
+    if (__a_unlikely(index >= self->length)) {
+        index = self->length - 1;
     }
 
     char ch = self->s[index];
@@ -96,13 +96,13 @@ void AStr_set(AStr* self, uint32_t index, char ch) {
         return;
     }
 
-    if(__a_unlikely(self->number == 0)){
+    if(__a_unlikely(self->length == 0)){
         aErrSet(AERR_overstep);
         return;
     }
 
-    if (__a_unlikely(index >= self->number)) {
-        index = self->number - 1;
+    if (__a_unlikely(index >= self->length)) {
+        index = self->length - 1;
     }
 
     self->s[index] = ch;
@@ -114,13 +114,13 @@ void AStr_rm(AStr* self, uint32_t index) {
         return;
     }
 
-    if(__a_unlikely(self->number == 0)){
+    if(__a_unlikely(self->length == 0)){
         aErrSet(AERR_overstep);
         return;
     }
 
-    if (__a_unlikely(index >= self->number)) {
-        index = self->number - 1;
+    if(__a_unlikely(index >= self->length)){
+        return;
     }
 
     int ret = AStr_ensure_writable(self);
@@ -129,8 +129,8 @@ void AStr_rm(AStr* self, uint32_t index) {
         return;
     }
 
-    memmove(self->s + index, self->s + index + 1, self->number - index);
-    self->number--;
+    memmove(self->s + index, self->s + index + 1, self->length - index);
+    self->length--;
     AStr_sub(self);
 }
 
@@ -140,8 +140,8 @@ void AStr_ins(AStr* self, uint32_t index, char c) {
         return;
     }
 
-    if (__a_unlikely(index > self->number)) {
-        index = self->number;
+    if(__a_unlikely(index > self->length)){
+        index = self->length;
     }
 
     int ret = AStr_ensure_writable(self);
@@ -150,22 +150,22 @@ void AStr_ins(AStr* self, uint32_t index, char c) {
         return;
     }
 
-    ret = AStr_grow(self, self->number + 2);
+    ret = AStr_grow(self, self->length + 2);
     if(ret != 0){
         aErrSet(AERR_alloc_failed);
         return;
     }
 
-    if(__a_unlikely(self->number == 0)){
+    if(__a_unlikely(self->length == 0)){
         self->s[1] = '\0';
     }else{
-        memmove(self->s + index + 1, self->s + index, self->number - index + 1);
+        memmove(self->s + index + 1, self->s + index, self->length - index + 1);
     }
-    self->s[index] = c, self->number++;
+    self->s[index] = c, self->length++;
 }
 
 void AStr_pushBack(AStr* self, char c) {
-    AStr_ins(self, self->number, c);
+    AStr_ins(self, self->length, c);
 }
 
 void AStr_pushFront(AStr* self, char c) {
@@ -178,7 +178,7 @@ char AStr_popBack(AStr* self) {
         return 0;
     }
 
-    if (__a_unlikely(self->number == 0)) {
+    if (__a_unlikely(self->length == 0)) {
         aErrSet(AERR_overstep);
         return '\0';
     }
@@ -188,9 +188,9 @@ char AStr_popBack(AStr* self) {
         return '\0';
     }
 
-    char c = self->s[self->number - 1];
-    self->s[self->number - 1] = '\0';
-    self->number--;
+    char c = self->s[self->length - 1];
+    self->s[self->length - 1] = '\0';
+    self->length--;
     AStr_sub(self);
 
     return c;
@@ -202,7 +202,7 @@ char AStr_popFront(AStr* self) {
         return 0;
     }
 
-    if (__a_unlikely(self->number == 0)) {
+    if (__a_unlikely(self->length == 0)) {
         aErrSet(AERR_overstep);
         return '\0';
     }
@@ -213,8 +213,8 @@ char AStr_popFront(AStr* self) {
     }
 
     char c = self->s[0];
-    memmove(self->s, self->s + 1, self->number);
-    self->number--;
+    memmove(self->s, self->s + 1, self->length);
+    self->length--;
     AStr_sub(self);
 
     return c;
@@ -233,14 +233,14 @@ void AStr_addBack(AStr* self, const char* s) {
         return;
     }
 
-    ret = AStr_grow(self, self->number + len + 1);
+    ret = AStr_grow(self, self->length + len + 1);
     if(ret != 0){
         aErrSet(AERR_alloc_failed);
         return;
     }
 
-    memcpy(self->s + self->number, s, len + 1);
-    self->number += len;
+    memcpy(self->s + self->length, s, len + 1);
+    self->length += len;
 }
 
 void AStr_addFront(AStr* self, const char* s) {
@@ -256,15 +256,15 @@ void AStr_addFront(AStr* self, const char* s) {
         return;
     }
 
-    ret = AStr_grow(self, self->number + len + 1);
+    ret = AStr_grow(self, self->length + len + 1);
     if(ret != 0){
         aErrSet(AERR_alloc_failed);
         return;
     }
 
-    memmove(self->s + len, self->s, self->number + 1);
+    memmove(self->s + len, self->s, self->length + 1);
     memcpy(self->s, s, len);
-    self->number += len;
+    self->length += len;
 }
 
 void AStr_truncate(AStr* self, uint32_t index) {
@@ -273,12 +273,12 @@ void AStr_truncate(AStr* self, uint32_t index) {
         return;
     }
 
-    if (__a_unlikely(self->number == 0)) {
+    if (__a_unlikely(self->length == 0)) {
         aErrSet(AERR_overstep);
         return;
     }
 
-    if(__a_unlikely(index >= self->number)){
+    if(__a_unlikely(index >= self->length)){
         return;
     }
 
@@ -288,12 +288,12 @@ void AStr_truncate(AStr* self, uint32_t index) {
         return;
     }
 
-    self->number = index, self->s[index] = '\0';
+    self->length = index, self->s[index] = '\0';
     AStr_sub(self);
 }
 
 int AStr_reCap(AStr* self, uint32_t new_cap){
-    if(__a_unlikely(new_cap < self->number + 1)){
+    if(__a_unlikely(new_cap < self->length + 1)){
         return AERR_overstep;
     }
 
@@ -312,6 +312,115 @@ uint32_t A_OBJ_HASH(AStr)(const AStr* self){
         return 0;
     }
     return alib_hash_str(self->s);
+}
+
+void AStr_insStr(AStr* self, uint32_t index, const char* s){
+    if(__a_unlikely(self == nullptr || s == nullptr)){
+        aErrSet(AERR_nullptr);
+        return;
+    }
+
+    if(__a_unlikely(index > self->length)){
+        index = self->length;
+    }
+
+    int ret = AStr_ensure_writable(self);
+    if(ret != 0){
+        aErrSet(AERR_alloc_failed);
+        return;
+    }
+    int n = strlen(s);
+
+    ret = AStr_grow(self, self->length + n + 1);
+    if(ret != 0){
+        aErrSet(AERR_alloc_failed);
+        return;
+    }
+
+    if(__a_unlikely(self->length != 0)){
+        memmove(self->s + index + n, self->s + index, self->length + 1 - index);
+    }
+    memcpy(self->s + index, s, n);
+    self->length += n; self->s[self->length] = 0;
+}
+
+void AStr_rmStr(AStr* self, uint32_t index, uint32_t n){
+    if(__a_unlikely(self == nullptr)){
+        aErrSet(AERR_nullptr);
+        return;
+    }
+
+    if(__a_unlikely(self->length == 0)){
+        aErrSet(AERR_overstep);
+        return;
+    }
+
+    if(__a_unlikely(index >= self->length)){
+        return;
+    }
+
+    if(__a_unlikely(index + n > self->length)){
+        n = self->length - index;
+    }
+
+    int ret = AStr_ensure_writable(self);
+    if(ret != 0){
+        aErrSet(AERR_alloc_failed);
+        return;
+    }
+
+    memmove(self->s + index, self->s + index + n, self->length + 1 - (index + n));
+    self->length -= n; self->s[self->length] = '\0';
+    AStr_sub(self);
+}
+
+static uint32_t autf8_len(const char* s);
+char*AStr_u8at(const AStr* self, uint32_t index){
+    if(__a_unlikely(self == nullptr)){
+        aErrSet(AERR_nullptr);
+        return nullptr;
+    }
+    char* s = self->s; uint32_t x = 0;
+    for(uint32_t n = 0; n < index && x < self->length; n++){
+        aTry(x += autf8_len(s + x);)aExc{
+            return nullptr;
+        }
+    }
+    s += x;
+
+    return s;
+}
+void AStr_u8rm(AStr* self, uint32_t index){
+    if(__a_unlikely(self == nullptr)){
+        aErrSet(AERR_nullptr);
+        return;
+    }
+    char* s = self->s; uint32_t x = 0;
+    for(uint32_t n = 0; n < index && x < self->length; n++){
+        aTry(x += autf8_len(s + x);)aExc{
+            return;
+        }
+    }
+    s += x;
+
+    AStr_rmStr(self, x, autf8_len(s));
+}
+void AStr_u8ins(AStr* self, uint32_t index, const char* ch){
+    if(__a_unlikely(self == nullptr || ch == nullptr)){
+        aErrSet(AERR_nullptr);
+        return;
+    }
+    char* s = self->s; uint32_t x = 0;
+    for(uint32_t n = 0; n < index && x < self->length; n++){
+        aTry(x += autf8_len(s + x);)aExc{
+            return;
+        }
+    }
+    s += x;
+
+    for(uint32_t i = 0 ; i < autf8_len(ch); i++){
+        AStr_ins(self, x + i, ch[i]);
+    }
 }
 
 
@@ -355,14 +464,30 @@ static inline uint32_t autf8_len(const char* s){
         return 0;
     }
 
-    unsigned char c = (unsigned char)*s;
-    if (c <= 0x7F) return 1;                // 0xxxxxxx
-    if (c >= 0xC0 && c <= 0xDF) return 2;   // 110xxxxx
-    if (c >= 0xE0 && c <= 0xEF) return 3;   // 1110xxxx
-    if (c >= 0xF0 && c <= 0xF7) return 4;   // 11110xxx
+    uint32_t len = strlen(s);
+    if(len == 0) return 0;
 
-    aErrSet(AERR_outdomain);
-    return 0;
+    unsigned char c = (unsigned char)*s;
+    uint32_t n = 0;
+    if (c <= 0x7F){
+        n = 1;                // 0xxxxxxx
+    }else if (c >= 0xC0 && c <= 0xDF){
+        n = 2;   // 110xxxxx
+    }else if (c >= 0xE0 && c <= 0xEF){
+        n = 3;   // 1110xxxx
+    }else if (c >= 0xF0 && c <= 0xF7){
+        n = 4;   // 11110xxx
+    }else{
+        aErrSet(AERR_outdomain);
+        return 0;
+    }
+
+    if(len < n){
+        aErrSet(AERR_outdomain);
+        return 0;
+    }
+
+    return n;
 }
 
 /* 计算u8字符数 */

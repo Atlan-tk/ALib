@@ -22,11 +22,11 @@ A_TYPE_REGISTER(Achar);
 typedef struct{
     char* s;
     bool noLiteral;     //是否为字面量, false指向字面量
-    uint32_t number;    //字符数量，不包括\0
+    uint32_t length;    //字符数量，不包括\0
     uint32_t capacity;
 }AStr;
 
-char AStr_at(AStr* self, uint32_t index);
+char AStr_at(const AStr* self, uint32_t index);
 void AStr_rm(AStr* self, uint32_t index);
 void AStr_set(AStr* self, uint32_t index, char c);
 void AStr_ins(AStr* self, uint32_t index, char c);
@@ -34,17 +34,33 @@ void AStr_pushBack(AStr* self, char c);
 void AStr_pushFront(AStr* self, char c);
 char AStr_popBack(AStr* self);
 char AStr_popFront(AStr* self);
-void AStr_addBack(AStr* self, const char* s);
-void AStr_addFront(AStr* self, const char* s);
-void AStr_truncate(AStr* self, uint32_t index);
 int  AStr_reCap(AStr* self, uint32_t new_cap);
 
-__noused static uint32_t AStr_getNumber(const AStr* self){
+void AStr_addBack(AStr* self, const char* s);
+void AStr_addFront(AStr* self, const char* s);
+void AStr_insStr(AStr* self, uint32_t index, const char* s);
+void AStr_rmStr(AStr* self, uint32_t index, uint32_t n);
+void AStr_truncate(AStr* self, uint32_t index);
+
+char*AStr_u8at(const AStr* self, uint32_t index);
+void AStr_u8rm(AStr* self, uint32_t index);
+void AStr_u8ins(AStr* self, uint32_t index, const char* ch);
+
+uint32_t autf8_num(const char* s);
+__noused static uint32_t AStr_u8num(const AStr* self){
     if(__a_unlikely(self == nullptr)){
         aErrSet(AERR_nullptr);
         return 0;
     }
-    return self->number;
+    return autf8_num(self->s);
+}
+
+__noused static uint32_t AStr_len(const AStr* self){
+    if(__a_unlikely(self == nullptr)){
+        aErrSet(AERR_nullptr);
+        return 0;
+    }
+    return self->length;
 }
 __noused static uint32_t AStr_getCapacity(const AStr* self){
     if(__a_unlikely(self == nullptr)){
@@ -58,7 +74,7 @@ __noused static bool AStr_empty(const AStr* self){
         aErrSet(AERR_nullptr);
         return true;
     }
-    return self->number == 0;
+    return self->length == 0;
 }
 
 __noused static inline void A_OBJ_INIT(AStr)(AStr* self) {
@@ -73,19 +89,19 @@ __noused static inline void A_OBJ_DEST(AStr)(AStr* self) {
 
 __noused static inline void A_OBJ_COPY(AStr)(AStr* self, const AStr* that) {
     if (that->noLiteral) {
-        int ret = AStr_reCap(self, that->number + 1);
+        int ret = AStr_reCap(self, that->length + 1);
         if(ret != 0){
             aErrSet(AERR_init_failed);
             return;
         }
-        memcpy(self->s, that->s, that->number + 1);
-        self->number = that->number;
+        memcpy(self->s, that->s, that->length + 1);
+        self->length = that->length;
     } else {
         self->s = that->s;
         self->capacity = 0;
     }
 
-    self->number = that->number;
+    self->length = that->length;
     self->noLiteral = that->noLiteral;
 }
 
@@ -108,7 +124,7 @@ A_TYPE_REGISTER(AStr);
 static inline AStr AStr_new(const char* s){
     return  (AStr){
         .s = (char*)s,
-        .number = s ? strlen(s) : 0,
+        .length = s ? strlen(s) : 0,
         .noLiteral = false,
         .capacity = 0,
     };

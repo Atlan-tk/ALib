@@ -72,7 +72,6 @@ int __Alist_cmpd(const __Alist* list, const __Alist* that_list){
 
 static inline __AlsNode* __Alist_at_node(const __Alist* list, uint32_t index){
     if(__a_unlikely(list->num == 0)){
-        aErrSet(AERR_overstep);
         return nullptr;
     }
 

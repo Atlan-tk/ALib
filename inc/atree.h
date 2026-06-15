@@ -91,8 +91,8 @@ void      __Atree_take(__Atree* tree, void* data);
     static inline void     __Atrf(TK,TV,iter_prev)(AIter(ATree(TK,TV))* it);                    \
     static inline TK       __Atrf(TK,TV,iter_getk)(AIter(ATree(TK,TV)) it);                     \
     static inline void __A_OBJ_DEST_FUNC_SELF(ATree(TK,TV))(ATree(TK,TV)*);                     \
-    static inline void __A_OBJ_INIT_FUNC_SELF(ATree(TK,TV))(ATree(TK,TV)*);                     \
-    static inline void __A_OBJ_COPY_FUNC_SELF(ATree(TK,TV))(ATree(TK,TV)*, const ATree(TK,TV)*);     \
+    static inline bool __A_OBJ_INIT_FUNC_SELF(ATree(TK,TV))(ATree(TK,TV)*);                     \
+    static inline bool __A_OBJ_COPY_FUNC_SELF(ATree(TK,TV))(ATree(TK,TV)*, const ATree(TK,TV)*);     \
     static inline int __A_OBJ_CMPD_FUNC_SELF(ATree(TK,TV))(const ATree(TK,TV)*,const ATree(TK,TV)*); \
                                                                                                 \
     static const A_FUNC(ATree(TK,TV)) A_FUNC_TAB(ATree(TK,TV)) = {                              \
@@ -131,7 +131,7 @@ void      __Atree_take(__Atree* tree, void* data);
     /******************************************************************************************/\
     static inline TV* __Atrf(TK,TV,at)(const ATree(TK,TV)* self, const TK k){                   \
         __AtrNode* node = __Atree_at(&self->tree, (const void*)&k);                             \
-        if(__a_unlikely(node == nullptr)){ aErrSet(AERR_overstep); return nullptr; }            \
+        if(__a_unlikely(node == nullptr)){ return nullptr; }                                    \
         return &(((__Atr_data(TK,TV)*)&(node->data[0]))->v);                                    \
     }                                                                                           \
     static inline void __Atrf(TK,TV,rm)(ATree(TK,TV)* self, const TK k){                        \

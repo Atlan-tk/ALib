@@ -59,8 +59,8 @@ extern "C" {
     static inline void __Asqf(T, iter_next)(AIter(ASortque(T))* it);                    \
     static inline void __Asqf(T, iter_prev)(AIter(ASortque(T))* it);                    \
     static inline void __A_OBJ_DEST_FUNC_SELF(ASortque(T))(ASortque(T)*);               \
-    static inline void __A_OBJ_INIT_FUNC_SELF(ASortque(T))(ASortque(T)*);               \
-    static inline void __A_OBJ_COPY_FUNC_SELF(ASortque(T))(ASortque(T)*, const ASortque(T)*);    \
+    static inline bool __A_OBJ_INIT_FUNC_SELF(ASortque(T))(ASortque(T)*);               \
+    static inline bool __A_OBJ_COPY_FUNC_SELF(ASortque(T))(ASortque(T)*, const ASortque(T)*);    \
     static inline int __A_OBJ_CMPD_FUNC_SELF(ASortque(T))(const ASortque(T)*,const ASortque(T)*);\
                                                                                         \
     static const A_FUNC(ASortque(T)) A_FUNC_TAB(ASortque(T)) = {                        \
@@ -135,7 +135,7 @@ extern "C" {
     }                                                                                   \
                                                                                         \
     static inline T* __Asqf(T,at)(const ASortque(T)* self, uint32_t i){                 \
-        if(__a_unlikely(self->arr.num == 0)){ aErrSet(AERR_overstep); return nullptr; } \
+        if(__a_unlikely(self->arr.num == 0)){ return nullptr; }                         \
         if(__a_unlikely(i >= self->arr.num)) i = self->arr.num - 1 ;                    \
         return &(self->p[i]);                                                           \
     }                                                                                   \
@@ -242,4 +242,3 @@ extern "C" {
 #endif /* __cplusplus */
 
 #endif /* __asortque_h__ */
-

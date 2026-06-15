@@ -52,8 +52,8 @@ extern "C" {
     static inline void __Ascf(T, iter_next)(AIter(AStack(T))* it);                  \
     static inline void __Ascf(T, iter_prev)(AIter(AStack(T))* it);                  \
     static inline void __A_OBJ_DEST_FUNC_SELF(AStack(T))(AStack(T)*);               \
-    static inline void __A_OBJ_INIT_FUNC_SELF(AStack(T))(AStack(T)*);               \
-    static inline void __A_OBJ_COPY_FUNC_SELF(AStack(T))(AStack(T)*, const AStack(T)*);     \
+    static inline bool __A_OBJ_INIT_FUNC_SELF(AStack(T))(AStack(T)*);               \
+    static inline bool __A_OBJ_COPY_FUNC_SELF(AStack(T))(AStack(T)*, const AStack(T)*);     \
     static inline int __A_OBJ_CMPD_FUNC_SELF(AStack(T))(const AStack(T)*,const AStack(T)*); \
                                                                                     \
     static const A_FUNC(AStack(T)) A_FUNC_TAB(AStack(T)) = {                        \

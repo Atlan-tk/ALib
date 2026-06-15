@@ -48,12 +48,11 @@ static void test_asortque_int(void) {
     assert(last != NULL);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
-    /* 4. 空容器越界行为：at 返回 NULL 并设置异常 */
+    /* 4. 空容器 at 返回 NULL，不设置异常 */
     RAII(ASortque(int)) empty_sq = A_INIT(ASortque(int));
     int *null_p = empty_sq.f->at(&empty_sq, 0);
     assert(null_p == NULL);
-    assert(aErrOccur());
-    aTry((void)0;)aExc{}
+    assert(!aErrOccur());
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* popMin/popMax 在空容器上应设置异常 */
@@ -155,12 +154,11 @@ static void test_asortque_astring(void) {
     }
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
-    /* 空容器 at 触发异常 */
+    /* 空容器 at 返回 NULL，不设置异常 */
     RAII(ASortque(AStr)) empty_sq = A_INIT(ASortque(AStr));
     AStr *null_s = empty_sq.f->at(&empty_sq, 0);
     assert(null_s == NULL);
-    assert(aErrOccur());
-    aTry((void)0;)aExc{}
+    assert(!aErrOccur());
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 空容器 popMin/popMax 触发异常 */
@@ -245,4 +243,3 @@ int main(void) {
     printf("All ASortque tests passed.\n");
     return 0;
 }
-

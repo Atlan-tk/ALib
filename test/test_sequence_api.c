@@ -25,8 +25,7 @@ A_TYPE_REGISTER(ASortque(int));
 static void test_aline_full_api(void) {
     RAII(ALine(int)) line = A_INIT(ALine(int));
     assert(line.f->at(&line, 0) == NULL);
-    assert(aErrOccur());
-    aTry((void)0;)aExc{}
+    assert(!aErrOccur());
 
     line.f->pushFront(&line, 2);
     line.f->pushFront(&line, 1);
@@ -80,8 +79,7 @@ static void test_aline_full_api(void) {
 static void test_alist_full_api(void) {
     RAII(AList(int)) list = A_INIT(AList(int));
     assert(list.f->at(&list, 0) == NULL);
-    assert(aErrOccur());
-    aTry((void)0;)aExc{}
+    assert(!aErrOccur());
 
     list.f->pushFront(&list, 2);
     list.f->pushFront(&list, 1);
@@ -135,8 +133,7 @@ static void test_alist_full_api(void) {
 static void test_adeque_full_api(void) {
     RAII(ADeque(int)) deq = A_INIT(ADeque(int));
     assert(deq.f->at(&deq, 0) == NULL);
-    assert(aErrOccur());
-    aTry((void)0;)aExc{}
+    assert(!aErrOccur());
 
     deq.f->pushFront(&deq, 2);
     deq.f->pushFront(&deq, 1);
@@ -179,8 +176,7 @@ static void test_adeque_full_api(void) {
 static void test_asortque_full_api(void) {
     RAII(ASortque(int)) sq = A_INIT(ASortque(int));
     assert(sq.f->at(&sq, 0) == NULL);
-    assert(aErrOccur());
-    aTry((void)0;)aExc{}
+    assert(!aErrOccur());
 
     sq.f->ins(&sq, 4);
     sq.f->ins(&sq, 1);

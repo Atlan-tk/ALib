@@ -93,8 +93,8 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
     static inline void     __Ahsf(TK,TV,iter_prev)(AIter(AHash(TK,TV))* it);                    \
     static inline TK       __Ahsf(TK,TV,iter_getk)(AIter(AHash(TK,TV)) it);                     \
     static inline void __A_OBJ_DEST_FUNC_SELF(AHash(TK,TV))(AHash(TK,TV)*);                     \
-    static inline void __A_OBJ_INIT_FUNC_SELF(AHash(TK,TV))(AHash(TK,TV)*);                     \
-    static inline void __A_OBJ_COPY_FUNC_SELF(AHash(TK,TV))(AHash(TK,TV)*, const AHash(TK,TV)*);     \
+    static inline bool __A_OBJ_INIT_FUNC_SELF(AHash(TK,TV))(AHash(TK,TV)*);                     \
+    static inline bool __A_OBJ_COPY_FUNC_SELF(AHash(TK,TV))(AHash(TK,TV)*, const AHash(TK,TV)*);     \
     static inline int __A_OBJ_CMPD_FUNC_SELF(AHash(TK,TV))(const AHash(TK,TV)*,const AHash(TK,TV)*); \
                                                                                                 \
     static const A_FUNC(AHash(TK,TV)) A_FUNC_TAB(AHash(TK,TV)) = {                              \
@@ -131,7 +131,7 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
     /******************************************************************************************/\
     static inline TV* __Ahsf(TK,TV,at)(const AHash(TK,TV)* self, const TK k){                   \
         __Ahs_data(TK,TV)* data = __Ahash_at(&self->hash, (const void*)&k);                     \
-        if(__a_unlikely(data == nullptr)){ aErrSet(AERR_overstep); return nullptr; }            \
+        if(__a_unlikely(data == nullptr)){ return nullptr; }                                    \
         return &(data->v);                                                                      \
     }                                                                                           \
     static inline void __Ahsf(TK,TV,rm)(AHash(TK,TV)* self, const TK k){                        \

@@ -167,7 +167,7 @@ ALib 不使用 C++ 异常，也不采用 `GError**` 风格。失败通过线程�
 常见错误码：
 
 - `AERR_nullptr`：空指针 / 空对象
-- `AERR_overstep`：越界、取空、查无此项
+- `AERR_overstep`：越界、取空、删除 / 取出不存在项
 - `AERR_outdomain`：参数超出允许域
 - `AERR_alloc_failed`：内存分配失败
 - `AERR_init_failed`：初始化 / 拷贝构造失败
@@ -298,8 +298,8 @@ A_TYPE_REGISTER(ATree(KeyType, ValueType));
 | `alib_alloc(uint32_t size)` | 分配字节数 | `void*` 或 `nullptr` | 默认不主动写异常 | 默认转到 `malloc` |
 | `alib_realloc(void* p, uint32_t size)` | 原地址、目标大小 | 新地址或 `nullptr` | 默认不主动写异常 | 默认转到 `realloc` |
 | `alib_free(void* p)` | 待释放地址，可为 `nullptr` | 无 | 无 | 默认转到 `free` |
-| `alib_new(uint32_t size, void(*init_func)(void*))` | 大小、初始化函数 | 已初始化对象地址或 `nullptr` | `AERR_alloc_failed`；或 `init_func` 自己设置的异常 | 先分配，再调用初始化；初始化失败会自动释放并返回 `nullptr` |
-| `alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*))` | 大小、源对象、拷贝函数 | 新对象地址或 `nullptr` | `AERR_alloc_failed`；或 `copy_func` 自己设置的异常 | 先分配，再复制；复制失败会自动释放 |
+| `alib_new(uint32_t size, bool(*init_func)(void*))` | 大小、初始化函数 | 已初始化对象地址或 `nullptr` | `AERR_alloc_failed`；或 `init_func` 自己设置的异常 | 先分配，再调用初始化；初始化函数返回 `false` 或设置异常时会自动释放并返回 `nullptr` |
+| `alib_cpnew(uint32_t size, const void* that, bool(*copy_func)(void*, const void*))` | 大小、源对象、拷贝函数 | 新对象地址或 `nullptr` | `AERR_alloc_failed`；或 `copy_func` 自己设置的异常 | 先分配，再复制；复制函数返回 `false` 或设置异常时会自动释放 |
 | `alib_delete(void* p, void(*dest_func)(void*))` | 对象地址、析构函数 | 无 | 由 `dest_func` 决定 | `p == nullptr` 时直接返回；若 `dest_func != nullptr` 先析构再释放 |
 
 平台差异：
@@ -498,7 +498,7 @@ A_TYPE_REGISTER(ALine(T));
 | `ALine(T)` | `T`：元素类型 | 生成具体容器类型名 | 无 | 类型名宏 |
 | `ALine_Define(T)` | 元素类型 | 声明容器结构和函数表 | 无 | 仅生成声明 |
 | `ALine_Generate(T)` | 元素类型 | 生成静态内联实现 | 无 | 需在一个可见编译单元中展开 |
-| `line.f->at(&line, index)` | `index: uint32_t` | `T*` 或 `nullptr` | 空容器时 `AERR_overstep` | 非空越界时会截断到尾元素 |
+| `line.f->at(&line, index)` | `index: uint32_t` | `T*` 或 `nullptr` | 无 | 空容器时返回 `nullptr`；非空越界时会截断到尾元素 |
 | `line.f->rm(&line, index)` | 索引 | 删除元素 | 一般无；空容器直接返回 | 非空越界时删除尾元素；删除时会 `A_DEST(T, element)` |
 | `line.f->ins(&line, index, obj)` | 索引、待插入对象 | 插入副本 | `A_COPY(T,obj)` 的异常；`AERR_alloc_failed` | `index > num` 时按 `num` 处理，相当于追加 |
 | `line.f->take(&line, index, tar)` | 索引、可选输出指针 | 取出元素 | 空容器时 `AERR_overstep` | `tar != nullptr` 时把元素交给调用方；否则直接析构 |
@@ -513,7 +513,7 @@ A_TYPE_REGISTER(ALine(T));
 
 #### 5.4.4 使用建议
 
-- `at()` 返回内部地址，结构修改后立即失效。
+- `at()` 返回内部地址，结构修改后立即失效；查找不到时返回 `nullptr`，不设置异常。
 - `rm()` 在空容器上是静默 no-op，而 `pop*()` / `take()` 会报 `AERR_overstep`；两类 API 的边界风格不同。
 - 如果你需要严格索引检查，请先比较 `index < getNumber()`。
 
@@ -534,7 +534,7 @@ A_TYPE_REGISTER(AList(T));
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
 | `AList(T)` / `AList_Define(T)` / `AList_Generate(T)` | 同 `ALine(T)` | 生成类型与实现 | 无 | 用法与 `ALine` 相同 |
-| `list.f->at(&list, index)` | 索引 | `T*` 或 `nullptr` | 空容器时 `AERR_overstep` | 非空越界时截断到尾节点 |
+| `list.f->at(&list, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空容器时返回 `nullptr`；非空越界时截断到尾节点 |
 | `list.f->rm(&list, index)` | 索引 | 删除节点 | 空容器时 `AERR_overstep` | 非空越界时删除尾节点 |
 | `list.f->rm_p(&list, p)` | `p: T*` | 删除 `p` 所在节点 | `p == nullptr` 时 `AERR_overstep` | `p` 必须来自当前链表的有效节点；传入外部指针属于未受支持用法 |
 | `list.f->ins(&list, index, obj)` | 索引、对象 | 插入副本 | `A_COPY` 异常；`AERR_alloc_failed` | `index > num` 时按 `num` 处理 |
@@ -577,7 +577,7 @@ A_TYPE_REGISTER(ADeque(T));
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
 | `ADeque(T)` / `ADeque_Define(T)` / `ADeque_Generate(T)` | 元素类型 | 生成类型与实现 | 无 | |
-| `deq.f->at(&deq, index)` | 索引 | `T*` 或 `nullptr` | 空容器时 `AERR_overstep` | 非空越界时截断到尾元素 |
+| `deq.f->at(&deq, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空容器时返回 `nullptr`；非空越界时截断到尾元素 |
 | `deq.f->pushBack(&deq, obj)` | 对象 | 尾插副本 | `A_COPY` 异常；`AERR_alloc_failed` | |
 | `deq.f->pushFront(&deq, obj)` | 对象 | 头插副本 | `A_COPY` 异常；`AERR_alloc_failed` | |
 | `deq.f->popBack(&deq, tar)` | 可选输出 | 弹出尾元素 | 空容器时 `AERR_overstep` | |
@@ -608,7 +608,7 @@ A_TYPE_REGISTER(AStack(T));
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
 | `AStack(T)` / `AStack_Define(T)` / `AStack_Generate(T)` | 元素类型 | 生成类型与实现 | 无 | |
-| `stack.f->at(&stack, index)` | 索引 | `T*` 或 `nullptr` | 空栈时 `AERR_overstep` | 非空越界时截断到栈顶；`at(0)` 是底部，`at(last)` 是栈顶 |
+| `stack.f->at(&stack, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空栈时返回 `nullptr`；非空越界时截断到栈顶；`at(0)` 是底部，`at(last)` 是栈顶 |
 | `stack.f->push(&stack, obj)` | 对象 | 压栈副本 | `A_COPY` 异常；`AERR_alloc_failed` | 对应底层 `pushBack` |
 | `stack.f->pop(&stack, tar)` | 可选输出 | 弹出栈顶 | 空栈时 `AERR_overstep` | `tar == nullptr` 时直接析构弹出的元素 |
 | `stack.f->getNumber(&stack)` / `empty(&stack)` | 无 | 个数 / 是否为空 | 无 | |
@@ -631,7 +631,7 @@ A_TYPE_REGISTER(AQueue(T));
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
 | `AQueue(T)` / `AQueue_Define(T)` / `AQueue_Generate(T)` | 元素类型 | 生成类型与实现 | 无 | |
-| `queue.f->at(&queue, index)` | 索引 | `T*` 或 `nullptr` | 空队列时 `AERR_overstep` | 非空越界时截断到队尾；`at(0)` 是下一个将被弹出的元素 |
+| `queue.f->at(&queue, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空队列时返回 `nullptr`；非空越界时截断到队尾；`at(0)` 是下一个将被弹出的元素 |
 | `queue.f->push(&queue, obj)` | 对象 | 入队副本 | `A_COPY` 异常；`AERR_alloc_failed` | 对应底层 `pushBack` |
 | `queue.f->pop(&queue, tar)` | 可选输出 | 弹出队首 | 空队列时 `AERR_overstep` | 对应底层 `popFront` |
 | `queue.f->getNumber(&queue)` / `empty(&queue)` | 无 | 个数 / 是否为空 | 无 | |
@@ -654,7 +654,7 @@ A_TYPE_REGISTER(ASortque(T));
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
 | `ASortque(T)` / `ASortque_Define(T)` / `ASortque_Generate(T)` | 元素类型 | 生成类型与实现 | 无 | |
-| `sq.f->at(&sq, index)` | 索引 | `T*` 或 `nullptr` | 空容器时 `AERR_overstep` | 非空越界时截断到最大元素 |
+| `sq.f->at(&sq, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空容器时返回 `nullptr`；非空越界时截断到最大元素 |
 | `sq.f->rm(&sq, index)` | 索引 | 删除一个元素 | 空容器时静默返回 | 非空越界时删除最大元素 |
 | `sq.f->ins(&sq, obj)` | 对象 | 按序插入副本 | `A_COPY` 异常；`AERR_alloc_failed` | 排序依据是 `A_CMPD(T, lhs, rhs)`；允许重复值 |
 | `sq.f->take(&sq, index, tar)` | 索引、可选输出 | 取出元素 | 空容器时 `AERR_overstep` | 非空越界时取最大元素 |
@@ -691,7 +691,7 @@ A_TYPE_REGISTER(ATree(TK, TV));
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
 | `ATree(TK,TV)` / `ATree_Define(TK,TV)` / `ATree_Generate(TK,TV)` | 键类型、值类型 | 生成类型与实现 | 无 | |
-| `tree.f->at(&tree, key)` | 键值 `key` | `TV*` 或 `nullptr` | 键不存在时 `AERR_overstep` | 返回内部值地址 |
+| `tree.f->at(&tree, key)` | 键值 `key` | `TV*` 或 `nullptr` | 无 | 键不存在时返回 `nullptr`；命中时返回内部值地址 |
 | `tree.f->rm(&tree, key)` | 键值 | 删除键值对 | 键不存在时 `AERR_overstep` | 删除时会析构键和值 |
 | `tree.f->ins(&tree, key, value)` | 键、值 | 插入 / 替换 | `A_COPY` 异常；`AERR_alloc_failed` | 同键再次插入是 upsert：旧键值对会被析构并被新副本替换 |
 | `tree.f->take(&tree, key, tar)` | 键、可选输出值指针 | 删除并取出值 | 键不存在时 `AERR_overstep` | 键始终由容器内部析构；`tar != nullptr` 时值交给调用方，否则直接析构值 |
@@ -734,7 +734,7 @@ A_TYPE_REGISTER(AHash(TK, TV));
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
 | `AHash(TK,TV)` / `AHash_Define(TK,TV)` / `AHash_Generate(TK,TV)` | 键类型、值类型 | 生成类型与实现 | 无 | |
-| `hash.f->at(&hash, key)` | 键值 | `TV*` 或 `nullptr` | 键不存在时 `AERR_overstep` | 返回内部值地址 |
+| `hash.f->at(&hash, key)` | 键值 | `TV*` 或 `nullptr` | 无 | 键不存在时返回 `nullptr`；命中时返回内部值地址 |
 | `hash.f->rm(&hash, key)` | 键值 | 删除键值对 | 键不存在时 `AERR_overstep` | 删除时析构键和值 |
 | `hash.f->ins(&hash, key, value)` | 键、值 | 插入 / 替换 | `A_COPY` 异常；`AERR_alloc_failed` | 同键再次插入会替换旧值；内部可能触发 rehash |
 | `hash.f->take(&hash, key, tar)` | 键、可选输出值指针 | 删除并取出值 | 键不存在时 `AERR_overstep` | 键总是由容器内部析构 |
@@ -767,7 +767,7 @@ A_TYPE_REGISTER(AHash(TK, TV));
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `noLiteral` | `bool` | `false` 表示当前仅借用外部字符串；`true` 表示当前字符串缓冲区由对象拥有 |
-| `number` | `uint32_t` | 当前字节数，不含终止符 |
+| `length` | `uint32_t` | 当前字节数，不含终止符 |
 | `capacity` | `uint32_t` | 当前缓冲容量，单位为字节；借用状态下一般为 `0` |
 | `s` | `char*` | 字符串缓冲区地址，可为 `nullptr` |
 
@@ -776,25 +776,28 @@ A_TYPE_REGISTER(AHash(TK, TV));
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
 | `AStr_new(const char* s)` | `s`：可为 `nullptr` 的 C 字符串指针 | 返回 `AStr` 值对象 | 无 | 只做包装，不复制内容；`s` 若是栈缓冲区，必须在其失效前把内容复制到拥有型字符串 |
-| `AStr_getNumber(const AStr* self)` | 指针 | `uint32_t` | `AERR_nullptr` | 当前字节数 |
+| `AStr_len(const AStr* self)` | 指针 | `uint32_t` | `AERR_nullptr` | 当前字节数 |
 | `AStr_getCapacity(const AStr* self)` | 指针 | `uint32_t` | `AERR_nullptr` | 当前容量 |
 | `AStr_empty(const AStr* self)` | 指针 | `bool` | `AERR_nullptr` | 是否为空 |
+| `AStr_u8num(const AStr* self)` | UTF-8 字符串对象 | `uint32_t` | `AERR_nullptr`、`AERR_outdomain` | 当前 UTF-8 码点数 |
 
 #### 5.12.3 编辑 API
 
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
-| `AStr_at(AStr* self, uint32_t index)` | 索引 | 返回一个字节 | `AERR_nullptr`、空串时 `AERR_overstep` | `index >= number` 时返回最后一个字节 |
-| `AStr_set(AStr* self, uint32_t index, char c)` | 索引、字节 | 设置一个字节 | `AERR_nullptr`、空串时 `AERR_overstep` | `index >= number` 时写入最后一个字节 |
-| `AStr_rm(AStr* self, uint32_t index)` | 索引 | 删除一个字节 | `AERR_nullptr`、空串时 `AERR_overstep`、分配失败时 `AERR_alloc_failed` | `index >= number` 时静默返回；借用状态写入前会先分配可写副本 |
+| `AStr_at(const AStr* self, uint32_t index)` | 索引 | 返回一个字节 | `AERR_nullptr`、空串时 `AERR_overstep` | `index >= length` 时返回最后一个字节 |
+| `AStr_set(AStr* self, uint32_t index, char c)` | 索引、字节 | 设置一个字节 | `AERR_nullptr`、空串时 `AERR_overstep` | `index >= length` 时写入最后一个字节 |
+| `AStr_rm(AStr* self, uint32_t index)` | 索引 | 删除一个字节 | `AERR_nullptr`、空串时 `AERR_overstep`、分配失败时 `AERR_alloc_failed` | `index >= length` 时静默返回；借用状态写入前会先分配可写副本 |
 | `AStr_ins(AStr* self, uint32_t index, char c)` | 索引、字节 | 插入字节 | `AERR_nullptr`、`AERR_overstep`、`AERR_alloc_failed` | 支持在头部 / 中间 / 尾部插入 |
+| `AStr_insStr(AStr* self, uint32_t index, const char* s)` | 索引、C 字符串 | 插入字符串 | `AERR_nullptr`、`AERR_alloc_failed` | `s` 按 `strlen` 计算长度；`index > length` 时追加到尾部 |
+| `AStr_rmStr(AStr* self, uint32_t index, uint32_t n)` | 起始索引、字节数 | 删除一段字节 | `AERR_nullptr`、空串时 `AERR_overstep`、分配失败时 `AERR_alloc_failed` | 超出尾部时截断到字符串末尾 |
 | `AStr_pushBack(AStr* self, char c)` | 字节 | 尾部追加 | 见 `AStr_ins` | |
 | `AStr_pushFront(AStr* self, char c)` | 字节 | 头部追加 | 见 `AStr_ins` | |
 | `AStr_popBack(AStr* self)` | 无 | 返回尾字节，空串时返回 `'\0'` | `AERR_nullptr`、分配失败时 `AERR_alloc_failed` | 空串时不报异常 |
 | `AStr_popFront(AStr* self)` | 无 | 返回首字节，空串时返回 `'\0'` | `AERR_nullptr`、分配失败时 `AERR_alloc_failed` | 空串时不报异常 |
 | `AStr_addBack(AStr* self, const char* s)` | 目标串、C 字符串 | 尾部拼接 | `AERR_nullptr`、`AERR_alloc_failed` | `s` 按 `strlen` 计算长度 |
 | `AStr_addFront(AStr* self, const char* s)` | 目标串、C 字符串 | 头部拼接 | `AERR_nullptr`、`AERR_alloc_failed` | `s` 按 `strlen` 计算长度 |
-| `AStr_truncate(AStr* self, uint32_t index)` | 截断位置 | 仅保留前 `index` 个字节 | `AERR_nullptr`、分配失败时 `AERR_alloc_failed` | `index >= number` 时静默返回 |
+| `AStr_truncate(AStr* self, uint32_t index)` | 截断位置 | 仅保留前 `index` 个字节 | `AERR_nullptr`、分配失败时 `AERR_alloc_failed` | `index >= length` 时静默返回 |
 | `AStr_reCap(AStr* self, uint32_t new_cap)` | 新容量 | 调整容量 | 返回 `AERR_overstep` 或分配错误码 | `new_cap` 必须能容纳当前内容和终止符 |
 
 #### 5.12.4 复制 / 析构语义
@@ -814,6 +817,9 @@ A_TYPE_REGISTER(AHash(TK, TV));
 | --- | --- | --- | --- | --- |
 | `autf8_num(const char* s)` | UTF-8 C 字符串 | `uint32_t` | `AERR_nullptr`、`AERR_outdomain` | 统计 UTF-8 码点数；遇到非法起始字节时停止并返回已统计数量 |
 | `autf8_index(const char* s, uint32_t index)` | UTF-8 C 字符串、码点索引 | `uint32_t` 字节偏移 | `AERR_nullptr`、`AERR_outdomain` | 返回第 `index` 个 UTF-8 码点的起始字节偏移 |
+| `AStr_u8at(const AStr* self, uint32_t index)` | UTF-8 字符串对象、码点索引 | `char*` | `AERR_nullptr`、`AERR_outdomain` | 返回第 `index` 个 UTF-8 码点的字节位置 |
+| `AStr_u8rm(AStr* self, uint32_t index)` | UTF-8 字符串对象、码点索引 | 删除一个 UTF-8 码点 | `AERR_nullptr`、`AERR_outdomain`、底层字节删除异常 | 按码点定位后删除对应字节序列 |
+| `AStr_u8ins(AStr* self, uint32_t index, const char* ch)` | UTF-8 字符串对象、码点索引、UTF-8 字符 | 插入一个 UTF-8 字符 | `AERR_nullptr`、`AERR_outdomain`、底层字节插入异常 | `ch` 应指向单个 UTF-8 字符的 C 字符串 |
 | `autf8_tou32(const char* s)` | UTF-8 C 字符串 | `AStr` | `AERR_nullptr`、`AERR_system_error`、`AERR_alloc_failed` | 转为 UTF-32 字节串 |
 | `autf8_tou16(const char* s)` | UTF-8 C 字符串 | `AStr` | 同上 | 转为 UTF-16 字节串 |
 | `autf8_togbk(const char* s)` | UTF-8 C 字符串 | `AStr` | 同上 | 转为 GBK 字节串 |
@@ -823,8 +829,8 @@ A_TYPE_REGISTER(AHash(TK, TV));
 
 注意：
 
-- `autf8_tou16` 和 `autf8_tou32` 的返回值是二进制字节串，可能包含内嵌 `\0`，不要用 `strlen(result.s)` 判断长度，应使用 `result.number`。
-- 当前转换使用系统 `iconv`，UTF-16/UTF-32 输出通常会包含 BOM；调用 `autf8_foru16` / `autf8_foru32` 时应把包含 BOM 的完整 `result.number` 传回去。
+- `autf8_tou16` 和 `autf8_tou32` 的返回值是二进制字节串，可能包含内嵌 `\0`，不要用 `strlen(result.s)` 判断长度，应使用 `result.length` 或 `AStr_len(&result)`。
+- 当前转换使用系统 `iconv`，UTF-16/UTF-32 输出通常会包含 BOM；调用 `autf8_foru16` / `autf8_foru32` 时应把包含 BOM 的完整 `result.length` 传回去。
 - `AStr_addBack` / `AStr_addFront` 仍按 `strlen` 处理输入，不适合拼接含内嵌 `\0` 的 UTF-16/UTF-32 结果；编码转换内部会按显式字节数写入。
 
 #### 5.12.6 最重要的坑
@@ -1508,7 +1514,7 @@ make CONFIG=linux
 - `AStr_new()` 只是借用，不是复制。
 - `APtr(T)` 复制后不会转移所有权，只会得到弱别名。
 - `AHash(K,V)` 的相等性比较不依赖插入顺序；但非零比较结果的正负号不适合作为稳定排序依据。
-- 顺序容器的 `at(index)` 普遍是“空容器报错，非空越界截断到尾元素”。
+- 顺序容器的 `at(index)` 普遍是“空容器返回 `NULL` 且不报错，非空越界截断到尾元素”。
 - `take` / `pop` 把元素写到 `tar` 后，后续由调用方负责析构该元素。
 - 迭代时一旦改容器结构，就应重新获取迭代器。
 - `a_signal_transmit(signal, ...)` 只允许 0 或 1 个附加参数。

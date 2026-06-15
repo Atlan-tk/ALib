@@ -47,10 +47,7 @@ typedef struct{
 
 __noused static inline void* __Adeq_at(const __Adeq* deq, uint32_t i){
     if(__a_unlikely(i >= deq->num)) i = deq->num - 1 ;
-    if(__a_unlikely(deq->num == 0)){
-        aErrSet(AERR_overstep);
-        return nullptr;
-    }
+    if(__a_unlikely(deq->num == 0)){ return nullptr; }
     return __A2arr_at(&deq->arr, i + deq->offset);
 }
 
@@ -139,8 +136,8 @@ static inline void __Adeq_pop_front(__Adeq* deq){
     static inline void __Adqf(T, iter_next)(AIter(ADeque(T))* it);                  \
     static inline void __Adqf(T, iter_prev)(AIter(ADeque(T))* it);                  \
     static inline void __A_OBJ_DEST_FUNC_SELF(ADeque(T))(ADeque(T)*);               \
-    static inline void __A_OBJ_INIT_FUNC_SELF(ADeque(T))(ADeque(T)*);               \
-    static inline void __A_OBJ_COPY_FUNC_SELF(ADeque(T))(ADeque(T)*, const ADeque(T)*);     \
+    static inline bool __A_OBJ_INIT_FUNC_SELF(ADeque(T))(ADeque(T)*);               \
+    static inline bool __A_OBJ_COPY_FUNC_SELF(ADeque(T))(ADeque(T)*, const ADeque(T)*);     \
     static inline int __A_OBJ_CMPD_FUNC_SELF(ADeque(T))(const ADeque(T)*,const ADeque(T)*); \
                                                                                     \
     static const A_FUNC(ADeque(T)) A_FUNC_TAB(ADeque(T)) = {                        \

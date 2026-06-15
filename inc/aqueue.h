@@ -52,8 +52,8 @@ extern "C" {
     static inline void __Aquf(T, iter_next)(AIter(AQueue(T))* it);                  \
     static inline void __Aquf(T, iter_prev)(AIter(AQueue(T))* it);                  \
     static inline void __A_OBJ_DEST_FUNC_SELF(AQueue(T))(AQueue(T)*);               \
-    static inline void __A_OBJ_INIT_FUNC_SELF(AQueue(T))(AQueue(T)*);               \
-    static inline void __A_OBJ_COPY_FUNC_SELF(AQueue(T))(AQueue(T)*, const AQueue(T)*);     \
+    static inline bool __A_OBJ_INIT_FUNC_SELF(AQueue(T))(AQueue(T)*);               \
+    static inline bool __A_OBJ_COPY_FUNC_SELF(AQueue(T))(AQueue(T)*, const AQueue(T)*);     \
     static inline int __A_OBJ_CMPD_FUNC_SELF(AQueue(T))(const AQueue(T)*,const AQueue(T)*); \
                                                                                     \
     static const A_FUNC(AQueue(T)) A_FUNC_TAB(AQueue(T)) = {                        \

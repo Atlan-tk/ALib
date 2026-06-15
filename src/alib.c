@@ -20,7 +20,7 @@ static void* __alib_default_realloc(void* p, uint32_t size){
     return realloc(p, size);
 }
 
-static void* __alib_default_new(uint32_t size, void(*init_func)(void*)){
+static void* __alib_default_new(uint32_t size, bool(*init_func)(void*)){
     aErrClean();
     void* p = alib_alloc(size);
 
@@ -30,20 +30,21 @@ static void* __alib_default_new(uint32_t size, void(*init_func)(void*)){
         return nullptr;
     }
 
+    bool ret = true;
     if(init_func != nullptr){
-        init_func(p);
+        ret = init_func(p);
     }else{
         memset(p, 0, size);
     }
 
-    if(aErrOccur()){
+    if(!ret){
         alib_free(p); p = nullptr;
     }
 
     return p;
 }
 
-static void* __alib_default_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*)){
+static void* __alib_default_cpnew(uint32_t size, const void* that, bool(*copy_func)(void*, const void*)){
     aErrClean();
     void* p = alib_alloc(size);
 
@@ -53,13 +54,14 @@ static void* __alib_default_cpnew(uint32_t size, const void* that, void(*copy_fu
         return nullptr;
     }
 
+    bool ret = true;
     if(copy_func != nullptr){
-        copy_func(p, that);
+        ret = copy_func(p, that);
     }else{
         memset(p, 0, size);
     }
 
-    if(aErrOccur()){
+    if(!ret){
         alib_free(p); p = nullptr;
     }
 
@@ -78,22 +80,22 @@ static void __alib_default_delete(void* p, void(*dest_func)(void*)){
         void  __alib_user_free(void* p);
         void* __alib_user_alloc(uint32_t size);
         void* __alib_user_realloc(void* p, uint32_t size);
-        void* __alib_user_new(uint32_t size, void(*init_func)(void*));
-        void* __alib_user_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*));
+        void* __alib_user_new(uint32_t size, bool(*init_func)(void*));
+        void* __alib_user_cpnew(uint32_t size, const void* that, bool(*copy_func)(void*, const void*));
         void  __alib_user_delete(void* p, void(*dest_func)(void*));
 
         void  (*const alib_free)(void* p) = __alib_user_free;
         void* (*const alib_alloc)(uint32_t size) = __alib_user_alloc;
         void* (*const alib_realloc)(void* p, uint32_t size) = __alib_user_realloc;
-        void* (*const alib_new)(uint32_t size, void(*init_func)(void*)) = __alib_user_new;
-        void* (*const alib_cpnew)(uint32_t size, const void* that, void(*copy_func)(void*, const void*)) = __alib_user_cpnew;
+        void* (*const alib_new)(uint32_t size, bool(*init_func)(void*)) = __alib_user_new;
+        void* (*const alib_cpnew)(uint32_t size, const void* that, bool(*copy_func)(void*, const void*)) = __alib_user_cpnew;
         void  (*const alib_delete)(void* p, void(*dest_func)(void*)) = __alib_user_delete;
     #else
         void  (*const alib_free)(void* p) = __alib_default_free;
         void* (*const alib_alloc)(uint32_t size) = __alib_default_alloc;
         void* (*const alib_realloc)(void* p, uint32_t size) = __alib_default_realloc;
-        void* (*const alib_new)(uint32_t size, void(*init_func)(void*)) = __alib_default_new;
-        void* (*const alib_cpnew)(uint32_t size, const void* that, void(*copy_func)(void*, const void*)) = __alib_default_cpnew;
+        void* (*const alib_new)(uint32_t size, bool(*init_func)(void*)) = __alib_default_new;
+        void* (*const alib_cpnew)(uint32_t size, const void* that, bool(*copy_func)(void*, const void*)) = __alib_default_cpnew;
         void  (*const alib_delete)(void* p, void(*dest_func)(void*)) = __alib_default_delete;
     #endif /* __ALIB_USER_ALLOC__ */
 #endif /* windows */
@@ -108,10 +110,10 @@ __weak void* alib_alloc(uint32_t size){
 __weak void* alib_realloc(void* p, uint32_t size){
     return __alib_default_realloc(p, size);
 }
-__weak void* alib_new(uint32_t size, void(*init_func)(void*)){
+__weak void* alib_new(uint32_t size, bool(*init_func)(void*)){
     return __alib_default_new(size, init_func);
 }
-__weak void* alib_cpnew(uint32_t size, const void* that, void(*copy_func)(void*, const void*)){
+__weak void* alib_cpnew(uint32_t size, const void* that, bool(*copy_func)(void*, const void*)){
     return __alib_default_cpnew(size, that, copy_func);
 }
 __weak void  alib_delete(void* p, void(*dest_func)(void*)){
@@ -194,6 +196,5 @@ __attribute__((constructor)) static inline void alib_start(void){
         alib_poweroff();
     }
 }
-
 
 

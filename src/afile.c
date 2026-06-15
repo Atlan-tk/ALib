@@ -1230,70 +1230,70 @@ AFile aFileInOpen(const char* name){
     AFile file = A_INIT(AFile);
     if(__a_unlikely(name == nullptr)){
         aErrSet(AERR_nullptr);
-        return file;
+        return A_INIT(AFile);
     }
     RAII(AStr) path = __af_path_absolute(name);
 
     int mod = __afmod_read;
     AFile_open(&file, __aftype_file, path, mod);
-    return file;
+    return A_MOVE(file);
 }
 AFile aFileOutOpen(const char* name){
     AFile file = A_INIT(AFile);
     if(__a_unlikely(name == nullptr)){
         aErrSet(AERR_nullptr);
-        return file;
+        return A_INIT(AFile);
     }
     RAII(AStr) path = __af_path_absolute(name);
 
     int mod = __afmod_write | __afmod_exclusive | __afmod_creat | __afmod_truncate;
     AFile_open(&file, __aftype_file, path, mod);
-    return file;
+    return A_MOVE(file);
 }
 AFile aFileEndOpen(const char* name){
     AFile file = A_INIT(AFile);
     if(__a_unlikely(name == nullptr)){
         aErrSet(AERR_nullptr);
-        return file;
+        return A_INIT(AFile);
     }
     RAII(AStr) path = __af_path_absolute(name);
 
     int mod = __afmod_write | __afmod_appent | __afmod_creat;
     AFile_open(&file, __aftype_file, path, mod);
-    return file;
+    return A_MOVE(file);
 }
 
 AFile aDevInOpen(const char* name, bool noblock){
     AFile file = A_INIT(AFile);
     if(__a_unlikely(name == nullptr)){
         aErrSet(AERR_nullptr);
-        return file;
+        return A_INIT(AFile);
     }
     RAII(AStr) path = __af_path_absolute(name);
 
     int mod = __afmod_read;
     if(noblock) mod |= __afmod_noblock;
     AFile_open(&file, __aftype_device, path, mod);
-    return file;
+    return A_MOVE(file);
 }
 AFile aDevOutOpen(const char* name, bool exclusive){
     AFile file = A_INIT(AFile);
     if(__a_unlikely(name == nullptr)){
         aErrSet(AERR_nullptr);
-        return file;
+        return A_INIT(AFile);
     }
     RAII(AStr) path = __af_path_absolute(name);
 
     int mod = __afmod_write;
     if(exclusive) mod |= __afmod_exclusive;
     AFile_open(&file, __aftype_device, path, mod);
-    return file;
+    return A_MOVE(file);
 }
 AFile aDevInOutOpen(const char* name, bool noblock, bool exclusive){
     AFile file = A_INIT(AFile);
     if(__a_unlikely(name == nullptr)){
         aErrSet(AERR_nullptr);
-        return file;
+        return A_INIT(AFile);
     }
     RAII(AStr) path = __af_path_absolute(name);
 
@@ -1301,7 +1301,7 @@ AFile aDevInOutOpen(const char* name, bool noblock, bool exclusive){
     if(noblock) mod |= __afmod_noblock;
     if(exclusive) mod |= __afmod_exclusive;
     AFile_open(&file, __aftype_device, path, mod);
-    return file;
+    return A_MOVE(file);
 }
 
 AFile aSocketTcpServerOpen(const char* ipstr, int port){
@@ -1310,7 +1310,7 @@ AFile aSocketTcpServerOpen(const char* ipstr, int port){
     char buf[8]; memset(buf, 0, sizeof(buf));
     if((ipstr == nullptr) || !(0 <= port && port < (int)(1 << 16))){
         aErrSet(AERR_outdomain);
-        return file;
+        return A_INIT(AFile);
     }
     snprintf(buf, sizeof(buf), "|%d|", port);
     const char* kinds = "tcp_server";
@@ -1321,12 +1321,12 @@ AFile aSocketTcpServerOpen(const char* ipstr, int port){
             AStr_addBack(&name, buf);
             AStr_addBack(&name, ipstr);
         )aExc{
-        return file;
+        return A_INIT(AFile);
     }
 
     int mod = __afmod_read | __afmod_write;
     AFile_open(&file, __aftype_socket, name, mod);
-    return file;
+    return A_MOVE(file);
 }
 AFile aSocketUdpServerOpen(const char* ipstr, int port){
     AFile file = A_INIT(AFile);
@@ -1334,7 +1334,7 @@ AFile aSocketUdpServerOpen(const char* ipstr, int port){
     char buf[8]; memset(buf, 0, sizeof(buf));
     if((ipstr == nullptr) || !(0 <= port && port < (int)(1 << 16))){
         aErrSet(AERR_outdomain);
-        return file;
+        return A_INIT(AFile);
     }
     snprintf(buf, sizeof(buf), "|%d|", port);
     const char* kinds = "udp_server";
@@ -1345,12 +1345,12 @@ AFile aSocketUdpServerOpen(const char* ipstr, int port){
             AStr_addBack(&name, buf);
             AStr_addBack(&name, ipstr);
         )aExc{
-        return file;
+        return A_INIT(AFile);
     }
 
     int mod = __afmod_read | __afmod_write;
     AFile_open(&file, __aftype_socket, name, mod);
-    return file;
+    return A_MOVE(file);
 }
 AFile aSocketUnixServerOpen(const char* ipstr){
     AFile file = A_INIT(AFile);
@@ -1359,7 +1359,7 @@ AFile aSocketUnixServerOpen(const char* ipstr){
     char buf[8]; memset(buf, 0, sizeof(buf));
     if((ipstr == nullptr) || !(0 <= port && port < (int)(1 << 16))){
         aErrSet(AERR_outdomain);
-        return file;
+        return A_INIT(AFile);
     }
     snprintf(buf, sizeof(buf), "|%d|", port);
     const char* kinds = "unix_server";
@@ -1370,12 +1370,12 @@ AFile aSocketUnixServerOpen(const char* ipstr){
             AStr_addBack(&name, buf);
             AStr_addBack(&name, ipstr);
         )aExc{
-        return file;
+        return A_INIT(AFile);
     }
 
     int mod = __afmod_read | __afmod_write;
     AFile_open(&file, __aftype_socket, name, mod);
-    return file;
+    return A_MOVE(file);
 }
 AFile aSocketRawServerOpen(const char* ipstr, int port){
     AFile file = A_INIT(AFile);
@@ -1383,7 +1383,7 @@ AFile aSocketRawServerOpen(const char* ipstr, int port){
     char buf[8]; memset(buf, 0, sizeof(buf));
     if((ipstr == nullptr) || !(0 <= port && port < (int)(1 << 16))){
         aErrSet(AERR_outdomain);
-        return file;
+        return A_INIT(AFile);
     }
     snprintf(buf, sizeof(buf), "|%d|", port);
     const char* kinds = "raw_server";
@@ -1394,12 +1394,12 @@ AFile aSocketRawServerOpen(const char* ipstr, int port){
             AStr_addBack(&name, buf);
             AStr_addBack(&name, ipstr);
         )aExc{
-        return file;
+        return A_INIT(AFile);
     }
 
     int mod = __afmod_read | __afmod_write;
     AFile_open(&file, __aftype_socket, name, mod);
-    return file;
+    return A_MOVE(file);
 }
 
 AFile aSocketTcpClientOpen(const char* ipstr, int port){
@@ -1408,7 +1408,7 @@ AFile aSocketTcpClientOpen(const char* ipstr, int port){
     char buf[8]; memset(buf, 0, sizeof(buf));
     if((ipstr == nullptr) || !(0 <= port && port < (int)(1 << 16))){
         aErrSet(AERR_outdomain);
-        return file;
+        return A_INIT(AFile);
     }
     snprintf(buf, sizeof(buf), "|%d|", port);
     const char* kinds = "tcp_client";
@@ -1419,12 +1419,12 @@ AFile aSocketTcpClientOpen(const char* ipstr, int port){
             AStr_addBack(&name, buf);
             AStr_addBack(&name, ipstr);
         )aExc{
-        return file;
+        return A_INIT(AFile);
     }
 
     int mod = __afmod_read | __afmod_write;
     AFile_open(&file, __aftype_socket, name, mod);
-    return file;
+    return A_MOVE(file);
 }
 
 AFile aSocketUdpClientOpen(const char* ipstr, int port){
@@ -1433,7 +1433,7 @@ AFile aSocketUdpClientOpen(const char* ipstr, int port){
     char buf[8]; memset(buf, 0, sizeof(buf));
     if((ipstr == nullptr) || !(0 <= port && port < (int)(1 << 16))){
         aErrSet(AERR_outdomain);
-        return file;
+        return A_INIT(AFile);
     }
     snprintf(buf, sizeof(buf), "|%d|", port);
     const char* kinds = "udp_client";
@@ -1444,12 +1444,12 @@ AFile aSocketUdpClientOpen(const char* ipstr, int port){
             AStr_addBack(&name, buf);
             AStr_addBack(&name, ipstr);
         )aExc{
-        return file;
+        return A_INIT(AFile);
     }
 
     int mod = __afmod_read | __afmod_write;
     AFile_open(&file, __aftype_socket, name, mod);
-    return file;
+    return A_MOVE(file);
 }
 AFile aSocketUnixClientOpen(const char* ipstr){
     AFile file = A_INIT(AFile);
@@ -1458,7 +1458,7 @@ AFile aSocketUnixClientOpen(const char* ipstr){
     char buf[8]; memset(buf, 0, sizeof(buf));
     if((ipstr == nullptr) || !(0 <= port && port < (int)(1 << 16))){
         aErrSet(AERR_outdomain);
-        return file;
+        return A_INIT(AFile);
     }
     snprintf(buf, sizeof(buf), "|%d|", port);
     const char* kinds = "unix_client";
@@ -1469,20 +1469,20 @@ AFile aSocketUnixClientOpen(const char* ipstr){
             AStr_addBack(&name, buf);
             AStr_addBack(&name, ipstr);
         )aExc{
-        return file;
+        return A_INIT(AFile);
     }
 
     int mod = __afmod_read | __afmod_write;
     AFile_open(&file, __aftype_socket, name, mod);
-    return file;
+    return A_MOVE(file);
 }
 AFile aSocketRawClientOpen(const char* ipstr, int port){
-    AFile file = A_INIT(AFile);
+    RAII(AFile) file = A_INIT(AFile);
 
     char buf[8]; memset(buf, 0, sizeof(buf));
     if((ipstr == nullptr) || !(0 <= port && port < (int)(1 << 16))){
         aErrSet(AERR_outdomain);
-        return file;
+        return A_INIT(AFile);
     }
     snprintf(buf, sizeof(buf), "|%d|", port);
     const char* kinds = "raw_client";
@@ -1493,12 +1493,12 @@ AFile aSocketRawClientOpen(const char* ipstr, int port){
             AStr_addBack(&name, buf);
             AStr_addBack(&name, ipstr);
         )aExc{
-        return file;
+        return A_INIT(AFile);
     }
 
     int mod = __afmod_read | __afmod_write;
     AFile_open(&file, __aftype_socket, name, mod);
-    return file;
+    return A_MOVE(file);
 }
 
 static inline const char* af_getip(AFile file){
@@ -1541,15 +1541,14 @@ static inline const char* af_getip(AFile file){
     return ipstr;
 }
 
-
 static inline AFile aSocketAccept(AFile server, const char* kinds){
-    AFile file = A_INIT(AFile);
+    RAII(AFile) file = A_INIT(AFile);
     static atomic_int accept_num = 0;
 
     char buf[8]; memset(buf, 0, sizeof(buf));
     const char* ipstr = af_getip(server);
     if(ipstr == nullptr){
-        return file;
+        return A_INIT(AFile);
     }
     snprintf(buf, sizeof(buf), "|%d|", atomic_fetch_add(&accept_num, 1));
 
@@ -1559,7 +1558,7 @@ static inline AFile aSocketAccept(AFile server, const char* kinds){
             AStr_addBack(&name, buf);
             AStr_addBack(&name, ipstr);
         )aExc{
-        return file;
+        return A_INIT(AFile);
     }
 
     socklen_t len = sizeof(Aaddr);
@@ -1567,7 +1566,7 @@ static inline AFile aSocketAccept(AFile server, const char* kinds){
     Afd fd = accept(server.fd, &addr.ip, &len);
     if(!Afd_exist(fd)){
         aErrSet(AERR_system_error);
-        return file;
+        return A_INIT(AFile);
     }
 
     aTry(
@@ -1577,7 +1576,7 @@ static inline AFile aSocketAccept(AFile server, const char* kinds){
         a_close(fd);
     }
 
-    return file;
+    return A_MOVE(file);
 }
 AFile aSocketTcpAccept(AFile server){
     return aSocketAccept(server, "tcp_accept");
@@ -1912,11 +1911,11 @@ static void __af_chmod_r(const char* name, int p){
 }
 
 static ALine(AStr) __af_ls(const char* name){
-    ALine(AStr) list = A_INIT(ALine(AStr));
+    RAII(ALine(AStr)) list = A_INIT(ALine(AStr));
 
     if(name == nullptr){
         aErrSet(AERR_nullptr);
-        return list;
+        return A_INIT(ALine(AStr));
     }
     if(__af_isfile(name)){
         list.f->pushBack(&list, AStr_new(name));
@@ -1924,17 +1923,17 @@ static ALine(AStr) __af_ls(const char* name){
     }
     if(!__af_isdir(name)){
         aErrSet(AERR_outdomain);
-        return list;
+        return A_INIT(ALine(AStr));
     }
 
     aTry(RAII(AStr) path = __af_path_absolute(name);)aExc{
-        return list;
+        return A_INIT(ALine(AStr));
     }
 
     DIR* dir = opendir(name);
     if(dir == nullptr){
         aErrSet(AERR_system_error);
-        return list;
+        return A_INIT(ALine(AStr));
     }
 
     errno = 0;
@@ -1967,81 +1966,73 @@ static ALine(AStr) __af_ls(const char* name){
     }
     closedir(dir);
 
-    return list;
+    return A_MOVE(list);
 }
 
 static AStr __af_path_absolute(const char* name){
     char buf[PATH_MAX]; memset(buf, 0, PATH_MAX);
-    AStr text = A_INIT(AStr);
     if(name == nullptr){
         aErrSet(AERR_nullptr);
-        return text;
+        return A_INIT(AStr);
+    }
+
+    if(name[0] == '/'){
+        aErrClean();
+        RAII(AStr) text = A_INIT(AStr);
+        AStr_addBack(&text, name);
+        if(AStr_len(&text) > 1 && AStr_at(&text, AEND) == '/') AStr_popBack(&text);
+        if(aErrOccur()){
+            return A_INIT(AStr);
+        }
+        return A_MOVE(text);
+    }
+
+    if(realpath(".", buf) == nullptr){
+        aErrSet(AERR_system_error);
+        return A_INIT(AStr);
     }
 
     aErrClean();
-    if(name[0] == '/'){
-        AStr_addBack(&text, name);
-    }else{
-        if(realpath(".", buf) == nullptr){
-            aErrSet(AERR_system_error);
-            return text;
-        }
-
-        AStr_addBack(&text, buf);
-        if(AStr_at(&text, AEND) != '/'){
-            AStr_pushBack(&text, '/');
-        }
-        AStr_addBack(&text, name);
-    }
-
-    if(__af_isdir(text.s)){
-        if(AStr_at(&text, AEND) == '/'){
-            AStr_popBack(&text);
-        }
-    }
-
+    RAII(AStr) text = A_INIT(AStr);
+    AStr_addBack(&text, buf);
+    if(AStr_at(&text, AEND) != '/') AStr_pushBack(&text, '/');
+    AStr_addBack(&text, name);
+    if(AStr_at(&text, AEND) == '/') AStr_popBack(&text);
     if(aErrOccur()){
         return A_INIT(AStr);
     }
 
-    return text;
+    return A_MOVE(text);
 }
 
-static AStr __af_name_extract(const char* name){
-    AStr text = A_INIT(AStr);
-    if(name == nullptr){
-        aErrSet(AERR_nullptr);
-        return text;
-    }
-    if(strlen(name) == 0){
-        aErrSet(AERR_outdomain);
-        return text;
-    }
-    if(strcmp(name, "/") == 0){
-        AStr_addBack(&text, name);
-        return text;
-    }
-
-    const char* p = name + strlen(name) - 1;
-
-    if(*p == '/') p--;
-    while(p != name){
-        if(*p == '/' && *(p-1) != '\\'){
-            break;
+static uint32_t __af_dir_len(const char* path){
+    int len = strlen(path);
+    if((len == 0) || (len == 1 && path[0] == '/')) return 0;
+    const char* p = path + len - 1;
+    for(; p > path; p--){
+        if(*p == '/'){
+            if(p == path || *(p-1) != '\\'){
+                break;
+            }
         }
-        p--;
     }
-
     if(*p == '/') p++;
-    aTry(AStr_addBack(&text, p);)aExc{
-        return text;
+    return (uint32_t)(p - path);
+}
+static AStr __af_name_extract(const char* name){
+    if(name == nullptr || strlen(name) == 0){
+        aErrSet(AERR_nullptr);
+        return A_INIT(AStr);
     }
-
-    if(AStr_at(&text, AEND) == '/'){
-        AStr_popBack(&text);
+    aTry(RAII(AStr) text = A_INIT(AStr); AStr_addBack(&text, name);)aExc{
+        return A_INIT(AStr);
     }
-
-    return text;
+    aTry(if(AStr_len(&text) > 1 && AStr_at(&text, AEND) == '/') AStr_popBack(&text);)aExc{
+        return A_INIT(AStr);
+    }
+    uint32_t n = __af_dir_len(text.s);
+    AStr_rmStr(&text, 0, n);
+    return A_MOVE(text);
 }
 
 static AStr __af_dir_extract(const char* name){
@@ -2049,40 +2040,22 @@ static AStr __af_dir_extract(const char* name){
         aErrSet(AERR_nullptr);
         return A_INIT(AStr);
     }
-    if(strcmp(name, "/") == 0){
-        AStr path = A_INIT(AStr);
-        AStr_addBack(&path, name);
-        return path;
+    aTry(RAII(AStr) path = __af_path_absolute(name);)aExc{
+        return A_INIT(AStr);
     }
-
-    AStr path = A_INIT(AStr);
-    if(name[0] == '/'){
-        aTry(AStr_addBack(&path, name);)aExc{
-            return A_INIT(AStr);
+    while(AStr_len(&path) > 1){
+        aErrClean();
+        if(AStr_popBack(&path) == '/'){
+            if(AStr_at(&path, AEND) != '\\'){
+                break;
+            }
         }
-    }else{
-        aTry(
-                RAII(AStr) all = __af_path_absolute(name);
-                AStr_addBack(&path, all.s);
-            )aExc{
+        if(aErrOccur()){
             return A_INIT(AStr);
         }
     }
 
-    char* p = path.s + AStr_getNumber(&path); p--;
-    if(*p == '/') p++;
-    while(p != path.s){
-        if(*p == '/' && *(p-1) != '\\'){
-            break;
-        }
-        p--;
-    }
-    AStr_truncate(&path, (uint32_t)(p - path.s));
-
-    if(AStr_at(&path, AEND) == '/'){
-        AStr_popBack(&path);
-    }
-    return path;
+    return A_MOVE(path);
 }
 
 
