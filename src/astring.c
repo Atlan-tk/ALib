@@ -427,7 +427,7 @@ void AStr_u8ins(AStr* self, uint32_t index, const char* ch){
 
 /* 字符编码操作 */
 /* pushback */
-static inline void AStr_pushAchar(AStr* self, Achar ch){
+__noused static inline void AStr_pushAchar(AStr* self, Achar ch){
     if(__a_unlikely(self == nullptr)){
         aErrSet(AERR_nullptr);
         return;

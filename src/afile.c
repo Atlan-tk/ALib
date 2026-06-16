@@ -254,7 +254,7 @@ static inline Aaddr af_domain_parsing(const char* ipstr, int port, int kinds){
 static inline Aaddr af_name_parsing(AStr name){
     Aaddr addr; memset(&addr, 0, sizeof(addr));
     char kinds[16]; memset(kinds, 0, 16); int port = 0, len = 0;
-    if(sscanf(name.s, "%16[^|]|%d|%n", kinds, &port, &len) != 2){
+    if(sscanf(name.s, "%15[^|]|%d|%n", kinds, &port, &len) != 2){
         aErrSet(AERR_outdomain);
         return addr;
     }
@@ -1514,7 +1514,7 @@ static inline const char* af_getip(AFile file){
     auto name = node->name;
 
     char kinds[16]; memset(kinds, 0, 16); int port = 0, len = 0;
-    if(sscanf(name.s, "%16[^|]|%d|%n", kinds, &port, &len) != 2){
+    if(sscanf(name.s, "%15[^|]|%d|%n", kinds, &port, &len) != 2){
         aErrSet(AERR_outdomain);
         return nullptr;
     }
