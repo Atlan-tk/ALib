@@ -133,6 +133,10 @@ void AStr_ins(AStr* self, uint32_t index, char c) {
         aErrSet(AERR_nullptr);
         return;
     }
+    if(c == 0){
+        AStr_truncate(self, index);
+        return;
+    }
 
     if(__a_unlikely(index > self->length)){
         index = self->length;
