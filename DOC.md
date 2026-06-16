@@ -762,6 +762,8 @@ A_TYPE_REGISTER(AHash(TK, TV));
 
 `AStr` 的文本处理能力仅适合 UTF-8 字符串。对 GBK、UTF-16、UTF-32 或其他非 UTF-8 字节串，`AStr` 只承担“按字节存储 / 复制 / 析构”的角色，不提供字符级编辑、索引、比较或长度语义。
 
+`Achar` 是 ALib 用于保存单个 UTF-8 字符字节序列的整数类型。当前定义为 `int`，低地址字节依次保存 UTF-8 字节，高位未使用字节填 `0`。例如 ASCII 字符占 1 字节，常用中文字符通常占 3 字节，最多保存 4 字节 UTF-8 序列。
+
 #### 5.12.1 结构字段
 
 | 字段 | 类型 | 说明 |
@@ -785,12 +787,12 @@ A_TYPE_REGISTER(AHash(TK, TV));
 
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
-| `AStr_at(const AStr* self, uint32_t index)` | 索引 | 返回一个字节 | `AERR_nullptr`、空串时 `AERR_overstep` | `index >= length` 时返回最后一个字节 |
+| `AStr_at(const AStr* self, uint32_t index)` | 索引 | 返回一个字节 | `AERR_nullptr` | 空串时返回 `0`；非空且 `index >= length` 时返回最后一个字节 |
 | `AStr_set(AStr* self, uint32_t index, char c)` | 索引、字节 | 设置一个字节 | `AERR_nullptr`、空串时 `AERR_overstep` | `index >= length` 时写入最后一个字节 |
-| `AStr_rm(AStr* self, uint32_t index)` | 索引 | 删除一个字节 | `AERR_nullptr`、空串时 `AERR_overstep`、分配失败时 `AERR_alloc_failed` | `index >= length` 时静默返回；借用状态写入前会先分配可写副本 |
+| `AStr_rm(AStr* self, uint32_t index)` | 索引 | 删除一个字节 | `AERR_nullptr`、分配失败时 `AERR_alloc_failed` | 空串或 `index >= length` 时静默返回；借用状态写入前会先分配可写副本 |
 | `AStr_ins(AStr* self, uint32_t index, char c)` | 索引、字节 | 插入字节 | `AERR_nullptr`、`AERR_overstep`、`AERR_alloc_failed` | 支持在头部 / 中间 / 尾部插入 |
 | `AStr_insStr(AStr* self, uint32_t index, const char* s)` | 索引、C 字符串 | 插入字符串 | `AERR_nullptr`、`AERR_alloc_failed` | `s` 按 `strlen` 计算长度；`index > length` 时追加到尾部 |
-| `AStr_rmStr(AStr* self, uint32_t index, uint32_t n)` | 起始索引、字节数 | 删除一段字节 | `AERR_nullptr`、空串时 `AERR_overstep`、分配失败时 `AERR_alloc_failed` | 超出尾部时截断到字符串末尾 |
+| `AStr_rmStr(AStr* self, uint32_t index, uint32_t n)` | 起始索引、字节数 | 删除一段字节 | `AERR_nullptr`、分配失败时 `AERR_alloc_failed` | 空串或 `index >= length` 时静默返回；超出尾部时截断到字符串末尾 |
 | `AStr_pushBack(AStr* self, char c)` | 字节 | 尾部追加 | 见 `AStr_ins` | |
 | `AStr_pushFront(AStr* self, char c)` | 字节 | 头部追加 | 见 `AStr_ins` | |
 | `AStr_popBack(AStr* self)` | 无 | 返回尾字节，空串时返回 `'\0'` | `AERR_nullptr`、分配失败时 `AERR_alloc_failed` | 空串时不报异常 |
@@ -817,9 +819,14 @@ A_TYPE_REGISTER(AHash(TK, TV));
 | --- | --- | --- | --- | --- |
 | `autf8_num(const char* s)` | UTF-8 C 字符串 | `uint32_t` | `AERR_nullptr`、`AERR_outdomain` | 统计 UTF-8 码点数；遇到非法起始字节时停止并返回已统计数量 |
 | `autf8_index(const char* s, uint32_t index)` | UTF-8 C 字符串、码点索引 | `uint32_t` 字节偏移 | `AERR_nullptr`、`AERR_outdomain` | 返回第 `index` 个 UTF-8 码点的起始字节偏移 |
-| `AStr_u8at(const AStr* self, uint32_t index)` | UTF-8 字符串对象、码点索引 | `char*` | `AERR_nullptr`、`AERR_outdomain` | 返回第 `index` 个 UTF-8 码点的字节位置 |
+| `autf8char(const char* s)` | UTF-8 C 字符串当前位置 | `Achar` | `AERR_nullptr`、`AERR_outdomain` | 读取当前位置的一个 UTF-8 字符并打包为 `Achar` |
+| `AStr_u8at(const AStr* self, uint32_t index)` | UTF-8 字符串对象、码点索引 | `Achar` | `AERR_nullptr`、非法 UTF-8 时 `AERR_outdomain` | 返回第 `index` 个 UTF-8 字符；`self == nullptr` 是异常；`index` 越界时返回 `0`，不视为错误 |
 | `AStr_u8rm(AStr* self, uint32_t index)` | UTF-8 字符串对象、码点索引 | 删除一个 UTF-8 码点 | `AERR_nullptr`、`AERR_outdomain`、底层字节删除异常 | 按码点定位后删除对应字节序列 |
-| `AStr_u8ins(AStr* self, uint32_t index, const char* ch)` | UTF-8 字符串对象、码点索引、UTF-8 字符 | 插入一个 UTF-8 字符 | `AERR_nullptr`、`AERR_outdomain`、底层字节插入异常 | `ch` 应指向单个 UTF-8 字符的 C 字符串 |
+| `AStr_u8ins(AStr* self, uint32_t index, Achar ch)` | UTF-8 字符串对象、码点索引、UTF-8 字符 | 插入一个 UTF-8 字符，或截断 | `AERR_nullptr`、`AERR_outdomain`、底层字节插入异常 | `ch` 是由 `autf8char()` 或同布局方式构造的单个 UTF-8 字符；`ch == 0` 时从目标 UTF-8 字符位置截断 |
+| `AStr_u8pushBack(AStr* self, Achar ch)` | UTF-8 字符串对象、UTF-8 字符 | 尾部追加一个 UTF-8 字符 | 见 `AStr_u8ins` | |
+| `AStr_u8pushFront(AStr* self, Achar ch)` | UTF-8 字符串对象、UTF-8 字符 | 头部插入一个 UTF-8 字符 | 见 `AStr_u8ins` | |
+| `AStr_u8popBack(AStr* self)` | UTF-8 字符串对象 | `Achar` | `AERR_nullptr`、`AERR_outdomain`、底层字节删除异常 | 删除并返回尾部 UTF-8 字符；空串或无可取字符时返回 `0` |
+| `AStr_u8popFront(AStr* self)` | UTF-8 字符串对象 | `Achar` | `AERR_nullptr`、`AERR_outdomain`、底层字节删除异常 | 删除并返回头部 UTF-8 字符；空串或无可取字符时返回 `0` |
 | `autf8_tou32(const char* s)` | UTF-8 C 字符串 | `AStr` | `AERR_nullptr`、`AERR_system_error`、`AERR_alloc_failed` | 转为 UTF-32 字节串 |
 | `autf8_tou16(const char* s)` | UTF-8 C 字符串 | `AStr` | 同上 | 转为 UTF-16 字节串 |
 | `autf8_togbk(const char* s)` | UTF-8 C 字符串 | `AStr` | 同上 | 转为 GBK 字节串 |
@@ -832,6 +839,7 @@ A_TYPE_REGISTER(AHash(TK, TV));
 - `autf8_tou16` 和 `autf8_tou32` 的返回值是二进制字节串，可能包含内嵌 `\0`，不要用 `strlen(result.s)` 判断长度，应使用 `result.length` 或 `AStr_len(&result)`。
 - 当前转换使用系统 `iconv`，UTF-16/UTF-32 输出通常会包含 BOM；调用 `autf8_foru16` / `autf8_foru32` 时应把包含 BOM 的完整 `result.length` 传回去。
 - `AStr_addBack` / `AStr_addFront` 仍按 `strlen` 处理输入，不适合拼接含内嵌 `\0` 的 UTF-16/UTF-32 结果；编码转换内部会按显式字节数写入。
+- `Achar` 保存的是 UTF-8 原始字节，不是 Unicode 码点数值；不能直接把 `Achar` 当作 Unicode code point 做数值比较或范围判断。
 
 #### 5.12.6 最重要的坑
 

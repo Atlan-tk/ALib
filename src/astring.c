@@ -78,7 +78,6 @@ char AStr_at(const AStr* self, uint32_t index) {
     }
 
     if(__a_unlikely(self->length == 0)){
-        aErrSet(AERR_overstep);
         return 0;
     }
 
@@ -111,11 +110,6 @@ void AStr_set(AStr* self, uint32_t index, char ch) {
 void AStr_rm(AStr* self, uint32_t index) {
     if(__a_unlikely(self == nullptr)){
         aErrSet(AERR_nullptr);
-        return;
-    }
-
-    if(__a_unlikely(self->length == 0)){
-        aErrSet(AERR_overstep);
         return;
     }
 
@@ -179,7 +173,6 @@ char AStr_popBack(AStr* self) {
     }
 
     if (__a_unlikely(self->length == 0)) {
-        aErrSet(AERR_overstep);
         return '\0';
     }
 
@@ -203,7 +196,6 @@ char AStr_popFront(AStr* self) {
     }
 
     if (__a_unlikely(self->length == 0)) {
-        aErrSet(AERR_overstep);
         return '\0';
     }
 
@@ -270,11 +262,6 @@ void AStr_addFront(AStr* self, const char* s) {
 void AStr_truncate(AStr* self, uint32_t index) {
     if(__a_unlikely(self == nullptr)){
         aErrSet(AERR_nullptr);
-        return;
-    }
-
-    if (__a_unlikely(self->length == 0)) {
-        aErrSet(AERR_overstep);
         return;
     }
 
@@ -350,11 +337,6 @@ void AStr_rmStr(AStr* self, uint32_t index, uint32_t n){
         return;
     }
 
-    if(__a_unlikely(self->length == 0)){
-        aErrSet(AERR_overstep);
-        return;
-    }
-
     if(__a_unlikely(index >= self->length)){
         return;
     }
@@ -375,20 +357,36 @@ void AStr_rmStr(AStr* self, uint32_t index, uint32_t n){
 }
 
 static uint32_t autf8_len(const char* s);
-char*AStr_u8at(const AStr* self, uint32_t index){
+static uint32_t AStr_u8at_i(const AStr* self, uint32_t index){
     if(__a_unlikely(self == nullptr)){
         aErrSet(AERR_nullptr);
-        return nullptr;
+        return 0;
+    }
+    if(__a_unlikely(self->s == nullptr)){
+        return 0;
     }
     char* s = self->s; uint32_t x = 0;
     for(uint32_t n = 0; n < index && x < self->length; n++){
         aTry(x += autf8_len(s + x);)aExc{
-            return nullptr;
+            return 0;
         }
     }
     s += x;
 
-    return s;
+    return x;
+}
+Achar AStr_u8at(const AStr* self, uint32_t index){
+    if(__a_unlikely(self == nullptr)){
+        aErrSet(AERR_nullptr);
+        return 0;
+    }
+    if(__a_unlikely(self->s == nullptr)){
+        return 0;
+    }
+    aTry(uint32_t i = AStr_u8at_i(self, index);)aExc{
+        return 0;
+    }
+    return autf8char(self->s + i);
 }
 void AStr_u8rm(AStr* self, uint32_t index){
     if(__a_unlikely(self == nullptr)){
@@ -405,9 +403,28 @@ void AStr_u8rm(AStr* self, uint32_t index){
 
     AStr_rmStr(self, x, autf8_len(s));
 }
-void AStr_u8ins(AStr* self, uint32_t index, const char* ch){
-    if(__a_unlikely(self == nullptr || ch == nullptr)){
+static void AStr_u8ins_ch(AStr* self, uint32_t index, Achar ch){
+    if(__a_unlikely(self == nullptr)){
         aErrSet(AERR_nullptr);
+        return;
+    }
+
+    char* p = (void*)&ch;
+    if(ch == 0){
+        AStr_truncate(self, index);
+        return;
+    }
+    for(uint32_t i = 0; i < sizeof(Achar) && p[i] != '\0'; i++){
+        AStr_ins(self, index + i, p[i]);
+    }
+}
+void AStr_u8ins(AStr* self, uint32_t index, Achar ch){
+    if(__a_unlikely(self == nullptr)){
+        aErrSet(AERR_nullptr);
+        return;
+    }
+    if(__a_unlikely(AStr_ensure_writable(self) != 0)){
+        aErrSet(AERR_alloc_failed);
         return;
     }
     char* s = self->s; uint32_t x = 0;
@@ -418,33 +435,64 @@ void AStr_u8ins(AStr* self, uint32_t index, const char* ch){
     }
     s += x;
 
-    for(uint32_t i = 0 ; i < autf8_len(ch); i++){
-        AStr_ins(self, x + i, ch[i]);
+    AStr_u8ins_ch(self, x, ch);
+}
+void AStr_u8pushFront(AStr* self, Achar ch){
+    AStr_u8ins(self, 0, ch);
+}
+void AStr_u8pushBack(AStr* self, Achar ch){
+    AStr_u8ins(self, AEND, ch);
+}
+Achar AStr_u8popFront(AStr* self){
+    if(__a_unlikely(self == nullptr)){
+        aErrSet(AERR_nullptr);
+        return 0;
     }
+    if(__a_unlikely(self->length == 0)){
+        return 0;
+    }
+    if(__a_unlikely(AStr_ensure_writable(self) != 0)){
+        aErrSet(AERR_alloc_failed);
+        return 0;
+    }
+    uint32_t i = 0;
+    char* s = self->s + i;
+    uint32_t len = autf8_len(s);
+    Achar ret = autf8char(s);
+    AStr_rmStr(self, i, len);
+    return ret;
+}
+Achar AStr_u8popBack(AStr* self){
+    if(__a_unlikely(self == nullptr)){
+        aErrSet(AERR_nullptr);
+        return 0;
+    }
+    if(__a_unlikely(self->length == 0)){
+        return 0;
+    }
+    if(__a_unlikely(AStr_ensure_writable(self) != 0)){
+        aErrSet(AERR_alloc_failed);
+        return 0;
+    }
+    aTry(uint32_t n = autf8_num(self->s);)aExc{
+        return 0;
+    }
+    if(__a_unlikely(n == 0)){
+        return 0;
+    }
+    aTry(uint32_t i = AStr_u8at_i(self, n - 1);)aExc{
+        return 0;
+    }
+    char* s = self->s + i;
+    uint32_t len = autf8_len(s);
+    Achar ret = autf8char(s);
+    AStr_rmStr(self, i, len);
+    return ret;
 }
 
 
 
 /* 字符编码操作 */
-/* pushback */
-__noused static inline void AStr_pushAchar(AStr* self, Achar ch){
-    if(__a_unlikely(self == nullptr)){
-        aErrSet(AERR_nullptr);
-        return;
-    }
-    if(__a_unlikely(ch == 0)){
-        return;
-    }
-    size_t i = 0;
-    char* p = (char*)&ch;
-    for( ; i < sizeof(Achar); i++){
-        if(p[i] != 0) break;
-    }
-
-    for( ; i < sizeof(Achar); i++){
-        AStr_pushBack(self, p[i]);
-    }
-}
 static inline void AStr_push_s(AStr* self, const char* s, uint32_t len){
     if(__a_unlikely(self == nullptr || s == nullptr)){
         aErrSet(AERR_nullptr);
@@ -492,7 +540,6 @@ static inline uint32_t autf8_len(const char* s){
 
 /* 计算u8字符数 */
 uint32_t autf8_num(const char* s){
-
     if(__a_unlikely(s == nullptr)){
         aErrSet(AERR_nullptr);
         return 0;
@@ -540,7 +587,7 @@ static AStr a_iconv(const char* s, const char* tar_name, const char* src_name, u
         aErrSet(AERR_nullptr);
         return A_INIT(AStr);
     }
-    Achar buf[64];
+    char buf[256];
 
     iconv_t fd = iconv_open(tar_name, src_name);
     if(__a_unlikely(fd == (iconv_t)-1)){
@@ -548,11 +595,11 @@ static AStr a_iconv(const char* s, const char* tar_name, const char* src_name, u
         return A_INIT(AStr);
     }
 
-    char* src = (char*)s; char* tar = (void*)buf;
+    char* src = (char*)s; char* tar = buf;
     while((size_t)(s + len) > (size_t)src){
-        memset(buf, 0, sizeof(buf)); tar = (void*)buf;
+        memset(buf, 0, sizeof(buf)); tar = buf;
         size_t len_src = (size_t)(s + len) - (size_t)src;
-        size_t len_tar = sizeof(Achar) * 64;
+        size_t len_tar = sizeof(buf);
 
         errno = 0;
         size_t ret = iconv(fd, &src, &len_src, &tar, &len_tar);
@@ -561,7 +608,7 @@ static AStr a_iconv(const char* s, const char* tar_name, const char* src_name, u
             aErrSet(AERR_system_error);
             return A_INIT(AStr);
         }
-        aTry( AStr_push_s(&str, (void*)buf, sizeof(Achar) * 64 - len_tar); )aExc{
+        aTry( AStr_push_s(&str, buf, sizeof(buf) - len_tar); )aExc{
             iconv_close(fd);
             return A_INIT(AStr);
         }
@@ -589,5 +636,14 @@ AStr autf8_togbk(const char* s){
     return a_iconv(s, "GBK", "UTF8", strlen(s));
 }
 
+/* u8字符转Achar */
+Achar autf8char(const char* s){
+    Achar ch = 0; char* p = (void*)&ch;
+    uint32_t len = autf8_len(s);
+    for(uint32_t i = 0; i < len; i++){
+        p[i] = s[i];
+    }
+    return ch;
+}
 
 

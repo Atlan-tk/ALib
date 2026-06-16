@@ -12,9 +12,10 @@ extern "C" {
 
 #include "alib.h"
 
+/* u8字符表示; 小端对齐大端填充0 */
 typedef int Achar;
-static inline void A_OBJ_INIT(Achar)(__noused Achar* self){}
-static inline void A_OBJ_DEST(Achar)(__noused Achar* self){}
+static inline void A_OBJ_INIT(Achar)(__noused Achar* self){ *self = 0; }
+static inline void A_OBJ_DEST(Achar)(__noused Achar* self){ *self = 0; }
 static inline void A_OBJ_COPY(Achar)(Achar* self, const Achar* that){ *self = *that; }
 static inline int  A_OBJ_CMPD(Achar)(const Achar* self, const Achar* that){ return A_CMPD(int, *self, *that); }
 A_TYPE_REGISTER(Achar);
@@ -42,9 +43,13 @@ void AStr_insStr(AStr* self, uint32_t index, const char* s);
 void AStr_rmStr(AStr* self, uint32_t index, uint32_t n);
 void AStr_truncate(AStr* self, uint32_t index);
 
-char*AStr_u8at(const AStr* self, uint32_t index);
-void AStr_u8rm(AStr* self, uint32_t index);
-void AStr_u8ins(AStr* self, uint32_t index, const char* ch);
+Achar AStr_u8at(const AStr* self, uint32_t index);
+void  AStr_u8rm(AStr* self, uint32_t index);
+void  AStr_u8ins(AStr* self, uint32_t index, Achar ch);
+void  AStr_u8pushBack(AStr* self, Achar ch);
+void  AStr_u8pushFront(AStr* self, Achar ch);
+Achar AStr_u8popBack(AStr* self);
+Achar AStr_u8popFront(AStr* self);
 
 uint32_t autf8_num(const char* s);
 __noused static uint32_t AStr_u8num(const AStr* self){
@@ -146,6 +151,8 @@ AStr autf8_forgbk(const char* s, uint32_t len);
 AStr autf8_tou32(const char* s);
 AStr autf8_tou16(const char* s);
 AStr autf8_togbk(const char* s);
+
+Achar autf8char(const char* s);
 
 
 
