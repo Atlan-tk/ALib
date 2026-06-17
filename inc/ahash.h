@@ -120,9 +120,12 @@ void __Ahash_iter_prev(const __Ahash* hash, __Aiter* it);
     }                                                                                           \
     static inline void __Ahsf(TK,TV,data_copy)(__Ahs_data(TK,TV)* data,                         \
             const __Ahs_data(TK,TV)* that_data){                                                \
-        data->k = A_COPY(TK, that_data->k);                                                     \
-        if(!aErrOccur()){ data->v=A_COPY(TV,that_data->v); }                                    \
-        if(aErrOccur()){ A_DEST(TK, data->k); }                                                 \
+        aTry(data->k = A_COPY(TK, that_data->k);)aExc{                                          \
+            return;                                                                             \
+        }                                                                                       \
+        aTry(data->v=A_COPY(TV,that_data->v);)aExc{                                             \
+            A_DEST(TK, data->k); return;                                                        \
+        }                                                                                       \
     }                                                                                           \
     static inline int  __Ahsf(TK,TV,data_cmpd)(const __Ahs_data(TK,TV)* data,                   \
             const __Ahs_data(TK,TV)* that_data){                                                \

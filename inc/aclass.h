@@ -75,7 +75,6 @@ extern "C" {
     }                                                                                                       \
     __noused static inline bool __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                         \
         if(__a_unlikely(self == nullptr)) { aErrSet(AERR_nullptr); return false; }                          \
-        auto ev = aErrGet(); aErrClean();                                                                   \
                                                                                                             \
         A_FUNC(T)* f = (void*)&A_FUNC_TAB(T); __A_FUNC_BASE(T)* bf = (void*)__A_FUNC_TAB_BASE(T);           \
         memset(self, 0, sizeof(T));  auto flag = f->flag; self->f = f;                                      \
@@ -91,14 +90,13 @@ extern "C" {
             ((A_FUNC(Atlan)*)f)->dest = (void*)__A_OBJ_DEST_FUNC_SELF(T);                                   \
         }                                                                                                   \
                                                                                                             \
-        if(__A_OBJ_INIT(T) != nullptr) __A_OBJ_INIT(T)(self);                                               \
+        auto ev = aErrGet(); aErrClean(); if(__A_OBJ_INIT(T) != nullptr) __A_OBJ_INIT(T)(self);             \
         if(aErrOccur()){ __A_OBJ_DEST_FUNC_SELF(T)(self); return false; }                                   \
         aErrSet(ev); return true;                                                                           \
     }                                                                                                       \
     __noused static inline bool __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){                          \
         if(__a_unlikely(self == nullptr)) { aErrSet(AERR_nullptr); return false; }                          \
         if(that == nullptr){ return __A_OBJ_INIT_FUNC_SELF(T)(self); }                                      \
-        auto ev = aErrGet(); aErrClean();                                                                   \
                                                                                                             \
         A_FUNC(T)* f = (void*)&A_FUNC_TAB(T); __A_FUNC_BASE(T)* bf = (void*)__A_FUNC_TAB_BASE(T);           \
         memset(self, 0, sizeof(T));  auto flag = f->flag; self->f = f;                                      \
@@ -115,14 +113,14 @@ extern "C" {
         }                                                                                                   \
                                                                                                             \
         if(__A_OBJ_COPY(T) != nullptr){                                                                     \
-            __A_OBJ_COPY(T)(self, that);                                                                    \
+            auto ev = aErrGet(); aErrClean(); __A_OBJ_COPY(T)(self, that);                                  \
+            if(aErrOccur()){ __A_OBJ_DEST_FUNC_SELF(T)(self); return false; }                               \
+            aErrSet(ev);                                                                                    \
         }else{                                                                                              \
             uint32_t size_self = sizeof(T); uint32_t size_base = sizeof(__A_CLASS_BASE(T));                 \
             memcpy(((char*)self) + size_base, ((const char*)that) + size_base, size_self - size_base);      \
         }                                                                                                   \
-                                                                                                            \
-        if(aErrOccur()){ __A_OBJ_DEST_FUNC_SELF(T)(self); return false; }                                   \
-        aErrSet(ev); return true;                                                                           \
+        return true;                                                                                        \
     }                                                                                                       \
     __noused static inline int  __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){                    \
         if(self == that || (self == nullptr && that == nullptr)){ return 0; }                               \

@@ -1639,46 +1639,38 @@ static void __af_mkdir(const char* name){
         aErrSet(AERR_nullptr);
         return;
     }
-    if(__af_isdir(name)){
+    if(strcmp(name, "/") == 0){
         return;
     }
 
-    aTry(RAII(AStr) all = A_INIT(AStr);)aExc{
+    aTry(RAII(AStr) path = __af_path_absolute(name);)aExc{
         return;
     }
+    if(__af_path_exist(path.s)){
+        if(__af_isdir(path.s)){
+            return;
+        }else{
+            aErrSet(AERR_repeat_write);
+            return;
+        }
+    }
 
-    if(name[0] == '/'){
-        aTry(AStr_addBack(&all, name);)aExc{
+    aTry(RAII(AStr) par_path = __af_dir_extract(path.s);)aExc{
+        return;
+    }
+    if(!__af_path_exist(par_path.s)){
+        aTry(__af_mkdir(par_path.s);)aExc{
             return;
         }
     }else{
-        aTry(
-                RAII(AStr) text = __af_path_absolute(".");
-                AStr_addBack(&all, text.s);
-                AStr_pushBack(&all, '/');
-                AStr_addBack(&all, name);
-            )aExc{
+        if(!__af_isdir(par_path.s)){
+            aErrSet(AERR_repeat_write);
             return;
         }
     }
 
-    aTry(RAII(AStr) path = __af_dir_extract(all.s);)aExc{
-        return;
-    }
-
-    if(!__af_path_exist(path.s)){
-        aTry(__af_mkdir(path.s);)aExc{
-            return;
-        }
-    }
-
-    if(__af_isdir(path.s)){
-        if(mkdir(all.s, 0755) != 0){
-            aErrSet(AERR_system_error);
-            return;
-        }
-    }else{
-        aErrSet(AERR_repeat_write);
+    if(mkdir(path.s, 0755) != 0){
+        aErrSet(AERR_system_error);
         return;
     }
 }

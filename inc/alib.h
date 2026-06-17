@@ -301,22 +301,23 @@ static inline int  aErrGet(void)    { return __a_err_value__; };
     }                                                                                                       \
     __noused static inline bool __A_OBJ_INIT_FUNC_SELF(T)(T* self){                                         \
         if(__a_unlikely(self == nullptr)) { aErrSet(AERR_nullptr); return false; }                          \
-        auto ev = aErrGet(); aErrClean();                                                                   \
-        memset(self, 0, sizeof(T)); if(__A_OBJ_INIT(T) != nullptr) __A_OBJ_INIT(T)(self);                   \
+        memset(self, 0, sizeof(T));                                                                         \
+        auto ev = aErrGet(); aErrClean(); if(__A_OBJ_INIT(T) != nullptr) __A_OBJ_INIT(T)(self);             \
         if(aErrOccur()){ __A_OBJ_DEST_FUNC_SELF(T)(self); return false; }                                   \
         aErrSet(ev); return true;                                                                           \
     }                                                                                                       \
     __noused static inline bool __A_OBJ_COPY_FUNC_SELF(T)(T* self, const T* that){                          \
         if(__a_unlikely(self == nullptr)) { aErrSet(AERR_nullptr); return false; }                          \
         if(__a_unlikely(that == nullptr)) { return __A_OBJ_INIT_FUNC_SELF(T)(self); }                       \
-        auto ev = aErrGet(); aErrClean();                                                                   \
-        memset(self, 0, sizeof(T)); if(__A_OBJ_COPY(T) != nullptr){                                         \
-            __A_OBJ_COPY(T)(self, that);                                                                    \
+        memset(self, 0, sizeof(T));                                                                         \
+        if(__A_OBJ_COPY(T) != nullptr){                                                                     \
+            auto ev = aErrGet(); aErrClean(); __A_OBJ_COPY(T)(self, that);                                  \
+            if(aErrOccur()){ __A_OBJ_DEST_FUNC_SELF(T)(self); return false; }                               \
+            aErrSet(ev);                                                                                    \
         }else{                                                                                              \
             memcpy(self, that, sizeof(T));                                                                  \
         }                                                                                                   \
-        if(aErrOccur()){ __A_OBJ_DEST_FUNC_SELF(T)(self); return false; }                                   \
-        aErrSet(ev); return true;                                                                           \
+        return true;                                                                                        \
     }                                                                                                       \
     __noused static inline int __A_OBJ_CMPD_FUNC_SELF(T)(const T* self, const T* that){                     \
         if(self == that || (self == nullptr && that == nullptr)) return 0;                                  \
