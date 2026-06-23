@@ -118,6 +118,22 @@ extern "C" {
     #endif /* posix */
 #endif /* __visibility */
 
+#ifndef __const_func
+    #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
+        #define __const_func [[gnu::const]]
+    #else
+        #define __const_func __attribute__((const))
+    #endif
+#endif /* __const */
+
+#ifndef __pure_func
+    #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202000L)
+        #define __pure_func [[gnu::pure]]
+    #else
+        #define __pure_func __attribute__((pure))
+    #endif
+#endif /* __const */
+
 #include <string.h>
 #include <stdint.h>
 
@@ -230,6 +246,7 @@ typedef enum{
     AERR_matching_failed,       //常用于信号匹配失败
     AERR_timedout,              //超时
     AERR_thrd_err,              //线程错误返回
+    AERR_format_err,            //格式错误
 }AERR_t;
 static inline void aErrClean(void)  { __a_err_value__ = 0; }
 static inline bool aErrOccur(void)  { return __a_err_value__ != 0; };

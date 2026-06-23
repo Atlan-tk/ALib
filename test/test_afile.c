@@ -63,6 +63,37 @@ static int line_has_path(ALine(AStr)* list, const char* path) {
     return 0;
 }
 
+static void assert_absolute_path(const char* input, const char* expected) {
+    RAII(AStr) path = af_path_absolute(input);
+    expect_clean();
+    assert(path.s != NULL);
+    assert(strcmp(path.s, expected) == 0);
+}
+
+static void test_path_absolute_edges(const char* root) {
+    test_mark("path absolute edges");
+    char input[PATH_MAX];
+    char expected[PATH_MAX];
+
+    assert_absolute_path("/", "/");
+    assert_absolute_path("//", "/");
+    assert_absolute_path("/tmp//x", "/tmp/x");
+
+    int n = snprintf(input, sizeof(input), "%s//rel//leaf", root);
+    assert(n > 0 && (size_t)n < sizeof(input));
+    n = snprintf(expected, sizeof(expected), "%s/rel/leaf", root);
+    assert(n > 0 && (size_t)n < sizeof(expected));
+    assert_absolute_path(input, expected);
+
+    char old_cwd[PATH_MAX];
+    assert(getcwd(old_cwd, sizeof(old_cwd)) != NULL);
+    assert(chdir(root) == 0);
+    n = snprintf(expected, sizeof(expected), "%s/a/b", root);
+    assert(n > 0 && (size_t)n < sizeof(expected));
+    assert_absolute_path("a//b", expected);
+    assert(chdir(old_cwd) == 0);
+}
+
 static void test_file_tools(const char* root) {
     test_mark("file tools");
     char nested[PATH_MAX];
@@ -199,10 +230,19 @@ static void test_file_object_io(const char* root) {
         assert(in.f->read_pos(&in, 5, 2, buf) == 2);
         expect_clean();
         assert(strcmp(buf, "++") == 0);
+
+        assert(in.f->read(&in, 0, NULL) == 0);
+        expect_clean();
+        assert(in.f->read_pos(&in, 0, 0, NULL) == 0);
+        expect_clean();
     }
 
     {
         RAII(AFile) rw = aDevInOutOpen(file, false, false);
+        expect_clean();
+        assert(rw.f->write(&rw, 0, NULL) == 0);
+        expect_clean();
+        assert(rw.f->write_pos(&rw, 0, 0, NULL) == 0);
         expect_clean();
         assert(rw.f->write_pos(&rw, 0, 2, "HE") == 2);
         expect_clean();
@@ -272,6 +312,7 @@ int main(void) {
     char* root = mkdtemp(tmpl);
     assert(root != NULL);
 
+    test_path_absolute_edges(root);
     test_file_tools(root);
     test_file_object_io(root);
     test_invalid_inputs(root);

@@ -277,6 +277,7 @@ AClass_Function(AFile,
     uint32_t(*write_pos)(AFile* self, uint64_t offset, size_t size, void* source);
 );
 int32_t  AFile_ioctl(AFile* self, int32_t cmd, void* buf);
+/* read/write/read_pos/write_pos 对于size == 0 是安全的 */
 uint32_t AFile_read (AFile* self, size_t size, void* target);
 uint32_t AFile_write(AFile* self, size_t size, void* source);
 uint32_t AFile_read_pos(AFile* self, uint64_t offset, size_t size, void* target);

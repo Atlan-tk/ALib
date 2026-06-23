@@ -921,6 +921,9 @@ static inline int afs_read(AShPtr(AFileNode) ptr, Afd fd, void* target, size_t s
         aErrSet(AERR_outdomain);
         return 0;
     }
+    if(size == 0){
+        return 0;
+    }
     aTry(RAII(AAutoKey) key = AMtxRW_rlock(&afslock);)aExc{
         return 0;
     }
@@ -958,6 +961,9 @@ static inline int afs_read_pos(AShPtr(AFileNode) ptr, Afd fd, uint64_t offset, v
     auto node = ptr.p;
     if(__a_unlikely(node == nullptr || !Afd_exist(fd))){
         aErrSet(AERR_outdomain);
+        return 0;
+    }
+    if(size == 0){
         return 0;
     }
     aTry(RAII(AAutoKey) key = AMtxRW_rlock(&afslock);)aExc{
@@ -998,6 +1004,9 @@ static inline int afs_write(AShPtr(AFileNode) ptr, Afd fd, void* source, size_t 
         aErrSet(AERR_outdomain);
         return 0;
     }
+    if(size == 0){
+        return 0;
+    }
     aTry(RAII(AAutoKey) key = AMtxRW_wlock(&afslock);)aExc{
         return 0;
     }
@@ -1034,6 +1043,9 @@ static inline int afs_write_pos(AShPtr(AFileNode) ptr, Afd fd, uint64_t offset, 
     auto node = ptr.p;
     if(__a_unlikely(node == nullptr || !Afd_exist(fd))){
         aErrSet(AERR_outdomain);
+        return 0;
+    }
+    if(size == 0){
         return 0;
     }
     aTry(RAII(AAutoKey) key = AMtxRW_wlock(&afslock);)aExc{
@@ -1962,7 +1974,6 @@ static ALine(AStr) __af_ls(const char* name){
 }
 
 static AStr __af_path_absolute(const char* name){
-    char buf[PATH_MAX]; memset(buf, 0, PATH_MAX);
     if(name == nullptr){
         aErrSet(AERR_nullptr);
         return A_INIT(AStr);
@@ -1976,11 +1987,27 @@ static AStr __af_path_absolute(const char* name){
         if(aErrOccur()){
             return A_INIT(AStr);
         }
+
+        uint32_t len = AStr_len(&text);
+        for(uint32_t i = 0; i < len;){
+            if(text.s[i] == '/' && text.s[i+1] == '/'){
+                AStr_rm(&text, i); len--;
+            }else{
+                i++;
+            }
+        }
         return A_MOVE(text);
     }
 
+    char* buf = alib_alloc(PATH_MAX);
+    if(buf == nullptr){
+        return A_INIT(AStr);
+    }
+    memset(buf, 0, PATH_MAX);
+
     if(realpath(".", buf) == nullptr){
         aErrSet(AERR_system_error);
+        alib_free(buf);
         return A_INIT(AStr);
     }
 
@@ -1990,10 +2017,21 @@ static AStr __af_path_absolute(const char* name){
     if(AStr_at(&text, AEND) != '/') AStr_pushBack(&text, '/');
     AStr_addBack(&text, name);
     if(AStr_at(&text, AEND) == '/') AStr_popBack(&text);
+
+    alib_free(buf);
+
     if(aErrOccur()){
         return A_INIT(AStr);
     }
 
+    uint32_t len = AStr_len(&text);
+    for(uint32_t i = 0; i < len;){
+        if(text.s[i] == '/' && text.s[i+1] == '/'){
+            AStr_rm(&text, i); len--;
+        }else{
+            i++;
+        }
+    }
     return A_MOVE(text);
 }
 
