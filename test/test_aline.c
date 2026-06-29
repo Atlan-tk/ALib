@@ -13,6 +13,16 @@ ALine_Define(AStr);
 ALine_Generate(AStr);
 A_TYPE_REGISTER(ALine(AStr));
 
+typedef struct {
+    int id;
+    char payload[600];
+} BigObj;
+
+A_TYPE_REGISTER(BigObj);
+ALine_Define(BigObj);
+ALine_Generate(BigObj);
+A_TYPE_REGISTER(ALine(BigObj));
+
 /* 测试 int 元素 */
 static void test_aline_int(void) {
     /* 基本构造与空容器 */
@@ -153,10 +163,38 @@ static void test_aline_astring(void) {
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
+static void test_aline_big_object(void) {
+    RAII(ALine(BigObj)) line = A_INIT(ALine(BigObj));
+    assert(!aErrOccur());
+
+    BigObj first = { .id = 1 };
+    BigObj second = { .id = 2 };
+    BigObj zero = { .id = 0 };
+    first.payload[0] = 'a';
+    second.payload[0] = 'b';
+    zero.payload[0] = 'z';
+
+    line.f->pushBack(&line, first);
+    assert(!aErrOccur());
+    line.f->pushBack(&line, second);
+    assert(!aErrOccur());
+    line.f->pushFront(&line, zero);
+    assert(!aErrOccur());
+
+    assert(line.f->getNumber(&line) == 3);
+    assert(line.f->at(&line, 0)->id == 0);
+    assert(line.f->at(&line, 1)->id == 1);
+    assert(line.f->at(&line, 2)->id == 2);
+    assert(line.f->at(&line, 0)->payload[0] == 'z');
+    assert(line.f->at(&line, 1)->payload[0] == 'a');
+    assert(line.f->at(&line, 2)->payload[0] == 'b');
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+}
+
 int main(void) {
     test_aline_int();
     test_aline_astring();
+    test_aline_big_object();
     printf("All ALine tests passed.\n");
     return 0;
 }
-

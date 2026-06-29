@@ -62,6 +62,18 @@ static void test_adeque_int(void) {
         assert(*big.f->at(&big, i) == i);
     }
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
+
+    RAII(ADeque(int)) front = A_INIT(ADeque(int));
+    front.f->pushFront(&front, 1);
+    assert(!aErrOccur());
+    front.f->popFront(&front, NULL);
+    assert(!aErrOccur());
+    assert(front.f->empty(&front));
+    front.f->pushFront(&front, 2);
+    assert(!aErrOccur());
+    assert(front.f->getNumber(&front) == 1);
+    assert(*front.f->at(&front, 0) == 2);
+    printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
 static void test_adeque_astring(void) {
@@ -119,4 +131,3 @@ int main(void) {
     printf("All ADeque tests passed.\n");
     return 0;
 }
-

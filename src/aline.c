@@ -14,15 +14,14 @@ int __Aarr_add_cap_back(__Aarr* arr){
     uint32_t cap = 0;
     uint32_t obj_size = arr->size;
 
-    if(arr->cap * obj_size >= __aPagSize){
+    if(obj_size >= __aPagSize){
+        cap = arr->cap + 1;
+    }else if(arr->cap * obj_size >= __aPagSize){
         cap = arr->cap + __aPagSize / obj_size;
     }else{
         cap = arr->cap * 2;
     }
-
-    if(__a_unlikely(cap < 16)){
-        cap = 16;
-    }
+    if(__a_unlikely(cap == 0)) cap++;
 
     char* p = alib_realloc(arr->data, cap * obj_size);
     if(__a_unlikely(p == nullptr)){
@@ -36,15 +35,14 @@ int __Aarr_add_cap_front(__Aarr* arr){
     uint32_t cap = 0;
     uint32_t obj_size = arr->size;
 
-    if(arr->cap * obj_size >= __aPagSize){
+    if(obj_size >= __aPagSize){
+        cap = arr->cap + 1;
+    }else if(arr->cap * obj_size >= __aPagSize){
         cap = arr->cap + __aPagSize / obj_size;
     }else{
         cap = arr->cap * 2;
     }
-
-    if(__a_unlikely(cap < 16)){
-        cap = 16;
-    }
+    if(__a_unlikely(cap == 0)) cap++;
 
     uint32_t new_offset = cap - arr->cap + arr->offset;
 
@@ -67,19 +65,24 @@ void __Aarr_sub_cap_back(__Aarr* arr){
     uint32_t obj_size = arr->size;
     uint32_t red = arr->cap - (arr->offset + arr->num);
 
-    if(red * obj_size >= __aPagSize){
-        cap = arr->cap - __aPagSize / obj_size;
+    if(obj_size >= __aPagSize){
+        cap = arr->cap - 1;
     }else{
-        cap = (arr->cap + 1) / 2;
+        if(red * obj_size >= __aPagSize){
+            cap = arr->cap - __aPagSize / obj_size;
+        }else{
+            cap = (arr->cap + 1) / 2;
+        }
     }
 
-    if(__a_unlikely(cap < 16)){
-        cap = 16;
-    }
-
-    char* p = alib_realloc(arr->data, cap * obj_size);
-    if(__a_likely(p != nullptr)){
-        arr->data = p, arr->cap = cap;
+    if(__a_unlikely(cap == 0)){
+        alib_free(arr->data);
+        arr->data = nullptr, arr->cap = cap;
+    }else{
+        char* p = alib_realloc(arr->data, cap * obj_size);
+        if(__a_likely(p != nullptr)){
+            arr->data = p, arr->cap = cap;
+        }
     }
 }
 void __Aarr_sub_cap_front(__Aarr* arr){
@@ -91,16 +94,19 @@ void __Aarr_sub_cap_front(__Aarr* arr){
     memmove(tar, src, arr->num * obj_size);
 
     cap = arr->cap - arr->offset;
-    if(__a_unlikely(cap < 16)){
-        cap = 16;
-    }
 
-
-    char* p = alib_realloc(arr->data, cap * obj_size);
-    if(__a_likely(p != nullptr)){
-        arr->data = p, arr->cap = cap, arr->offset = 0;
+    if(__a_unlikely(cap == 0)){
+        alib_free(arr->data);
+        arr->data = nullptr, arr->cap = cap;
+    }else{
+        char* p = alib_realloc(arr->data, cap * obj_size);
+        if(__a_likely(p != nullptr)){
+            arr->data = p, arr->cap = cap;
+        }
     }
+    arr->offset = 0;
 }
+
 
 
 int __Aarr_copy(__Aarr* arr, const __Aarr* that_arr){
@@ -167,7 +173,7 @@ void __Aarr_rm(__Aarr* arr, uint32_t i){
         arr->offset++, arr->num--;
 
         uint32_t red = arr->offset;
-        if(__a_unlikely(arr->cap > 16 && (red * arr->size >= __aPagSize || red >= (arr->cap + 1) / 2))){
+        if(__a_unlikely((red * arr->size >= __aPagSize || red >= (arr->cap + 1) / 2))){
             __Aarr_sub_cap_front(arr);
         }
     }else{
@@ -179,10 +185,8 @@ void __Aarr_rm(__Aarr* arr, uint32_t i){
         arr->num--;
 
         uint32_t red = arr->cap - (arr->offset + arr->num);
-        if(__a_unlikely(arr->cap > 16 && (red * arr->size >= __aPagSize || red >= (arr->cap + 1) / 2))){
+        if(__a_unlikely((red * arr->size >= __aPagSize || red >= (arr->cap + 1) / 2))){
             __Aarr_sub_cap_back(arr);
         }
     }
 }
-
-
