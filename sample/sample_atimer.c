@@ -18,7 +18,7 @@ static void sleep_ms(long ms) {
     thrd_sleep(&delay, NULL);
 }
 
-static void print_timer_event(void *data) {
+static bool print_timer_event(void *data) {
     TimerEvent *event = data;
     AClock now = A_INIT(AClock);
     int n = atomic_fetch_add(event->count, 1) + 1;
@@ -26,6 +26,7 @@ static void print_timer_event(void *data) {
         event->name,
         n,
         (long long)AClock_msDiff(now, event->start));
+    return true;
 }
 
 int main(void) {

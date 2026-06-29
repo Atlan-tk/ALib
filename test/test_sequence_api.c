@@ -37,7 +37,8 @@ static void test_aline_full_api(void) {
     for (int i = 0; i < 4; ++i) {
         assert(*line.f->at(&line, (uint32_t)i) == expected0[i]);
     }
-    assert(*line.f->at(&line, 99) == 4);
+    assert(*line.f->at(&line, AEND) == 4);
+    assert(line.f->at(&line, 99) == NULL);
 
     int taken = -1;
     line.f->take(&line, 1, &taken);
@@ -91,7 +92,8 @@ static void test_alist_full_api(void) {
     for (int i = 0; i < 4; ++i) {
         assert(*list.f->at(&list, (uint32_t)i) == expected0[i]);
     }
-    assert(*list.f->at(&list, 99) == 4);
+    assert(*list.f->at(&list, AEND) == 4);
+    assert(list.f->at(&list, 99) == NULL);
 
     int taken = -1;
     list.f->take(&list, 1, &taken);
@@ -145,7 +147,8 @@ static void test_adeque_full_api(void) {
     for (int i = 0; i < 4; ++i) {
         assert(*deq.f->at(&deq, (uint32_t)i) == expected0[i]);
     }
-    assert(*deq.f->at(&deq, 99) == 4);
+    assert(*deq.f->at(&deq, AEND) == 4);
+    assert(deq.f->at(&deq, 99) == NULL);
 
     int expected = 1;
     forEach(it, deq) {
@@ -188,7 +191,8 @@ static void test_asortque_full_api(void) {
     for (int i = 0; i < 4; ++i) {
         assert(*sq.f->at(&sq, (uint32_t)i) == expected0[i]);
     }
-    assert(*sq.f->at(&sq, 99) == 4);
+    assert(*sq.f->at(&sq, AEND) == 4);
+    assert(sq.f->at(&sq, 99) == NULL);
 
     int taken = -1;
     sq.f->take(&sq, 1, &taken);

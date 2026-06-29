@@ -38,7 +38,7 @@ static inline char* __AhsBucket_at(__AhsBucket* bt, uint32_t ele_size, uint32_t 
 static inline uint32_t __AhsBucket_find(__AhsBucket* bt, uint32_t ele_size,
         const void* k, int(cmpd)(const void*, const void*)){
     if(__a_unlikely(bt == 0)){
-        return 0xffffffff;
+        return AEND;
     }
 
     for(uint32_t i = 0; i < bt->num; i++){
@@ -48,7 +48,7 @@ static inline uint32_t __AhsBucket_find(__AhsBucket* bt, uint32_t ele_size,
         }
     }
 
-    return 0xffffffff;
+    return AEND;
 }
 static inline int __AhsBucket_expand(__AhsBucket* bt, uint32_t ele_size){
     if(bt->num >= bt->cap){
@@ -165,7 +165,7 @@ static inline int __Ahash_add(__Ahash* hash, void* obj){
 
     uint32_t y = __AhsBucket_find(bt, obj_size, obj, hash->cmpd_k);
 
-    if(y != 0xffffffff){
+    if(y != AEND){
         //已存在
         char* element = __AhsBucket_at(bt, obj_size, y);
         if(__a_likely(element != nullptr)){
@@ -206,7 +206,7 @@ static inline int __Ahash_del(__Ahash* hash, const void* k){
     }
 
     uint32_t y = __AhsBucket_find(bt, obj_size, k, hash->cmpd_k);
-    if(y == 0xffffffff){
+    if(y == AEND){
         //不存在
         return AERR_overstep;
     }else{
@@ -244,7 +244,7 @@ void* __Ahash_at(const __Ahash* hash, const void* k){
     __AhsBucket* bt = __Ahash_at_bt(hash, hv);
 
     uint32_t y = __AhsBucket_find(bt, obj_size, k, hash->cmpd_k);
-    if(__a_unlikely(y == 0xffffffff)){
+    if(__a_unlikely(y == AEND)){
         return nullptr;
     }
 
@@ -287,7 +287,7 @@ void __Ahash_take(__Ahash* hash, void* data){
     }
 
     uint32_t y = __AhsBucket_find(bt, obj_size, k, hash->cmpd_k);
-    if(y == 0xffffffff){
+    if(y == AEND){
         //不存在
         aErrSet(AERR_overstep);
         return;

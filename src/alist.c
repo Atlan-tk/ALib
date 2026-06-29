@@ -71,11 +71,8 @@ int __Alist_cmpd(const __Alist* list, const __Alist* that_list){
 
 
 static inline __AlsNode* __Alist_at_node(const __Alist* list, uint32_t index){
-    if(__a_unlikely(list->num == 0)){
-        return nullptr;
-    }
-
-    if(__a_unlikely(index >= list->num)) index = list->num - 1;
+    if(__a_unlikely(index == AEND)) index = list->num - 1;
+    if(__a_unlikely(index >= list->num)) return nullptr;
 
     __AlsNode* node = nullptr;
     if(index <= list->num / 2){

@@ -125,14 +125,14 @@ static inline AClock AClock_sCvs(int64_t t){
 
 /* 毫秒级定时器 */
 void a_timer_rmwork(int64_t id);
-int64_t a_timer_addwork(uint32_t cycle/*周期*/, uint32_t num/*执行次数*/, void(*call)(void*), void* data);
-static const uint32_t aLongWork = 0xffffffff;
+int64_t a_timer_addwork(uint32_t cycle/*周期*/, uint32_t num/*执行次数*/, bool(*call)(void*), void* data);
+static const uint32_t aLongWork = AEND;
 
-static inline int64_t a_timer_addwork_long(uint32_t cycle/*周期*/, void(*call)(void*), void* data){
+static inline int64_t a_timer_addwork_long(uint32_t cycle/*周期*/, bool(*call)(void*), void* data){
     return a_timer_addwork(cycle, aLongWork, call, data);
 }
 
-static inline int64_t a_timer_addwork_one(uint32_t cycle/*周期*/, void(*call)(void*), void* data){
+static inline int64_t a_timer_addwork_one(uint32_t cycle/*周期*/, bool(*call)(void*), void* data){
     return a_timer_addwork(cycle, 1, call, data);
 }
 

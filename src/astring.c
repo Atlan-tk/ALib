@@ -77,13 +77,8 @@ char AStr_at(const AStr* self, uint32_t index) {
         return 0;
     }
 
-    if(__a_unlikely(self->length == 0)){
-        return 0;
-    }
-
-    if (__a_unlikely(index >= self->length)) {
-        index = self->length - 1;
-    }
+    if(__a_unlikely(index == AEND)) index = self->length - 1;
+    if(__a_unlikely(index >= self->length)) return 0;
 
     char ch = self->s[index];
     return ch;
@@ -374,6 +369,9 @@ static uint32_t AStr_u8at_i(const AStr* self, uint32_t index){
         aTry(x += autf8_len(s + x);)aExc{
             return 0;
         }
+        if(x >= self->length && n < index){
+            return 0;
+        }
     }
     s += x;
 
@@ -400,6 +398,9 @@ void AStr_u8rm(AStr* self, uint32_t index){
     char* s = self->s; uint32_t x = 0;
     for(uint32_t n = 0; n < index && x < self->length; n++){
         aTry(x += autf8_len(s + x);)aExc{
+            return;
+        }
+        if(x >= self->length && n < index){
             return;
         }
     }
@@ -434,6 +435,9 @@ void AStr_u8ins(AStr* self, uint32_t index, Achar ch){
     char* s = self->s; uint32_t x = 0;
     for(uint32_t n = 0; n < index && x < self->length; n++){
         aTry(x += autf8_len(s + x);)aExc{
+            return;
+        }
+        if(x > self->length && n < index){
             return;
         }
     }
@@ -649,5 +653,4 @@ Achar autf8char(const char* s){
     }
     return ch;
 }
-
 

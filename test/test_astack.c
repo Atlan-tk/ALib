@@ -37,7 +37,8 @@ static void test_astack_int(void) {
     assert(st.f->getNumber(&st) == 5);
     assert(*st.f->at(&st, 0) == 1);
     assert(*st.f->at(&st, 4) == 5);
-    assert(*st.f->at(&st, 99) == 5);
+    assert(*st.f->at(&st, AEND) == 5);
+    assert(st.f->at(&st, 99) == NULL);
 
     int expected = 1;
     forEach(it, st) {

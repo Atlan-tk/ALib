@@ -46,8 +46,8 @@ typedef struct{
 }__Adeq;
 
 __noused static inline void* __Adeq_at(const __Adeq* deq, uint32_t i){
-    if(__a_unlikely(i >= deq->num)) i = deq->num - 1 ;
-    if(__a_unlikely(deq->num == 0)){ return nullptr; }
+    if(__a_unlikely(i == AEND)) i = deq->num - 1 ;
+    if(__a_unlikely(i >= deq->num)) return nullptr;
     return __A2arr_at(&deq->arr, i + deq->offset);
 }
 

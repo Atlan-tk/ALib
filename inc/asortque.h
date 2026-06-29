@@ -135,8 +135,8 @@ extern "C" {
     }                                                                                   \
                                                                                         \
     static inline T* __Asqf(T,at)(const ASortque(T)* self, uint32_t i){                 \
-        if(__a_unlikely(self->arr.num == 0)){ return nullptr; }                         \
-        if(__a_unlikely(i >= self->arr.num)) i = self->arr.num - 1 ;                    \
+        if(__a_unlikely(i == AEND))i = self->arr.num - 1 ;                              \
+        if(__a_unlikely(i >= self->arr.num)) return nullptr;                            \
         return &(self->p[i]);                                                           \
     }                                                                                   \
                                                                                         \

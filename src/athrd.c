@@ -305,14 +305,14 @@ static inline DWORD __athrd_win32_timeout_ms(const struct timespec* time_point, 
     *expired = 0;
     delta = __athrd_timespec_sub(time_point, &now);
 
-    if((uint64_t)delta.tv_sec >= (UINT64_C(0xffffffff) - 1) / UINT64_C(1000)){
+    if((uint64_t)delta.tv_sec >= (UINT64_C(AEND) - 1) / UINT64_C(1000)){
         return INFINITE - 1;
     }
 
     timeout_ms = (uint64_t)delta.tv_sec * UINT64_C(1000);
     timeout_ms += ((uint64_t)delta.tv_nsec + UINT64_C(999999)) / UINT64_C(1000000);
-    if(timeout_ms >= UINT64_C(0xffffffff)){
-        timeout_ms = UINT64_C(0xffffffff) - 1;
+    if(timeout_ms >= UINT64_C(AEND)){
+        timeout_ms = UINT64_C(AEND) - 1;
     }
     return (DWORD)timeout_ms;
 }
@@ -347,7 +347,7 @@ static inline uint64_t __athrd_win32_duration_ms(const struct timespec* duration
 
 static inline void __athrd_win32_sleep_ms(uint64_t timeout_ms){
     while(timeout_ms != 0){
-        DWORD chunk = timeout_ms >= UINT64_C(0xffffffff)
+        DWORD chunk = timeout_ms >= UINT64_C(AEND)
                 ? INFINITE - 1
                 : (DWORD)timeout_ms;
         Sleep(chunk);

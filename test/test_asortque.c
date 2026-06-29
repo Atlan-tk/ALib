@@ -43,9 +43,10 @@ static void test_asortque_int(void) {
     }
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
-    /* 超出索引的访问：ASortque 将 index 截断到 num-1，不会触发异常 */
-    int *last = sq.f->at(&sq, n + 10);
+    /* AEND 访问最后一个元素，普通越界访问返回 NULL */
+    int *last = sq.f->at(&sq, AEND);
     assert(last != NULL);
+    assert(sq.f->at(&sq, n + 10) == NULL);
     printf("------>>>%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     /* 4. 空容器 at 返回 NULL，不设置异常 */

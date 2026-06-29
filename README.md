@@ -265,7 +265,7 @@ out.f->write(&out, n, buf);
 - `aFileInOpen()` 不创建不存在的文件；`aFileOutOpen()` 会截断普通文件；`aFileEndOpen()` 只追加。
 - `AFile_open(self, type, name, mod)` 是低层入口：`type` 使用 `__aftype_file`、`__aftype_device` 或 `__aftype_socket`，`mod` 使用 `__afmod_read/write/creat/appent/truncate/noblock/exclusive` 位组合。
 - `sample/sample_afile_socket.c` 是长期运行的 TCP 回显示例，服务端和客户端会循环收发 `hello` / `yes`，需要手动停止；它不是自动退出型测试。
-- 顺序容器的 `at(index)` 在空容器上返回 `NULL` 且不设置异常；容器非空但 `index` 越界时，通常会截断到尾元素。
+- 顺序容器的 `at(index)` 在空容器或普通越界索引上返回 `NULL` 且不设置异常；传入 `AEND` 时表示访问尾元素。
 - `AHash(K,V)` 和 `ATree(K,V)` 的 `ins()` 是 upsert 语义：同键再次插入会替换已有值。
 - `a_signal_connection(id, addressee, call)` 对同一个 `(id, addressee)` 重复连接时，会覆盖原有回调，而不是忽略此次连接。
 - `AHash(K,V)` 的遍历顺序依赖桶布局与插入路径，不应把它当成稳定顺序容器。

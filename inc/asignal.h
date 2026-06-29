@@ -90,7 +90,7 @@ A_CLASS_REGISTER(AExcCollector);
 
 
 
-/* 信号靶函数 */
+/* 槽函数 */
 //void (*call)(const ASignal* signal, void* addressee);
 
 /* 信号系统API */
@@ -98,9 +98,9 @@ A_CLASS_REGISTER(AExcCollector);
 int64_t a_signal_alloc(void);
 
 /* 发送信号 */
-/* 信号发出后后调用对应的靶函数 */
-/* collector用于收集靶函数抛出的异常 */
-/* 返回值表示靶函数是否抛出了异常，其取值仅为0或AERR_response_exc */
+/* 信号发出后后调用对应的槽函数 */
+/* collector用于收集槽函数抛出的异常 */
+/* 返回值表示槽函数是否抛出了异常，其取值仅为0或AERR_response_exc */
 int __a_signal_transmit(const ASignal* signal, AExcCollector* collector);
 
 #define _a_signal_transmit(signal, collector, ...)({                                \
@@ -119,7 +119,7 @@ int __a_signal_transmit(const ASignal* signal, AExcCollector* collector);
 
 
 
-/* 连接信号与靶 */
+/* 连接信号与槽 */
 /* 同一个(id, addressee)重复连接时会覆盖原有回调 */
 void a_signal_connection(int64_t id, const void* addressee, void(*call)(const ASignal*, void*));
 
@@ -139,8 +139,8 @@ void a_target_disconnect_all(const void* addressee);
 /*
  *             使用约定
  * 1 已连接信号的对象在析构前必须断开连接
- * 2 不在靶函数中等待其他线程的信号操作，否则可能会死锁
- * 3 可以在靶函数中断开连接，但尽量不要析构目标对象，若必须析构，则析构后不可再使用
+ * 2 不在槽函数中等待其他线程的信号操作，否则可能会死锁
+ * 3 可以在槽函数中断开连接，但尽量不要析构目标对象，若必须析构，则析构后不可再使用
  *
  * 只要满足上面的约定即可安全使用对象系统
  */

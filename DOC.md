@@ -498,7 +498,7 @@ A_TYPE_REGISTER(ALine(T));
 | `ALine(T)` | `T`：元素类型 | 生成具体容器类型名 | 无 | 类型名宏 |
 | `ALine_Define(T)` | 元素类型 | 声明容器结构和函数表 | 无 | 仅生成声明 |
 | `ALine_Generate(T)` | 元素类型 | 生成静态内联实现 | 无 | 需在一个可见编译单元中展开 |
-| `line.f->at(&line, index)` | `index: uint32_t` | `T*` 或 `nullptr` | 无 | 空容器时返回 `nullptr`；非空越界时会截断到尾元素 |
+| `line.f->at(&line, index)` | `index: uint32_t` | `T*` 或 `nullptr` | 无 | 空容器或普通越界索引返回 `nullptr`；`index == AEND` 时访问尾元素 |
 | `line.f->rm(&line, index)` | 索引 | 删除元素 | 一般无；空容器直接返回 | 非空越界时删除尾元素；删除时会 `A_DEST(T, element)` |
 | `line.f->ins(&line, index, obj)` | 索引、待插入对象 | 插入副本 | `A_COPY(T,obj)` 的异常；`AERR_alloc_failed` | `index > num` 时按 `num` 处理，相当于追加 |
 | `line.f->take(&line, index, tar)` | 索引、可选输出指针 | 取出元素 | 空容器时 `AERR_overstep` | `tar != nullptr` 时把元素交给调用方；否则直接析构 |
@@ -534,7 +534,7 @@ A_TYPE_REGISTER(AList(T));
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
 | `AList(T)` / `AList_Define(T)` / `AList_Generate(T)` | 同 `ALine(T)` | 生成类型与实现 | 无 | 用法与 `ALine` 相同 |
-| `list.f->at(&list, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空容器时返回 `nullptr`；非空越界时截断到尾节点 |
+| `list.f->at(&list, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空容器或普通越界索引返回 `nullptr`；`index == AEND` 时访问尾节点 |
 | `list.f->rm(&list, index)` | 索引 | 删除节点 | 空容器时 `AERR_overstep` | 非空越界时删除尾节点 |
 | `list.f->rm_p(&list, p)` | `p: T*` | 删除 `p` 所在节点 | `p == nullptr` 时 `AERR_overstep` | `p` 必须来自当前链表的有效节点；传入外部指针属于未受支持用法 |
 | `list.f->ins(&list, index, obj)` | 索引、对象 | 插入副本 | `A_COPY` 异常；`AERR_alloc_failed` | `index > num` 时按 `num` 处理 |
@@ -577,7 +577,7 @@ A_TYPE_REGISTER(ADeque(T));
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
 | `ADeque(T)` / `ADeque_Define(T)` / `ADeque_Generate(T)` | 元素类型 | 生成类型与实现 | 无 | |
-| `deq.f->at(&deq, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空容器时返回 `nullptr`；非空越界时截断到尾元素 |
+| `deq.f->at(&deq, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空容器或普通越界索引返回 `nullptr`；`index == AEND` 时访问尾元素 |
 | `deq.f->pushBack(&deq, obj)` | 对象 | 尾插副本 | `A_COPY` 异常；`AERR_alloc_failed` | |
 | `deq.f->pushFront(&deq, obj)` | 对象 | 头插副本 | `A_COPY` 异常；`AERR_alloc_failed` | |
 | `deq.f->popBack(&deq, tar)` | 可选输出 | 弹出尾元素 | 空容器时 `AERR_overstep` | |
@@ -589,6 +589,7 @@ A_TYPE_REGISTER(ADeque(T));
 
 - `ADeque(T)` 只暴露双端接口，不提供中间插入 / 删除。
 - `at(0)` 是当前队首，`at(getNumber()-1)` 是当前队尾。
+- `at(AEND)` 等价于访问当前队尾；普通越界索引返回 `nullptr`。
 - 内部是分块存储，`at()` 返回的指针同样会在结构修改后失效。
 
 ### 5.7 `astack.h` — `AStack(T)`
@@ -608,7 +609,7 @@ A_TYPE_REGISTER(AStack(T));
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
 | `AStack(T)` / `AStack_Define(T)` / `AStack_Generate(T)` | 元素类型 | 生成类型与实现 | 无 | |
-| `stack.f->at(&stack, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空栈时返回 `nullptr`；非空越界时截断到栈顶；`at(0)` 是底部，`at(last)` 是栈顶 |
+| `stack.f->at(&stack, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空栈或普通越界索引返回 `nullptr`；`at(AEND)` 访问栈顶；`at(0)` 是底部，`at(last)` 是栈顶 |
 | `stack.f->push(&stack, obj)` | 对象 | 压栈副本 | `A_COPY` 异常；`AERR_alloc_failed` | 对应底层 `pushBack` |
 | `stack.f->pop(&stack, tar)` | 可选输出 | 弹出栈顶 | 空栈时 `AERR_overstep` | `tar == nullptr` 时直接析构弹出的元素 |
 | `stack.f->getNumber(&stack)` / `empty(&stack)` | 无 | 个数 / 是否为空 | 无 | |
@@ -631,7 +632,7 @@ A_TYPE_REGISTER(AQueue(T));
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
 | `AQueue(T)` / `AQueue_Define(T)` / `AQueue_Generate(T)` | 元素类型 | 生成类型与实现 | 无 | |
-| `queue.f->at(&queue, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空队列时返回 `nullptr`；非空越界时截断到队尾；`at(0)` 是下一个将被弹出的元素 |
+| `queue.f->at(&queue, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空队列或普通越界索引返回 `nullptr`；`at(AEND)` 访问队尾；`at(0)` 是下一个将被弹出的元素 |
 | `queue.f->push(&queue, obj)` | 对象 | 入队副本 | `A_COPY` 异常；`AERR_alloc_failed` | 对应底层 `pushBack` |
 | `queue.f->pop(&queue, tar)` | 可选输出 | 弹出队首 | 空队列时 `AERR_overstep` | 对应底层 `popFront` |
 | `queue.f->getNumber(&queue)` / `empty(&queue)` | 无 | 个数 / 是否为空 | 无 | |
@@ -654,7 +655,7 @@ A_TYPE_REGISTER(ASortque(T));
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
 | `ASortque(T)` / `ASortque_Define(T)` / `ASortque_Generate(T)` | 元素类型 | 生成类型与实现 | 无 | |
-| `sq.f->at(&sq, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空容器时返回 `nullptr`；非空越界时截断到最大元素 |
+| `sq.f->at(&sq, index)` | 索引 | `T*` 或 `nullptr` | 无 | 空容器或普通越界索引返回 `nullptr`；`index == AEND` 时访问最大元素 |
 | `sq.f->rm(&sq, index)` | 索引 | 删除一个元素 | 空容器时静默返回 | 非空越界时删除最大元素 |
 | `sq.f->ins(&sq, obj)` | 对象 | 按序插入副本 | `A_COPY` 异常；`AERR_alloc_failed` | 排序依据是 `A_CMPD(T, lhs, rhs)`；允许重复值 |
 | `sq.f->take(&sq, index, tar)` | 索引、可选输出 | 取出元素 | 空容器时 `AERR_overstep` | 非空越界时取最大元素 |
@@ -787,7 +788,7 @@ A_TYPE_REGISTER(AHash(TK, TV));
 
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
-| `AStr_at(const AStr* self, uint32_t index)` | 索引 | 返回一个字节 | `AERR_nullptr` | 空串时返回 `0`；非空且 `index >= length` 时返回最后一个字节 |
+| `AStr_at(const AStr* self, uint32_t index)` | 索引 | 返回一个字节 | `AERR_nullptr` | 空串或普通越界索引返回 `0`；`index == AEND` 时返回最后一个字节 |
 | `AStr_set(AStr* self, uint32_t index, char c)` | 索引、字节 | 设置一个字节 | `AERR_nullptr`、空串时 `AERR_overstep` | `index >= length` 时写入最后一个字节 |
 | `AStr_rm(AStr* self, uint32_t index)` | 索引 | 删除一个字节 | `AERR_nullptr`、分配失败时 `AERR_alloc_failed` | 空串或 `index >= length` 时静默返回；借用状态写入前会先分配可写副本 |
 | `AStr_ins(AStr* self, uint32_t index, char c)` | 索引、字节 | 插入字节 | `AERR_nullptr`、`AERR_overstep`、`AERR_alloc_failed` | 支持在头部 / 中间 / 尾部插入 |
@@ -985,16 +986,18 @@ RAII(AShPtr(int)) moved = AShPtrCvs(int, sp);
 
 | API | 参数 | 返回值 / 效果 | 异常 | 说明 |
 | --- | --- | --- | --- | --- |
-| `a_timer_addwork(cycle, num, call, data)` | 周期 ms、执行次数、回调、用户数据 | 返回任务 id；失败返回 `-1` | `AERR_outdomain`、`AERR_system_error` 等 | `cycle` 和 `num` 必须非 0 |
+| `a_timer_addwork(cycle, num, call, data)` | 周期 ms、执行次数、回调、用户数据 | 返回任务 id；失败返回 `-1` | `AERR_outdomain`、`AERR_system_error` 等 | `cycle`、`num` 和 `call` 必须非 0；回调返回 `false` 时任务停止 |
 | `a_timer_addwork_one(cycle, call, data)` | 周期 ms、回调、用户数据 | 注册一次性任务 | 同上 | 等价于 `num == 1` |
-| `a_timer_addwork_long(cycle, call, data)` | 周期 ms、回调、用户数据 | 注册长期任务 | 同上 | 持续执行直到被删除或进程退出 |
+| `a_timer_addwork_long(cycle, call, data)` | 周期 ms、回调、用户数据 | 注册长期任务 | 同上 | 持续执行直到回调返回 `false`、被删除或进程退出 |
 | `a_timer_rmwork(id)` | 任务 id | 删除等待中或正在回调队列中的任务 | `AERR_outdomain` 等 | 删除正在执行的任务时，实际重入会被抑制 |
 
 回调签名为：
 
 ```c
-void callback(void *data);
+bool callback(void *data);
 ```
+
+回调返回 `true` 表示按原计划继续；返回 `false` 表示本任务在本次回调后停止，即使它原本是有限次数任务或长期任务。
 
 定时器是进程内全局单例，通过构造函数自动启动、析构函数自动停止。用户通常只需要调用 `a_timer_addwork*` 和 `a_timer_rmwork`，不需要直接管理定时线程。
 
@@ -1005,13 +1008,15 @@ void callback(void *data);
 - 定时器在调用用户回调时不持有内部锁，因此回调里可以继续添加或删除其他定时任务。
 - `a_timer_rmwork(id)` 可以删除等待队列中的任务；如果目标任务正处于本轮回调队列，会标记为删除，避免后续重新入队。
 - 回调中的异常槽会被定时器清理，不会直接传回注册线程；需要业务层自行记录错误状态。
+- 回调返回 `false` 时不会重新入队，可用于从回调内部自停止。
 
 示例：
 
 ```c
-static void on_timer(void *data) {
+static bool on_timer(void *data) {
     int *count = data;
     ++*count;
+    return true;
 }
 
 int count = 0;
@@ -1500,7 +1505,7 @@ int main(void) {
 - `test/test_map_api.c`：映射容器共性 API
 - `test/test_alock.c`：`AMtxCnd` 唤醒、`ASemaphore` 并发上限与动态扩容
 - `test/test_athrd.c`：线程兼容层、定时锁、条件变量、TSS 与 `call_once`
-- `test/test_atimer.c`：一次性任务、重复次数、中途新增任务和删除长期任务
+- `test/test_atimer.c`：一次性任务、重复次数、中途新增任务、删除长期任务和回调自停止
 - `test/test_asignal.c`：信号系统、重入发送、异常收集
 - `test/test_aptr.c`：`APtr` / `AShPtr` 语义
 - 其余 `test/test_*.c`：各模块单独行为测试
@@ -1522,7 +1527,7 @@ make CONFIG=linux
 - `AStr_new()` 只是借用，不是复制。
 - `APtr(T)` 复制后不会转移所有权，只会得到弱别名。
 - `AHash(K,V)` 的相等性比较不依赖插入顺序；但非零比较结果的正负号不适合作为稳定排序依据。
-- 顺序容器的 `at(index)` 普遍是“空容器返回 `NULL` 且不报错，非空越界截断到尾元素”。
+- 顺序容器的 `at(index)` 普遍是“空容器或普通越界返回 `NULL` 且不报错，`AEND` 才表示尾元素”。
 - `take` / `pop` 把元素写到 `tar` 后，后续由调用方负责析构该元素。
 - 迭代时一旦改容器结构，就应重新获取迭代器。
 - `a_signal_transmit(signal, ...)` 只允许 0 或 1 个附加参数。

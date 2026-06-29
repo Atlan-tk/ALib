@@ -54,7 +54,7 @@ int timespec_get(struct timespec *ts, int base){
 
 
 typedef struct{
-    void(*call)(void* data);    //任务处理函数
+    bool(*call)(void* data);    //任务处理函数
     void*       data;           //任务数据
     int64_t     id;             //任务id
     uint32_t    num;            //执行次数, =-1时为长期任务
@@ -75,12 +75,15 @@ static inline void ATWork_call(ATWork* self){
         return;
     }
     if(0 == atomic_load_explicit(&self->rm_flag, memory_order_relaxed)){
-        self->call(self->data);
+        bool ret = self->call(self->data);
         self->wait = self->cycle;   //重置等待时间
         if(self->num != aLongWork){
             if(__a_likely(self->num != 0)){
                 self->num--;
             }
+        }
+        if(!ret){
+            self->num = 0;
         }
     }
 }
@@ -506,7 +509,7 @@ void a_timer_rmwork(int64_t id){
     ATimer_rm(&a_timer_0, id);
 }
 
-int64_t a_timer_addwork(uint32_t cycle, uint32_t num, void(*call)(void*), void* data){
+int64_t a_timer_addwork(uint32_t cycle, uint32_t num, bool(*call)(void*), void* data){
     if(call == nullptr || cycle == 0 || num == 0){
         aErrSet(AERR_outdomain); return -1;
     }

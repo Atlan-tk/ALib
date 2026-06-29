@@ -103,11 +103,11 @@ A_TYPE_REGISTER(ASignalTower);
 static inline uint32_t ASignalTower_find_i(const ASignalTower* self, const void* addressee){
     if(__a_unlikely(self == nullptr)){
         aErrSet(AERR_nullptr);
-        return 0xffffffff;
+        return AEND;
     }
     if(__a_unlikely(addressee == nullptr)){
         aErrSet(AERR_outdomain);
-        return 0xffffffff;
+        return AEND;
     }
 
     auto list = &self->linkpList;
@@ -117,7 +117,7 @@ static inline uint32_t ASignalTower_find_i(const ASignalTower* self, const void*
             return i;
         }
     }
-    return 0xffffffff;
+    return AEND;
 }
 static inline void ASignalTower_add(ASignalTower* self, ASignalLink* p){
     if(__a_unlikely(self == nullptr)){
@@ -131,7 +131,7 @@ static inline void ASignalTower_add(ASignalTower* self, ASignalLink* p){
 
     uint32_t i = ASignalTower_find_i(self, p->addressee);
     auto list = &self->linkpList;
-    if(i == 0xffffffff){
+    if(i == AEND){
         list->f->pushBack(list, p);
     }
 }
@@ -147,7 +147,7 @@ static inline void ASignalTower_rm(ASignalTower* self, const void* addressee){
 
     uint32_t i = ASignalTower_find_i(self, addressee);
     auto list = &self->linkpList;
-    if(i != 0xffffffff){
+    if(i != AEND){
         list->f->rm(list, i);
     }
 }
@@ -163,7 +163,7 @@ static inline ASignalLink* ASignalTower_find(const ASignalTower* self, const voi
 
     uint32_t i = ASignalTower_find_i(self, addressee);
     auto list = &self->linkpList;
-    if(i != 0xffffffff){
+    if(i != AEND){
         auto pp = list->f->at(list, i);
         if(pp != nullptr) return *pp;
     }
@@ -181,7 +181,7 @@ static inline bool ASignalTower_exist(const ASignalTower* self, const void* addr
     }
 
     uint32_t i = ASignalTower_find_i(self, addressee);
-    if(i != 0xffffffff){
+    if(i != AEND){
         return true;
     }
 
@@ -259,11 +259,11 @@ A_TYPE_REGISTER(ASignalRadio);
 static inline uint32_t ASignalRadio_find_i(const ASignalRadio* self, int64_t id){
     if(__a_unlikely(self == nullptr)){
         aErrSet(AERR_nullptr);
-        return 0xffffffff;
+        return AEND;
     }
     if(__a_unlikely(id <= 0)){
         aErrSet(AERR_outdomain);
-        return 0xffffffff;
+        return AEND;
     }
 
     auto list = &self->linkpList;
@@ -273,7 +273,7 @@ static inline uint32_t ASignalRadio_find_i(const ASignalRadio* self, int64_t id)
             return i;
         }
     }
-    return 0xffffffff;
+    return AEND;
 }
 static inline void ASignalRadio_add(ASignalRadio* self, ASignalLink* p){
     if(__a_unlikely(self == nullptr)){
@@ -287,7 +287,7 @@ static inline void ASignalRadio_add(ASignalRadio* self, ASignalLink* p){
 
     uint32_t i = ASignalRadio_find_i(self, p->id);
     auto list = &self->linkpList;
-    if(i == 0xffffffff){
+    if(i == AEND){
         list->f->pushBack(list, p);
     }
 }
@@ -303,7 +303,7 @@ static inline void ASignalRadio_rm(ASignalRadio* self, int64_t id){
 
     uint32_t i = ASignalRadio_find_i(self, id);
     auto list = &self->linkpList;
-    if(i != 0xffffffff){
+    if(i != AEND){
         list->f->rm(list, i);
     }
 }
@@ -319,7 +319,7 @@ __noused static inline ASignalLink* ASignalRadio_find(const ASignalRadio* self, 
 
     uint32_t i = ASignalRadio_find_i(self, id);
     auto list = &self->linkpList;
-    if(i != 0xffffffff){
+    if(i != AEND){
         auto pp = list->f->at(list, i);
         if(pp != nullptr) return *pp;
     }
@@ -337,7 +337,7 @@ static inline bool ASignalRadio_exist(const ASignalRadio* self, int64_t id){
     }
 
     uint32_t i = ASignalRadio_find_i(self, id);
-    if(i != 0xffffffff){
+    if(i != AEND){
         return true;
     }
 

@@ -37,7 +37,8 @@ static void test_aqueue_int(void) {
     assert(qu.f->getNumber(&qu) == 5);
     assert(*qu.f->at(&qu, 0) == 1);
     assert(*qu.f->at(&qu, 4) == 5);
-    assert(*qu.f->at(&qu, 99) == 5);
+    assert(*qu.f->at(&qu, AEND) == 5);
+    assert(qu.f->at(&qu, 99) == NULL);
 
     int out = -1;
     qu.f->pop(&qu, &out);

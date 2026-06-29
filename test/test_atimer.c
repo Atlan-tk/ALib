@@ -28,13 +28,20 @@ static void timer_probe_reset(TimerProbe *probe) {
     assert(!aErrOccur());
 }
 
-static void timer_probe_cb(void *data) {
+static bool timer_probe_cb(void *data) {
     TimerProbe *probe = data;
     int index = atomic_fetch_add(&probe->fired, 1);
     if (index >= 0 && index < 8) {
         AClock now = A_INIT(AClock);
         atomic_store(&probe->fired_ms[index], (long)AClock_msDiff(now, probe->start));
     }
+    return true;
+}
+
+static bool timer_probe_stop_cb(void *data) {
+    TimerProbe *probe = data;
+    timer_probe_cb(probe);
+    return false;
 }
 
 static void test_one_shot(void) {
@@ -110,11 +117,24 @@ static void test_remove_long_work(void) {
     assert(atomic_load(&probe.fired) == after_remove);
 }
 
+static void test_callback_can_stop_work(void) {
+    TimerProbe probe;
+    timer_probe_reset(&probe);
+
+    int64_t id = a_timer_addwork_long(40, timer_probe_stop_cb, &probe);
+    assert(!aErrOccur());
+    assert(id > 0);
+
+    sleep_ms(180);
+    assert(atomic_load(&probe.fired) == 1);
+}
+
 int main(void) {
     test_one_shot();
     test_repeat_count();
     test_add_while_waiting();
     test_remove_long_work();
+    test_callback_can_stop_work();
     printf("All ATimer tests passed.\n");
     return 0;
 }
