@@ -998,7 +998,7 @@ static inline int afs_read_pos(AShPtr(AFileNode) ptr, Afd fd, uint64_t offset, v
     return ret;
 }
 
-static inline int afs_write(AShPtr(AFileNode) ptr, Afd fd, void* source, size_t size){
+static inline int afs_write(AShPtr(AFileNode) ptr, Afd fd, const void* source, size_t size){
     auto node = ptr.p;
     if(__a_unlikely(node == nullptr || !Afd_exist(fd))){
         aErrSet(AERR_outdomain);
@@ -1039,7 +1039,7 @@ static inline int afs_write(AShPtr(AFileNode) ptr, Afd fd, void* source, size_t 
     return ret;
 }
 
-static inline int afs_write_pos(AShPtr(AFileNode) ptr, Afd fd, uint64_t offset, void* source, size_t size){
+static inline int afs_write_pos(AShPtr(AFileNode) ptr, Afd fd, uint64_t offset, const void* source, size_t size){
     auto node = ptr.p;
     if(__a_unlikely(node == nullptr || !Afd_exist(fd))){
         aErrSet(AERR_outdomain);
@@ -1119,7 +1119,7 @@ uint32_t AFile_read (AFile* self, size_t size, void* target){
     return (uint32_t)ret;
 }
 
-uint32_t AFile_write(AFile* self, size_t size, void* source){
+uint32_t AFile_write(AFile* self, size_t size, const void* source){
     if(__a_unlikely(self == nullptr)){
         aErrSet(AERR_nullptr);
         return 0;
@@ -1155,7 +1155,7 @@ uint32_t AFile_read_pos(AFile* self, uint64_t offset, size_t size, void* target)
     return (uint32_t)ret;
 }
 
-uint32_t AFile_write_pos(AFile* self, uint64_t offset, size_t size, void* source){
+uint32_t AFile_write_pos(AFile* self, uint64_t offset, size_t size, const void* source){
     if(__a_unlikely(self == nullptr)){
         aErrSet(AERR_nullptr);
         return 0;

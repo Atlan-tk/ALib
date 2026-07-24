@@ -272,16 +272,16 @@ AClass_Struct(AFile,
 AClass_Function(AFile,
     int32_t (*ioctl)(AFile* self, int32_t cmd, void* buf);
     uint32_t(*read) (AFile* self, size_t size, void* target);
-    uint32_t(*write)(AFile* self, size_t size, void* source);
+    uint32_t(*write)(AFile* self, size_t size, const void* source);
     uint32_t(*read_pos)(AFile* self, uint64_t offset, size_t size, void* target);
-    uint32_t(*write_pos)(AFile* self, uint64_t offset, size_t size, void* source);
+    uint32_t(*write_pos)(AFile* self, uint64_t offset, size_t size, const void* source);
 );
 int32_t  AFile_ioctl(AFile* self, int32_t cmd, void* buf);
 /* read/write/read_pos/write_pos 对于size == 0 是安全的 */
 uint32_t AFile_read (AFile* self, size_t size, void* target);
-uint32_t AFile_write(AFile* self, size_t size, void* source);
+uint32_t AFile_write(AFile* self, size_t size, const void* source);
 uint32_t AFile_read_pos(AFile* self, uint64_t offset, size_t size, void* target);
-uint32_t AFile_write_pos(AFile* self, uint64_t offset, size_t size, void* source);
+uint32_t AFile_write_pos(AFile* self, uint64_t offset, size_t size, const void* source);
 AClass_Generate(AFile, AFile_ioctl, AFile_read, AFile_write, AFile_read_pos, AFile_write_pos);
 
 void AFile_close(AFile* self);
